@@ -1,0 +1,63 @@
+name: Build and publish latest ASP.NET Core tags to NuGet
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish missing package versions to NuGet.org
+        type: boolean
+        default: false
+  schedule:
+    - cron: '23 5 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      majors: ${{ steps.config.outputs.majors }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: config
+        run: node -e "console.log('majors=' + JSON.stringify(require('./config/majors.json').supportedMajors))" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        major: ${{ fromJSON(needs.matrix.outputs.majors) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            ${{ matrix.major }}.0.x
+      - run: npm ci --ignore-scripts
+      - id: version
+        env: { GITHUB_TOKEN: "${{ github.token }}" }
+        run: node scripts/resolve-version.mjs '${{ matrix.major }}'
+      - name: Build upstream source, browser variants, and NuGet package
+        env: { ASPNETCORE_TAG: "${{ steps.version.outputs.tag }}" }
+        run: npm run build -- '${{ matrix.major }}'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke test every generated script in a Blazor Server app
+        env: { PACKAGE_VERSION: "${{ steps.version.outputs.version }}" }
+        run: |
+          for PROFILE in $(node -e "console.log(Object.keys(require('./config/targets.json')).join(' '))"); do
+            npm run test:smoke -- "$PROFILE" "$PACKAGE_VERSION"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LegacyBlazorJs-${{ steps.version.outputs.version }}
+          path: artifacts/packages/*.nupkg
+      - name: Publish missing package
+        if: github.event_name == 'schedule' || inputs.publish
+        run: dotnet nuget push 'artifacts/packages/*.nupkg' --api-key '${{ secrets.NUGET_API_KEY }}' --source https://api.nuget.org/v3/index.json --skip-duplicate
