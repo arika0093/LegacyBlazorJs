@@ -1,26 +1,28 @@
 # LegacyBlazorJs
 
-ASP.NET Core 公式リポジトリの各リリースタグから `blazor.web.js` を公式の Web.JS production script でビルドし、複数のブラウザー対象へ再トランスパイルして、**Razor Class Library の NuGet パッケージ**として公開するためのプロジェクトです。
+LegacyBlazorJs rebuilds the official ASP.NET Core `blazor.web.js` for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
 
-## 動作の流れ
+## How it works
 
-1. `config/majors.json` に列挙した .NET 8、9、10 などの各メジャーバージョンについて、`dotnet/aspnetcore` の最新安定タグを GitHub API から解決します。
-2. 該当タグを clone し、`src/Components/Web.JS` の upstream `build:production` script で公式 `blazor.web.js` を生成します。
-3. upstream の TypeScript と webpack/Terser の対象設定を差し替えて対象別 JavaScript を生成し、Razor Class Library の `wwwroot` に配置します。
-4. 元タグの `v` を除いたバージョン（例: `v8.0.27` → `8.0.27`）で `LegacyBlazorJs` NuGet パッケージを作成します。
+1. For every .NET major listed in `config/majors.json`, resolve the latest stable `dotnet/aspnetcore` tag through the GitHub API.
+2. Clone that tag and build the upstream `Microsoft.AspNetCore.Components.Web.JS.npmproj`, including its linked JSInterop and SignalR dependencies.
+3. Rebuild `src/Components/Web.JS` once per profile after changing the upstream TypeScript and webpack/Rollup Terser targets.
+4. Put the generated scripts in the Razor Class Library's `wwwroot` and pack `LegacyBlazorJs` using the upstream tag without its `v` prefix, for example `v8.0.27` becomes package version `8.0.27`.
 
-## 収録ファイルと対象ブラウザー
+Building from source is intentional. Retranspiling the already bundled upstream `blazor.web.js` was tested and produced a script that loaded but did not make a Blazor Server application interactive.
 
-NuGet パッケージを参照したアプリでは、各ファイルを `_content/LegacyBlazorJs/<ファイル名>` から配信できます。
+## Included files and intended browser targets
 
-| ファイル | 想定対象ブラウザー | TypeScript/webpack 出力構文 |
+After referencing the NuGet package, applications can serve each file from `_content/LegacyBlazorJs/<file-name>`.
+
+| File | Intended browser target | TypeScript/bundler output syntax |
 |---|---|---|
-| `blazor.web.ie6.js` | Internet Explorer 6 以降（best effort） | ES5 |
-| `blazor.web.ie7.js` | Internet Explorer 7 以降（best effort） | ES5 |
-| `blazor.web.ie8.js` | Internet Explorer 8 以降（best effort） | ES5 |
-| `blazor.web.ie9.js` | Internet Explorer 9 以降（best effort） | ES5 |
-| `blazor.web.ie10.js` | Internet Explorer 10 以降（best effort） | ES5 |
-| `blazor.web.ie11.js` | Internet Explorer 11 以降（best effort） | ES5 |
+| `blazor.web.ie6.js` | Internet Explorer 6+ (best effort) | ES5 |
+| `blazor.web.ie7.js` | Internet Explorer 7+ (best effort) | ES5 |
+| `blazor.web.ie8.js` | Internet Explorer 8+ (best effort) | ES5 |
+| `blazor.web.ie9.js` | Internet Explorer 9+ (best effort) | ES5 |
+| `blazor.web.ie10.js` | Internet Explorer 10+ (best effort) | ES5 |
+| `blazor.web.ie11.js` | Internet Explorer 11+ (best effort) | ES5 |
 | `blazor.web.es2015.js` | Chrome 49+, Edge 14+, Firefox 45+, Safari 10+ | ES2015 |
 | `blazor.web.es2016.js` | Chrome 52+, Edge 14+, Firefox 52+, Safari 10.1+ | ES2016 |
 | `blazor.web.es2017.js` | Chrome 58+, Edge 16+, Firefox 54+, Safari 11+ | ES2017 |
@@ -30,59 +32,63 @@ NuGet パッケージを参照したアプリでは、各ファイルを `_conte
 | `blazor.web.es2021.js` | Chrome 85+, Edge 85+, Firefox 79+, Safari 14.1+ | ES2021 |
 | `blazor.web.es2022.js` | Chrome 94+, Edge 94+, Firefox 93+, Safari 15.4+ | ES2022 |
 
-対象の定義元は `config/targets.json` です。要望に合わせて `modern` は収録していません。
+The authoritative profile definitions are in `config/targets.json`. There is intentionally no `modern` copy.
 
 > [!WARNING]
-> IE 向けファイルは JavaScript **構文**を可能な限り変換する best-effort ビルドです。構文のダウンレベルビルドは DOM API、WebAssembly、Promise、Fetch、URL、WebSocket などを実装しません。現在の Blazor ランタイムが要求する機能を IE が満たす保証もないため、IE 上での起動を保証するものではありません。必要な polyfill と実ブラウザーでの検証は利用側で行ってください。
+> The IE files are best-effort **syntax-level** builds. Lowering the JavaScript syntax does not provide DOM APIs, WebAssembly, Promise, Fetch, URL, WebSocket, or any other missing browser feature. Current Blazor runtimes are not guaranteed to run on Internet Explorer. Consumers must supply any required polyfills and test on their actual target browsers. The IE6 through IE11 profiles currently produce the same ES5-targeted bundle; their separate names are provided so future browser-specific changes can be introduced without changing consumer URLs.
 
-## 必要環境とローカルビルド
+## Prerequisites and local build
 
 - Git
-- Node.js 20 以降と Corepack/Yarn
-- .NET 8 SDK 以降
-- upstream と npm/NuGet の依存物を取得できるインターネット接続
+- Node.js 20 or later with Corepack
+- .NET 8 SDK or later
+- Internet access to the upstream repository and its npm/NuGet feeds
 
 ```bash
-npm install
+npm ci
 npm run build -- 8
 ```
 
-上記は .NET 8 の最新安定タグを取得・ビルドし、`artifacts/packages/LegacyBlazorJs.<version>.nupkg` を生成します。特定タグを再現する場合は次のように指定します。
+This resolves and builds the latest stable .NET 8 tag, then creates `artifacts/packages/LegacyBlazorJs.<version>.nupkg`. Set an explicit tag for a reproducible historical build:
 
 ```bash
 ASPNETCORE_TAG=v8.0.27 npm run build
 ```
 
-## Blazor アプリでの利用
+## Use in a Blazor application
 
 ```bash
 dotnet add package LegacyBlazorJs --version 8.0.27
 ```
 
-Blazor Web App の `Components/App.razor` にある公式 script を、必要な対象へ差し替えます。
+Replace the official script in the Blazor Web App's `Components/App.razor` with the required profile:
 
 ```html
 <!-- <script src="_framework/blazor.web.js"></script> -->
 <script src="_content/LegacyBlazorJs/blazor.web.es2015.js"></script>
 ```
 
-パッケージは static web assets を持つ Razor Class Library なので、アプリ側へ JavaScript をコピーする必要はありません。
+Because the package is a Razor Class Library with static web assets, consumers do not need to copy the JavaScript into the application.
 
-## 動作確認
+## Smoke testing
 
-`smoke-test.yml` は生成された NuGet パッケージをテンプレートの Blazor Server アプリへ追加し、各 JavaScript ファイルを1つずつ読み込みます。Playwright Chromium で Counter ページを開き、ボタン操作後にカウントが更新されることと、ブラウザーエラーがないことを確認します。これは各ファイルが現行 Chromium で動作する確認であり、IE 実機の互換性確認ではありません。upstream のビルド済み bundle を後処理で再トランスパイルすると Blazor Server の起動が壊れるため、各プロファイルは upstream ソースから再ビルドします。
+`.github/workflows/smoke-test.yml` installs the generated NuGet package into an unmodified Blazor Server template application and loads each generated JavaScript file in turn. Playwright Chromium opens the Counter page and verifies that clicking the button updates the count without browser errors.
 
-ローカルでも、パッケージ生成後に対象を指定して実行できます。
+This proves that every generated file remains functional in current Chromium. It does not prove compatibility with the historical browsers named by each profile.
+
+After building a package, run a profile locally with:
 
 ```bash
 npx playwright install --with-deps chromium
 npm run test:smoke -- es2015 8.0.27
 ```
 
-## 自動公開
+## Automated publishing
 
-`.github/workflows/publish-latest.yml` は毎週、各対象メジャーバージョンの最新安定タグをビルドし、`dotnet nuget push --skip-duplicate` で NuGet.org へ公開します。リポジトリ Secret `NUGET_API_KEY` を設定してください。初回は workflow dispatch の `publish=false` で成果物を確認してから公開することを推奨します。
+`.github/workflows/publish-latest.yml` checks every configured .NET major each week, builds its latest stable tag, runs all smoke tests, and publishes the package to NuGet.org with `dotnet nuget push --skip-duplicate`.
 
-## ライセンス
+Configure the repository secret `NUGET_API_KEY` before publishing. Run the workflow manually with `publish=false` first to inspect its artifacts before enabling publication.
 
-このリポジトリの自動化コードは MIT License です。生成 JavaScript は Microsoft の `dotnet/aspnetcore` に由来します。公開前に upstream のライセンス、商標、再配布条件を確認してください。パッケージには `THIRD-PARTY-NOTICES.txt` と、正確な upstream タグを示す `build-manifest.json` を収録します。
+## License
+
+The automation in this repository is licensed under the MIT License. Generated JavaScript is derived from Microsoft's `dotnet/aspnetcore` repository. Review the upstream license, trademark, and redistribution requirements before publishing packages. Each package includes `THIRD-PARTY-NOTICES.txt`, the upstream license, and a `build-manifest.json` recording the exact upstream tag.

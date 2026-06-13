@@ -1,138 +1,138 @@
 {
   "ie6": {
     "description": "Internet Explorer 6+ (best effort)",
-    "targets": {
-      "ie": "6"
-    },
     "ecma": 5,
-    "typescriptTarget": "es5"
+    "typescriptTarget": "es5",
+    "intendedBrowsers": {
+      "ie": "6"
+    }
   },
   "ie7": {
     "description": "Internet Explorer 7+ (best effort)",
-    "targets": {
-      "ie": "7"
-    },
     "ecma": 5,
-    "typescriptTarget": "es5"
+    "typescriptTarget": "es5",
+    "intendedBrowsers": {
+      "ie": "7"
+    }
   },
   "ie8": {
     "description": "Internet Explorer 8+ (best effort)",
-    "targets": {
-      "ie": "8"
-    },
     "ecma": 5,
-    "typescriptTarget": "es5"
+    "typescriptTarget": "es5",
+    "intendedBrowsers": {
+      "ie": "8"
+    }
   },
   "ie9": {
     "description": "Internet Explorer 9+ (best effort)",
-    "targets": {
-      "ie": "9"
-    },
     "ecma": 5,
-    "typescriptTarget": "es5"
+    "typescriptTarget": "es5",
+    "intendedBrowsers": {
+      "ie": "9"
+    }
   },
   "ie10": {
     "description": "Internet Explorer 10+ (best effort)",
-    "targets": {
-      "ie": "10"
-    },
     "ecma": 5,
-    "typescriptTarget": "es5"
+    "typescriptTarget": "es5",
+    "intendedBrowsers": {
+      "ie": "10"
+    }
   },
   "ie11": {
     "description": "Internet Explorer 11+ (best effort)",
-    "targets": {
-      "ie": "11"
-    },
     "ecma": 5,
-    "typescriptTarget": "es5"
+    "typescriptTarget": "es5",
+    "intendedBrowsers": {
+      "ie": "11"
+    }
   },
   "es2015": {
     "description": "Chrome 49+, Edge 14+, Firefox 45+, Safari 10+",
-    "targets": [
+    "ecma": 2015,
+    "typescriptTarget": "es2015",
+    "intendedBrowsers": [
       "Chrome >= 49",
       "Edge >= 14",
       "Firefox >= 45",
       "Safari >= 10"
-    ],
-    "ecma": 2015,
-    "typescriptTarget": "es2015"
+    ]
   },
   "es2016": {
     "description": "Chrome 52+, Edge 14+, Firefox 52+, Safari 10.1+",
-    "targets": [
+    "ecma": 2016,
+    "typescriptTarget": "es2016",
+    "intendedBrowsers": [
       "Chrome >= 52",
       "Edge >= 14",
       "Firefox >= 52",
       "Safari >= 10.1"
-    ],
-    "ecma": 2016,
-    "typescriptTarget": "es2016"
+    ]
   },
   "es2017": {
     "description": "Chrome 58+, Edge 16+, Firefox 54+, Safari 11+",
-    "targets": [
+    "ecma": 2017,
+    "typescriptTarget": "es2017",
+    "intendedBrowsers": [
       "Chrome >= 58",
       "Edge >= 16",
       "Firefox >= 54",
       "Safari >= 11"
-    ],
-    "ecma": 2017,
-    "typescriptTarget": "es2017"
+    ]
   },
   "es2018": {
     "description": "Chrome 64+, Edge 79+, Firefox 58+, Safari 12+",
-    "targets": [
+    "ecma": 2018,
+    "typescriptTarget": "es2018",
+    "intendedBrowsers": [
       "Chrome >= 64",
       "Edge >= 79",
       "Firefox >= 58",
       "Safari >= 12"
-    ],
-    "ecma": 2018,
-    "typescriptTarget": "es2018"
+    ]
   },
   "es2019": {
     "description": "Chrome 73+, Edge 79+, Firefox 67+, Safari 12.1+",
-    "targets": [
+    "ecma": 2019,
+    "typescriptTarget": "es2019",
+    "intendedBrowsers": [
       "Chrome >= 73",
       "Edge >= 79",
       "Firefox >= 67",
       "Safari >= 12.1"
-    ],
-    "ecma": 2019,
-    "typescriptTarget": "es2019"
+    ]
   },
   "es2020": {
     "description": "Chrome 80+, Edge 80+, Firefox 74+, Safari 13.1+",
-    "targets": [
+    "ecma": 2020,
+    "typescriptTarget": "es2020",
+    "intendedBrowsers": [
       "Chrome >= 80",
       "Edge >= 80",
       "Firefox >= 74",
       "Safari >= 13.1"
-    ],
-    "ecma": 2020,
-    "typescriptTarget": "es2020"
+    ]
   },
   "es2021": {
     "description": "Chrome 85+, Edge 85+, Firefox 79+, Safari 14.1+",
-    "targets": [
+    "ecma": 2021,
+    "typescriptTarget": "es2021",
+    "intendedBrowsers": [
       "Chrome >= 85",
       "Edge >= 85",
       "Firefox >= 79",
       "Safari >= 14.1"
-    ],
-    "ecma": 2021,
-    "typescriptTarget": "es2021"
+    ]
   },
   "es2022": {
     "description": "Chrome 94+, Edge 94+, Firefox 93+, Safari 15.4+",
-    "targets": [
+    "ecma": 2022,
+    "typescriptTarget": "es2022",
+    "intendedBrowsers": [
       "Chrome >= 94",
       "Edge >= 94",
       "Firefox >= 93",
       "Safari >= 15.4"
-    ],
-    "ecma": 2022,
-    "typescriptTarget": "es2022"
+    ]
   }
 }

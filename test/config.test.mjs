@@ -11,6 +11,7 @@ test('supported majors and browser target profiles are configured', async () => 
   for (const required of ['ie6', 'ie7', 'ie8', 'ie9', 'ie10', 'ie11', 'es2015', 'es2016', 'es2017', 'es2018', 'es2019', 'es2020', 'es2021', 'es2022']) {
     assert.ok(targets[required], `missing ${required} profile`);
     assert.ok(targets[required].typescriptTarget, `missing ${required} TypeScript target`);
+    assert.ok(targets[required].intendedBrowsers, `missing ${required} intended browser documentation`);
   }
   assert.equal(targets.modern, undefined);
 });
