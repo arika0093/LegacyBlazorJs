@@ -4,11 +4,15 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 import { parseAspNetTag } from './version-lib.mjs';
+import { readTargetsConfig } from './config-lib.mjs';
 
 function arg(name, fallback) { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : fallback; }
 function run(command, args, cwd) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, stdio: 'inherit' });
+    const invocation = process.platform === 'win32' && command === 'yarn'
+      ? { command: 'cmd.exe', args: ['/d', '/s', '/c', 'yarn', ...args] }
+      : { command, args };
+    const child = spawn(invocation.command, invocation.args, { cwd, stdio: 'inherit' });
     child.once('error', reject);
     child.once('exit', code => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code}`)));
   });
@@ -29,7 +33,8 @@ const sourceDir = path.resolve(arg('source-dir', 'src/Components/Web.JS'));
 const output = path.resolve(arg('output', 'src/LegacyBlazorJs/wwwroot'));
 const parsed = parseAspNetTag(arg('tag', process.env.ASPNETCORE_TAG) ?? '');
 if (!parsed) throw new Error('A valid --tag vX.Y.Z is required.');
-const targets = JSON.parse(await readFile(new URL('../config/targets.json', import.meta.url), 'utf8'));
+// Target profiles define the JS syntax level we rebuild for each output file.
+const targets = await readTargetsConfig();
 const bundlerConfigPath = await firstExisting([
   path.join(sourceDir, 'src/webpack.config.js'),
   path.join(sourceDir, '../Shared.JS/rollup.config.mjs'),
@@ -45,10 +50,13 @@ const files = {};
 
 try {
   for (const [name, profile] of Object.entries(targets)) {
+    // Rewrite the upstream TypeScript target before each rebuild so the emitted syntax matches the profile.
     const tsconfig = JSON.parse(originalTsconfig);
     tsconfig.compilerOptions.target = profile.typescriptTarget;
     if (profile.typescriptTarget === 'es5') tsconfig.compilerOptions.downlevelIteration = true;
     await writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
+
+    // The bundler also needs the matching ECMA level so minification does not re-introduce newer syntax.
     const bundlerConfig = originalBundlerConfig.replace(/ecma:\s*\d+/g, `ecma: ${profile.ecma}`);
     if (bundlerConfig === originalBundlerConfig && !originalBundlerConfig.includes(`ecma: ${profile.ecma}`)) {
       throw new Error('Could not locate the upstream bundler/Terser ECMA target.');
@@ -60,6 +68,7 @@ try {
     files[name] = { file: filename, description: profile.description, ecma: profile.ecma };
   }
 } finally {
+  // Always restore upstream files so repeated builds start from a clean checkout.
   await writeFile(tsconfigPath, originalTsconfig);
   await writeFile(bundlerConfigPath, originalBundlerConfig);
 }

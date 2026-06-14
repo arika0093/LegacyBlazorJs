@@ -30,3 +30,35 @@ export function latestTagForMajor(tags, major, includePrerelease = false) {
     .sort(compareVersions);
   return versions.at(-1) ?? null;
 }
+
+export async function fetchTagsFromGitHub(repository, githubToken) {
+  const tags = [];
+
+  // GitHub's tags API is paginated, so keep walking until the response shortens.
+  for (let page = 1; page <= 10; page++) {
+    const response = await fetch(`https://api.github.com/repos/${repository}/tags?per_page=100&page=${page}`, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'legacy-blazor-js-build',
+        ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub tags request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const pageTags = await response.json();
+    tags.push(...pageTags.map(item => item.name));
+    if (pageTags.length < 100) {
+      break;
+    }
+  }
+
+  return tags;
+}
+
+export async function fetchLatestTagForMajor({ repository, major, includePrerelease = false, githubToken }) {
+  const tags = await fetchTagsFromGitHub(repository, githubToken);
+  return latestTagForMajor(tags, major, includePrerelease);
+}

@@ -7,7 +7,7 @@ LegacyBlazorJs rebuilds the official ASP.NET Core `blazor.web.js` for multiple J
 1. For every .NET major listed in `config/majors.json`, resolve the latest stable `dotnet/aspnetcore` tag through the GitHub API.
 2. Clone that tag and build the upstream `Microsoft.AspNetCore.Components.Web.JS.npmproj`, including its linked JSInterop and SignalR dependencies.
 3. Rebuild `src/Components/Web.JS` once per profile after changing the upstream TypeScript and webpack/Rollup Terser targets.
-4. Put the generated scripts in the Razor Class Library's `wwwroot` and pack `LegacyBlazorJs` using the upstream tag without its `v` prefix, for example `v8.0.27` becomes package version `8.0.27`.
+4. Write the generated scripts to `dist/<tag>`, mirror them into the Razor Class Library's `wwwroot`, and pack `LegacyBlazorJs` using the upstream tag without its `v` prefix, for example `v8.0.27` becomes package version `8.0.27`.
 
 Building from source is intentional. Retranspiling the already bundled upstream `blazor.web.js` was tested and produced a script that loaded but did not make a Blazor Server application interactive.
 
@@ -45,10 +45,16 @@ The authoritative profile definitions are in `config/targets.json`. There is int
 
 ```bash
 npm ci
-npm run build -- 8
+npm run build
 ```
 
-This resolves and builds the latest stable .NET 8 tag, then creates `artifacts/packages/LegacyBlazorJs.<version>.nupkg`. Set an explicit tag for a reproducible historical build:
+This resolves and builds the latest stable tag for every major listed in `config/majors.json`, writes the generated browser-specific scripts under `dist/<tag>`, and creates one `LegacyBlazorJs.<version>.nupkg` per upstream tag under `artifacts/packages`. To limit the run to specific majors, pass them after `--`:
+
+```bash
+npm run build -- 8 10
+```
+
+Set an explicit tag for a reproducible historical build:
 
 ```bash
 ASPNETCORE_TAG=v8.0.27 npm run build
@@ -71,21 +77,33 @@ Because the package is a Razor Class Library with static web assets, consumers d
 
 ## Smoke testing
 
-`.github/workflows/smoke-test.yml` installs the generated NuGet package into an unmodified Blazor Server template application and loads each generated JavaScript file in turn. The C# smoke test project creates the app, starts Blazor Server, launches Playwright Chromium, and verifies that clicking the Counter button updates the count without browser errors.
+`.github/workflows/smoke-test.yml` builds the generated NuGet package, then runs Playwright smoke tests against the `ES2020` through `ES2022` outputs in both `Blazor Server` and `Blazor WebAssembly` template apps. Each profile is validated against its minimum intended Chromium major by downloading a fixed Chrome for Testing build, for example `es2020 -> Chrome 80`, `es2021 -> Chrome 85`, and `es2022 -> Chrome 94`.
 
-This proves that every generated file remains functional in current Chromium. It does not prove compatibility with the historical browsers named by each profile.
+The C# smoke test project creates the app, swaps in `_content/LegacyBlazorJs/blazor.web.<profile>.js`, starts the app, launches the pinned Chromium build, and verifies that clicking the Counter button updates the count without browser errors.
 
-After building a package, run the smoke tests locally with:
+After building package artifacts, run the compatibility matrix and refresh this README with:
+
+```bash
+npm run test:compat:update-readme
+```
+
+To run only the smoke test project directly, use:
 
 ```bash
 dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
 ```
 
-The test project resolves the latest `LegacyBlazorJs.*.nupkg` from `artifacts/packages` automatically. Set `PACKAGE_VERSION` to force a specific package version or `SMOKE_TEST_PROFILE` to run a single profile, for example `SMOKE_TEST_PROFILE=es2015 dotnet test tests/PlaywrightTest/PlaywrightTest.csproj`.
+The test project resolves the latest `LegacyBlazorJs.*.nupkg` from `artifacts/packages` automatically. Set `PACKAGE_VERSION` to force a specific package version, `SMOKE_TEST_PROFILE` to run a single profile, `SMOKE_TEST_HOSTING_MODEL` to switch between `Server` and `WebAssembly`, or `SMOKE_TEST_CHROMIUM_DOWNLOAD_URL` plus `SMOKE_TEST_CHROMIUM_VERSION` to force a specific Chrome for Testing binary.
+
+### ES20x compatibility results
+
+<!-- compatibility-results:start -->
+Run `npm run test:compat:update-readme` after building packages to populate this section.
+<!-- compatibility-results:end -->
 
 ## Automated publishing
 
-`.github/workflows/publish-latest.yml` checks every configured .NET major each week, builds its latest stable tag, runs all smoke tests, and publishes the package to NuGet.org with `dotnet nuget push --skip-duplicate`.
+`.github/workflows/publish-latest.yml` reads `config/majors.json`, builds every configured .NET major in one run, executes the ES20x compatibility matrix, and publishes the resulting packages to NuGet.org with `dotnet nuget push --skip-duplicate`.
 
 Configure the repository secret `NUGET_API_KEY` before publishing. Run the workflow manually with `publish=false` first to inspect its artifacts before enabling publication.
 

@@ -7,3 +7,4 @@ bin/
 obj/
 *.nupkg
 src/LegacyBlazorJs/UPSTREAM-LICENSE.txt
+dist/

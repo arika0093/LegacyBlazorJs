@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -21,12 +22,13 @@ public sealed class SmokeTests
     {
         var repositoryRoot = TestEnvironment.RepositoryRoot;
         var packageVersion = TestEnvironment.PackageVersion;
+        var hostingModel = TestEnvironment.HostingModel;
 
-        await using var harness = await SmokeAppHarness.CreateAsync(repositoryRoot, profile, packageVersion);
+        await using var harness = await SmokeAppHarness.CreateAsync(repositoryRoot, profile, packageVersion, hostingModel);
         await harness.StartAsync();
 
         await using var browserHarness = await BrowserHarness.CreateAsync();
-        await browserHarness.AssertCounterInteractiveAsync(harness.BaseUri, profile);
+        await browserHarness.AssertCounterInteractiveAsync(harness.BaseUri, profile, hostingModel);
     }
 
     public static IEnumerable<object[]> GetProfiles()
@@ -56,6 +58,12 @@ internal static class TestEnvironment
     public static string PackageVersion => PackageVersionValue.Value;
 
     public static string PackageSourceDirectory => Path.Combine(RepositoryRoot, "artifacts", "packages");
+
+    public static string WorkDirectory => Path.Combine(RepositoryRoot, ".work");
+
+    public static string HostingModel => ResolveHostingModel();
+
+    public static string SmokeAppTemplatesDirectory => Path.Combine(RepositoryRoot, "tests", "SmokeApps");
 
     private static string FindRepositoryRoot()
     {
@@ -101,68 +109,106 @@ internal static class TestEnvironment
 
         return Regex.Match(package.Name, @"^LegacyBlazorJs\.(.+)\.nupkg$").Groups[1].Value;
     }
+
+    private static string ResolveHostingModel()
+    {
+        var configured = Environment.GetEnvironmentVariable("SMOKE_TEST_HOSTING_MODEL");
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return "Server";
+        }
+
+        return configured switch
+        {
+            "Server" => configured,
+            "WebAssembly" => configured,
+            _ => throw new InvalidOperationException(
+                $"Unsupported SMOKE_TEST_HOSTING_MODEL value '{configured}'. Expected 'Server' or 'WebAssembly'.")
+        };
+    }
 }
 
 internal sealed class SmokeAppHarness : IAsyncDisposable
 {
-    private const string AppName = "SmokeApp";
     private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromSeconds(2) };
+    private static readonly Uri ReadyPath = new("/counter", UriKind.Relative);
 
     private readonly string _rootDirectory;
     private readonly string _appDirectory;
+    private readonly string _projectPath;
     private readonly string _profile;
     private readonly string _packageVersion;
+    private readonly string _hostingModel;
     private readonly Uri _baseUri;
     private CapturedProcess? _serverProcess;
 
-    private SmokeAppHarness(string rootDirectory, string appDirectory, string profile, string packageVersion, Uri baseUri)
+    private SmokeAppHarness(
+        string rootDirectory,
+        string appDirectory,
+        string projectPath,
+        string profile,
+        string packageVersion,
+        string hostingModel,
+        Uri baseUri)
     {
         _rootDirectory = rootDirectory;
         _appDirectory = appDirectory;
+        _projectPath = projectPath;
         _profile = profile;
         _packageVersion = packageVersion;
+        _hostingModel = hostingModel;
         _baseUri = baseUri;
     }
 
     public Uri BaseUri => _baseUri;
 
-    public static async Task<SmokeAppHarness> CreateAsync(string repositoryRoot, string profile, string packageVersion)
+    public static async Task<SmokeAppHarness> CreateAsync(
+        string repositoryRoot,
+        string profile,
+        string packageVersion,
+        string hostingModel)
     {
-        var rootDirectory = Path.Combine(repositoryRoot, ".work", $"smoke-{profile}-{Guid.NewGuid():N}");
-        var appDirectory = Path.Combine(rootDirectory, AppName);
+        var rootDirectory = Path.Combine(
+            repositoryRoot,
+            ".work",
+            $"smoke-{hostingModel.ToLowerInvariant()}-{profile}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(rootDirectory);
 
+        var templateDirectory = GetTemplateDirectory(hostingModel);
+        CopyDirectory(templateDirectory, rootDirectory);
+        var appDirectory = GetAppDirectory(rootDirectory, hostingModel);
+        var projectPath = GetProjectPath(appDirectory, hostingModel);
         var port = GetAvailablePort();
         var baseUri = new Uri($"http://127.0.0.1:{port}");
-        var harness = new SmokeAppHarness(rootDirectory, appDirectory, profile, packageVersion, baseUri);
+        var harness = new SmokeAppHarness(rootDirectory, appDirectory, projectPath, profile, packageVersion, hostingModel, baseUri);
         await harness.InitializeAsync();
         return harness;
     }
 
     public async Task StartAsync()
     {
-        var projectPath = Path.Combine(_appDirectory, $"{AppName}.csproj");
         _serverProcess = CapturedProcess.Start(
             "dotnet",
             [
                 "run",
-                "--project", projectPath,
+                "--project", _projectPath,
                 "--urls", _baseUri.ToString(),
-                "--no-launch-profile"
+                "--no-launch-profile",
+                "--no-restore"
             ],
             _appDirectory);
 
-        for (var attempt = 0; attempt < 90; attempt++)
+        for (var attempt = 0; attempt < 120; attempt++)
         {
             if (_serverProcess.Process.HasExited)
             {
                 throw new InvalidOperationException(
-                    $"Blazor Server exited before it became ready.{Environment.NewLine}{await _serverProcess.GetCombinedOutputAsync()}");
+                    $"Blazor {_hostingModel} app exited before it became ready.{Environment.NewLine}{await _serverProcess.GetCombinedOutputAsync()}");
             }
 
             try
             {
-                using var response = await HttpClient.GetAsync(_baseUri);
+                using var response = await HttpClient.GetAsync(new Uri(_baseUri, ReadyPath));
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -179,7 +225,7 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         }
 
         await DisposeServerAsync();
-        throw new TimeoutException($"Blazor Server did not become ready at {_baseUri} within 90 seconds.");
+        throw new TimeoutException($"Blazor {_hostingModel} app did not become ready at {_baseUri} within 120 seconds.");
     }
 
     public async ValueTask DisposeAsync()
@@ -206,24 +252,17 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         await ProcessRunner.RunCheckedAsync(
             "dotnet",
             [
-                "new", "blazor",
-                "--name", AppName,
-                "--output", _appDirectory,
-                "--framework", "net8.0",
-                "--interactivity", "Server",
-                "--all-interactive",
-                "--no-https",
-                "--no-restore"
+                "add", _projectPath,
+                "package", "LegacyBlazorJs",
+                "--version", _packageVersion,
+                "--source", TestEnvironment.PackageSourceDirectory
             ],
-            _rootDirectory);
+            _appDirectory);
 
-        var projectPath = Path.Combine(_appDirectory, $"{AppName}.csproj");
         await ProcessRunner.RunCheckedAsync(
             "dotnet",
             [
-                "add", projectPath,
-                "package", "LegacyBlazorJs",
-                "--version", _packageVersion,
+                "restore", _projectPath,
                 "--source", TestEnvironment.PackageSourceDirectory
             ],
             _appDirectory);
@@ -235,18 +274,63 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
     {
         var contents = File.ReadAllText(appRazorPath);
         var replacement = $"<script src=\"_content/LegacyBlazorJs/blazor.web.{_profile}.js\"></script>";
-        var updated = Regex.Replace(
-            contents,
-            "<script src=.*?_framework/blazor\\.web\\.js.*?</script>",
-            replacement,
-            RegexOptions.Singleline);
+        var updated = contents.Replace("__LEGACY_BLAZOR_SCRIPT__", replacement, StringComparison.Ordinal);
 
         if (ReferenceEquals(contents, updated) || contents == updated)
         {
-            throw new InvalidOperationException($"Could not replace the default blazor.web.js script tag in '{appRazorPath}'.");
+            throw new InvalidOperationException($"Could not replace the script placeholder in '{appRazorPath}'.");
         }
 
         File.WriteAllText(appRazorPath, updated);
+    }
+
+    private static string GetTemplateDirectory(string hostingModel) =>
+        Path.Combine(TestEnvironment.SmokeAppTemplatesDirectory, hostingModel switch
+        {
+            "Server" => "ServerApp",
+            "WebAssembly" => "WasmApp",
+            _ => throw new InvalidOperationException($"Unsupported hosting model '{hostingModel}'.")
+        });
+
+    private static string GetAppDirectory(string rootDirectory, string hostingModel) =>
+        hostingModel switch
+        {
+            "Server" => rootDirectory,
+            "WebAssembly" => Path.Combine(rootDirectory, "WasmApp"),
+            _ => throw new InvalidOperationException($"Unsupported hosting model '{hostingModel}'.")
+        };
+
+    private static string GetProjectPath(string appDirectory, string hostingModel) =>
+        hostingModel switch
+        {
+            "Server" => Path.Combine(appDirectory, "ServerApp.csproj"),
+            "WebAssembly" => Path.Combine(appDirectory, "WasmApp.csproj"),
+            _ => throw new InvalidOperationException($"Unsupported hosting model '{hostingModel}'.")
+        };
+
+    private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
+    {
+        var source = new DirectoryInfo(sourceDirectory);
+        if (!source.Exists)
+        {
+            throw new DirectoryNotFoundException($"Smoke app template directory '{sourceDirectory}' does not exist.");
+        }
+
+        Directory.CreateDirectory(destinationDirectory);
+
+        foreach (var directory in source.GetDirectories("*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceDirectory, directory.FullName);
+            Directory.CreateDirectory(Path.Combine(destinationDirectory, relativePath));
+        }
+
+        foreach (var file in source.GetFiles("*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceDirectory, file.FullName);
+            var targetPath = Path.Combine(destinationDirectory, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+            file.CopyTo(targetPath, overwrite: true);
+        }
     }
 
     private async Task DisposeServerAsync()
@@ -295,11 +379,30 @@ internal sealed class BrowserHarness : IAsyncDisposable
 
     public static async Task<BrowserHarness> CreateAsync()
     {
-        await EnsureBrowsersInstalledAsync(force: false);
+        var launchConfiguration = await BrowserBinaryResolver.ResolveAsync();
+        if (launchConfiguration.ExecutablePath is null)
+        {
+            await EnsureBrowsersInstalledAsync(force: false);
+        }
+
         var playwright = await Playwright.CreateAsync();
         try
         {
-            var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+            var options = new BrowserTypeLaunchOptions
+            {
+                Headless = true,
+                ExecutablePath = launchConfiguration.ExecutablePath
+            };
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                options.Args =
+                [
+                    "--no-sandbox"
+                ];
+            }
+
+            var browser = await playwright.Chromium.LaunchAsync(options);
             return new BrowserHarness(playwright, browser);
         }
         catch
@@ -309,7 +412,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
         }
     }
 
-    public async Task AssertCounterInteractiveAsync(Uri baseUri, string profile)
+    public async Task AssertCounterInteractiveAsync(Uri baseUri, string profile, string hostingModel)
     {
         var page = await _browser.NewPageAsync();
         var errors = new List<string>();
@@ -331,7 +434,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Click me" });
         var updatedCount = page.GetByText("Current count: 1");
 
-        for (var attempt = 0; attempt < 20; attempt++)
+        for (var attempt = 0; attempt < 30; attempt++)
         {
             if (errors.Count > 0)
             {
@@ -343,17 +446,32 @@ internal sealed class BrowserHarness : IAsyncDisposable
                 break;
             }
 
-            await button.ClickAsync();
+            if (await button.IsVisibleAsync())
+            {
+                await button.ClickAsync();
+            }
+
             await page.WaitForTimeoutAsync(500);
         }
 
         if (errors.Count > 0)
         {
-            throw new InvalidOperationException($"{profile} emitted browser errors:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}");
+            throw new InvalidOperationException(
+                $"{hostingModel} {profile} emitted browser errors:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}");
         }
 
-        await updatedCount.WaitForAsync();
-        await page.CloseAsync();
+        try
+        {
+            await updatedCount.WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
+        }
+        catch (TimeoutException)
+        {
+            throw new TimeoutException($"{hostingModel} {profile} did not become interactive within the allotted time.");
+        }
+        finally
+        {
+            await page.CloseAsync();
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -428,6 +546,114 @@ internal sealed class BrowserHarness : IAsyncDisposable
 
         return scriptPath;
     }
+}
+
+internal static class BrowserBinaryResolver
+{
+    private static readonly HttpClient HttpClient = new();
+
+    public static async Task<BrowserLaunchConfiguration> ResolveAsync()
+    {
+        var downloadUrl = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_DOWNLOAD_URL");
+        if (string.IsNullOrWhiteSpace(downloadUrl))
+        {
+            return BrowserLaunchConfiguration.Bundled;
+        }
+
+        var browserVersion = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_VERSION");
+        if (string.IsNullOrWhiteSpace(browserVersion))
+        {
+            throw new InvalidOperationException(
+                "SMOKE_TEST_CHROMIUM_VERSION is required when SMOKE_TEST_CHROMIUM_DOWNLOAD_URL is set.");
+        }
+
+        var platform = ResolvePlatform();
+        var browserDirectory = Path.Combine(TestEnvironment.WorkDirectory, "browsers", "chromium", browserVersion, platform.DirectoryName);
+        var executablePath = Path.Combine(browserDirectory, platform.ExecutableRelativePath);
+
+        if (File.Exists(executablePath))
+        {
+            EnsureExecutablePermissions(executablePath);
+            return new BrowserLaunchConfiguration(executablePath);
+        }
+
+        Directory.CreateDirectory(browserDirectory);
+        var archivePath = Path.Combine(browserDirectory, Path.GetFileName(new Uri(downloadUrl).AbsolutePath));
+        if (!File.Exists(archivePath))
+        {
+            using var response = await HttpClient.GetAsync(downloadUrl);
+            response.EnsureSuccessStatusCode();
+
+            await using var archiveStream = await response.Content.ReadAsStreamAsync();
+            await using var fileStream = File.Create(archivePath);
+            await archiveStream.CopyToAsync(fileStream);
+        }
+
+        ZipFile.ExtractToDirectory(archivePath, browserDirectory, overwriteFiles: true);
+        EnsureExecutablePermissions(executablePath);
+
+        if (!File.Exists(executablePath))
+        {
+            throw new FileNotFoundException(
+                $"Downloaded Chromium archive did not contain the expected executable '{platform.ExecutableRelativePath}'.");
+        }
+
+        return new BrowserLaunchConfiguration(executablePath);
+    }
+
+    private static BrowserPlatform ResolvePlatform()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return Environment.Is64BitOperatingSystem
+                ? new BrowserPlatform("win64", Path.Combine("chrome-win64", "chrome.exe"))
+                : new BrowserPlatform("win32", Path.Combine("chrome-win32", "chrome.exe"));
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return new BrowserPlatform("linux64", Path.Combine("chrome-linux64", "chrome"));
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            var directoryName = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "mac-arm64" : "mac-x64";
+            var executable = Path.Combine(
+                directoryName == "mac-arm64" ? "chrome-mac-arm64" : "chrome-mac-x64",
+                "Google Chrome for Testing.app",
+                "Contents",
+                "MacOS",
+                "Google Chrome for Testing");
+            return new BrowserPlatform(directoryName, executable);
+        }
+
+        throw new PlatformNotSupportedException("Only Windows, Linux, and macOS are supported for browser automation.");
+    }
+
+    private static void EnsureExecutablePermissions(string executablePath)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || !File.Exists(executablePath))
+        {
+            return;
+        }
+
+        File.SetUnixFileMode(
+            executablePath,
+            UnixFileMode.UserRead |
+            UnixFileMode.UserWrite |
+            UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead |
+            UnixFileMode.GroupExecute |
+            UnixFileMode.OtherRead |
+            UnixFileMode.OtherExecute);
+    }
+
+    private sealed record BrowserPlatform(string DirectoryName, string ExecutableRelativePath);
+}
+
+internal sealed record BrowserLaunchConfiguration(string? ExecutablePath)
+{
+    public static BrowserLaunchConfiguration Bundled { get; } = new((string?)null);
 }
 
 internal static class ProcessRunner

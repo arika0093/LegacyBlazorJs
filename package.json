@@ -6,9 +6,12 @@
   "scripts": {
     "resolve-version": "node scripts/resolve-version.mjs",
     "build:variants": "node scripts/build-variants.mjs",
-    "build": "bash scripts/fetch-and-build-upstream.sh",
+    "build": "node scripts/build-all.mjs",
     "test": "node --test test/*.test.mjs",
-    "test:smoke": "dotnet test tests/PlaywrightTest/PlaywrightTest.csproj"
+    "test:smoke": "dotnet test tests/PlaywrightTest/PlaywrightTest.csproj",
+    "test:compat": "node scripts/run-compat-tests.mjs",
+    "readme:compat": "node scripts/update-readme-compat.mjs",
+    "test:compat:update-readme": "node scripts/run-compat-tests.mjs && node scripts/update-readme-compat.mjs"
   },
   "engines": {
     "node": ">=20"
