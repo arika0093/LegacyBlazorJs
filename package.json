@@ -1,6 +1,6 @@
 {
   "name": "legacy-blazor-js-build",
-  "version": "0.2.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,10 +8,7 @@
     "build:variants": "node scripts/build-variants.mjs",
     "build": "bash scripts/fetch-and-build-upstream.sh",
     "test": "node --test test/*.test.mjs",
-    "test:smoke": "bash scripts/test-blazor-server.sh"
-  },
-  "devDependencies": {
-    "@playwright/test": "1.52.0"
+    "test:smoke": "dotnet test tests/PlaywrightTest/PlaywrightTest.csproj"
   },
   "engines": {
     "node": ">=20"

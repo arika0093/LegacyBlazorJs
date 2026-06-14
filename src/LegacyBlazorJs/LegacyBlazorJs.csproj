@@ -5,7 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>true</IsPackable>
     <PackageId>LegacyBlazorJs</PackageId>
-    <Version>0.0.0-local</Version>
     <Authors>LegacyBlazorJs contributors</Authors>
     <Description>Browser-targeted builds of the official ASP.NET Core blazor.web.js.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -16,7 +15,5 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
-    <None Include="../../THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="/" />
-    <None Include="UPSTREAM-LICENSE.txt" Pack="true" PackagePath="/" Condition="Exists('UPSTREAM-LICENSE.txt')" />
   </ItemGroup>
 </Project>

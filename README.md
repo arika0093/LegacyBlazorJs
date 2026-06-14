@@ -42,7 +42,6 @@ The authoritative profile definitions are in `config/targets.json`. There is int
 - Git
 - Node.js 20 or later with Corepack
 - .NET 8 SDK or later
-- Internet access to the upstream repository and its npm/NuGet feeds
 
 ```bash
 npm ci
@@ -72,16 +71,17 @@ Because the package is a Razor Class Library with static web assets, consumers d
 
 ## Smoke testing
 
-`.github/workflows/smoke-test.yml` installs the generated NuGet package into an unmodified Blazor Server template application and loads each generated JavaScript file in turn. Playwright Chromium opens the Counter page and verifies that clicking the button updates the count without browser errors.
+`.github/workflows/smoke-test.yml` installs the generated NuGet package into an unmodified Blazor Server template application and loads each generated JavaScript file in turn. The C# smoke test project creates the app, starts Blazor Server, launches Playwright Chromium, and verifies that clicking the Counter button updates the count without browser errors.
 
 This proves that every generated file remains functional in current Chromium. It does not prove compatibility with the historical browsers named by each profile.
 
-After building a package, run a profile locally with:
+After building a package, run the smoke tests locally with:
 
 ```bash
-npx playwright install --with-deps chromium
-npm run test:smoke -- es2015 8.0.27
+dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
 ```
+
+The test project resolves the latest `LegacyBlazorJs.*.nupkg` from `artifacts/packages` automatically. Set `PACKAGE_VERSION` to force a specific package version or `SMOKE_TEST_PROFILE` to run a single profile, for example `SMOKE_TEST_PROFILE=es2015 dotnet test tests/PlaywrightTest/PlaywrightTest.csproj`.
 
 ## Automated publishing
 

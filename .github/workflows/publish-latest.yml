@@ -46,13 +46,11 @@ jobs:
       - name: Build upstream source, browser variants, and NuGet package
         env: { ASPNETCORE_TAG: "${{ steps.version.outputs.tag }}" }
         run: npm run build -- '${{ matrix.major }}'
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
       - name: Smoke test every generated script in a Blazor Server app
         env: { PACKAGE_VERSION: "${{ steps.version.outputs.version }}" }
         run: |
           for PROFILE in $(node -e "console.log(Object.keys(require('./config/targets.json')).join(' '))"); do
-            npm run test:smoke -- "$PROFILE" "$PACKAGE_VERSION"
+            SMOKE_TEST_PROFILE="$PROFILE" dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
           done
       - uses: actions/upload-artifact@v4
         with:

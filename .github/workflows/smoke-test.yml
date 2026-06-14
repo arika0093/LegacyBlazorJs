@@ -36,14 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: 8.0.x }
       - uses: actions/download-artifact@v4
         with: { name: package, path: artifacts/packages }
-      - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium
       - run: |
           VERSION=$(basename artifacts/packages/LegacyBlazorJs.*.nupkg | sed -E 's/^LegacyBlazorJs\.(.*)\.nupkg$/\1/')
-          npm run test:smoke -- '${{ matrix.profile }}' "$VERSION"
+          PACKAGE_VERSION="$VERSION" SMOKE_TEST_PROFILE='${{ matrix.profile }}' dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
