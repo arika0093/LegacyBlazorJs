@@ -15,6 +15,7 @@ const explicitTag = process.env.ASPNETCORE_TAG;
 const positionalMajors = process.argv.slice(2).filter(argument => !argument.startsWith('--'));
 const nodeBinForBash = toBashPath(process.execPath);
 
+/** Convert a Windows path into a WSL-style /mnt/<drive>/... path for use by Bash scripts. */
 function toBashPath(filePath) {
   const normalized = filePath.replace(/\\/g, '/');
   const match = /^([A-Za-z]):\/(.*)$/.exec(normalized);

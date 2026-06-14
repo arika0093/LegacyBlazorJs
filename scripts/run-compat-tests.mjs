@@ -11,14 +11,22 @@ import {
   resolveCompatibilityBrowsers,
 } from './compat-lib.mjs';
 
+const PROCESS_TIMEOUT_MS = 600_000;
+
+/** Spawn a child process, tee its output, and enforce a wall-clock timeout. */
 function run(command, args, env) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     let output = '';
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      reject(new Error(`Process '${command}' timed out after ${PROCESS_TIMEOUT_MS}ms.`));
+    }, PROCESS_TIMEOUT_MS);
+
     child.stdout.on('data', chunk => {
       const text = chunk.toString();
       output += text;
@@ -30,11 +38,18 @@ function run(command, args, env) {
       process.stderr.write(text);
     });
 
-    child.once('error', error => resolve({ exitCode: 1, output: `${output}\n${String(error)}` }));
-    child.once('exit', exitCode => resolve({ exitCode: exitCode ?? 1, output }));
+    child.once('error', error => {
+      clearTimeout(timer);
+      resolve({ exitCode: 1, output: `${output}\n${String(error)}` });
+    });
+    child.once('exit', exitCode => {
+      clearTimeout(timer);
+      resolve({ exitCode: exitCode ?? 1, output });
+    });
   });
 }
 
+/** Keep failure logs readable by trimming them to the last 8000 characters. */
 function trimLog(text) {
   const normalized = text.trim();
   if (normalized.length <= 8000) {

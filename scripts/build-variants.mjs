@@ -6,9 +6,13 @@ import process from 'node:process';
 import { parseAspNetTag } from './version-lib.mjs';
 import { readTargetsConfig } from './config-lib.mjs';
 
+/** Parse a command-line flag and return the following value, or the fallback. */
 function arg(name, fallback) { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : fallback; }
+
+/** Run a command in the given directory and fail on non-zero exit codes. */
 function run(command, args, cwd) {
   return new Promise((resolve, reject) => {
+    // On Windows, yarn may not be directly executable, so invoke it through cmd.exe.
     const invocation = process.platform === 'win32' && command === 'yarn'
       ? { command: 'cmd.exe', args: ['/d', '/s', '/c', 'yarn', ...args] }
       : { command, args };
@@ -17,6 +21,8 @@ function run(command, args, cwd) {
     child.once('exit', code => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code}`)));
   });
 }
+
+/** Return the first accessible path, allowing for layout differences across upstream versions. */
 async function firstExisting(paths) {
   for (const candidate of paths) {
     try {

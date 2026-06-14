@@ -28,6 +28,8 @@ if (explicitTag) {
 }
 
 console.log(JSON.stringify(selected, null, 2));
+
+// Emit step outputs when running inside a GitHub Actions workflow.
 if (process.env.GITHUB_OUTPUT) {
   await appendFile(process.env.GITHUB_OUTPUT, `tag=${selected.tag}\nversion=${selected.version}\nmajor=${selected.major}\n`);
 }

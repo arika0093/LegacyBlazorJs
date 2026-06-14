@@ -145,6 +145,7 @@ internal static class TestEnvironment
 internal sealed class SmokeAppHarness : IAsyncDisposable
 {
     private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromSeconds(2) };
+    private static readonly TimeSpan ServerReadyTimeout = TimeSpan.FromSeconds(120);
     private static readonly Uri ReadyPath = new("/counter", UriKind.Relative);
 
     private readonly string _rootDirectory;
@@ -228,7 +229,8 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
                 ["ASPNETCORE_ENVIRONMENT"] = "Development"
             });
 
-        for (var attempt = 0; attempt < 120; attempt++)
+        var readyCts = new CancellationTokenSource(ServerReadyTimeout);
+        while (!readyCts.IsCancellationRequested)
         {
             if (_serverProcess.Process.HasExited)
             {
@@ -238,7 +240,7 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
 
             try
             {
-                using var response = await HttpClient.GetAsync(new Uri(_baseUri, ReadyPath));
+                using var response = await HttpClient.GetAsync(new Uri(_baseUri, ReadyPath), readyCts.Token);
                 if (response.IsSuccessStatusCode)
                 {
                     return;
@@ -249,13 +251,21 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
             }
             catch (TaskCanceledException)
             {
+                break;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), readyCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
 
         await DisposeServerAsync();
-        throw new TimeoutException($"Blazor {_hostingModel} app did not become ready at {_baseUri} within 120 seconds.");
+        throw new TimeoutException($"Blazor {_hostingModel} app did not become ready at {_baseUri} within {ServerReadyTimeout.TotalSeconds} seconds.");
     }
 
     public async ValueTask DisposeAsync()
@@ -528,7 +538,8 @@ internal sealed class BrowserHarness : IAsyncDisposable
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Click me" });
         var updatedCount = page.GetByText("Current count: 1");
 
-        for (var attempt = 0; attempt < 30; attempt++)
+        var interactionCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        for (var attempt = 0; attempt < 30 && !interactionCts.IsCancellationRequested; attempt++)
         {
             if (errors.Count > 0)
             {
@@ -545,7 +556,14 @@ internal sealed class BrowserHarness : IAsyncDisposable
                 await button.ClickAsync();
             }
 
-            await page.WaitForTimeoutAsync(500);
+            try
+            {
+                await page.WaitForTimeoutAsync(500, interactionCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
 
         if (errors.Count > 0)

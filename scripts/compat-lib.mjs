@@ -34,6 +34,7 @@ export function getHostingModels() {
   return ['Server', 'WebAssembly'];
 }
 
+/** Determine the Chromium snapshot platform identifiers for the current OS/architecture. */
 export function getChromiumHistoryPlatform() {
   switch (process.platform) {
     case 'linux':
@@ -109,6 +110,7 @@ export async function resolveCompatibilityBrowsers() {
   return byProfile;
 }
 
+/** Find the newest Chromium snapshot that matches the requested major version. */
 function resolveSnapshotRelease(versionLinks, chromeMajor) {
   const prefix = `${chromeMajor}.`;
   const version = Object.keys(versionLinks)
@@ -132,6 +134,7 @@ function resolveSnapshotRelease(versionLinks, chromeMajor) {
   };
 }
 
+/** Compare dotted version strings numerically, treating missing segments as zero. */
 function compareVersions(left, right) {
   const leftParts = left.split('.').map(Number);
   const rightParts = right.split('.').map(Number);
@@ -146,13 +149,30 @@ function compareVersions(left, right) {
   return 0;
 }
 
+const FETCH_TIMEOUT_MS = 30_000;
+
 async function fetchJson(url) {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'legacy-blazor-js-build',
-      Accept: 'application/json',
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'legacy-blazor-js-build',
+        Accept: 'application/json',
+      },
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`Chromium version metadata request timed out after ${FETCH_TIMEOUT_MS}ms for ${url}.`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     throw new Error(`Chromium version metadata request failed for ${url}: ${response.status} ${response.statusText}`);
@@ -174,6 +194,7 @@ export async function readBuildSummary() {
   }
 }
 
+/** Extract the minimum Chrome major version declared for a target profile. */
 function parseChromeMajor(profile) {
   const text = Array.isArray(profile.intendedBrowsers)
     ? profile.intendedBrowsers.find(entry => /^Chrome\s*>=\s*\d+/.test(entry))

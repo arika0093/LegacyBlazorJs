@@ -17,8 +17,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: { node-version: 20 }
       - id: dotnet-versions
         shell: bash
@@ -31,7 +33,7 @@ jobs:
             } | sort -u
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
           dotnet-version: ${{ steps.dotnet-versions.outputs.versions }}
       - run: npm ci --ignore-scripts
@@ -40,11 +42,11 @@ jobs:
         run: npm run build
       - name: Run ES20x compatibility matrix and refresh README snapshot
         run: npm run test:compat:update-readme
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages/*.nupkg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: LegacyBlazorJs-compatibility-results
           path: |

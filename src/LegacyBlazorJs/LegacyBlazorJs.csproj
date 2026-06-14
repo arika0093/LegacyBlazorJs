@@ -10,6 +10,7 @@
     <Description>Browser-targeted builds of the official ASP.NET Core blazor.web.js.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/arika0093/LegacyBlazorJs</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>false</IncludeSymbols>
     <NoWarn>$(NoWarn);NU5100</NoWarn>

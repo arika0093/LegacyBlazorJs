@@ -9,6 +9,7 @@ const mode = process.argv[2] ?? 'profiles';
 const json = process.argv.includes('--json');
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+/** List LegacyBlazorJs package versions present in the artifacts directory. */
 async function listPackageVersions() {
   const packageDirectory = path.join(rootDir, 'artifacts', 'packages');
   const files = await readdir(packageDirectory);
