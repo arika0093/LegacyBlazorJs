@@ -63,7 +63,9 @@ internal static class TestEnvironment
 
     public static string HostingModel => ResolveHostingModel();
 
-    public static string SmokeAppTemplatesDirectory => Path.Combine(RepositoryRoot, "tests", "SmokeApps");
+    public static string BlazorServerAppTemplateDirectory => Path.Combine(RepositoryRoot, "tests", "BlazorServerApp");
+
+    public static string BlazorWasmAppTemplateDirectory => Path.Combine(RepositoryRoot, "tests", "BlazorWasmApp");
 
     private static string FindRepositoryRoot()
     {
@@ -126,6 +128,18 @@ internal static class TestEnvironment
                 $"Unsupported SMOKE_TEST_HOSTING_MODEL value '{configured}'. Expected 'Server' or 'WebAssembly'.")
         };
     }
+
+    public static string ResolveTargetFrameworkMoniker(string packageVersion)
+    {
+        var match = Regex.Match(packageVersion, @"^(?<major>\d+)\.");
+        if (!match.Success)
+        {
+            throw new InvalidOperationException(
+                $"Could not determine the target framework from package version '{packageVersion}'.");
+        }
+
+        return $"net{match.Groups["major"].Value}.0";
+    }
 }
 
 internal sealed class SmokeAppHarness : IAsyncDisposable
@@ -138,6 +152,7 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
     private readonly string _projectPath;
     private readonly string _profile;
     private readonly string _packageVersion;
+    private readonly string _targetFramework;
     private readonly string _hostingModel;
     private readonly Uri _baseUri;
     private CapturedProcess? _serverProcess;
@@ -148,6 +163,7 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         string projectPath,
         string profile,
         string packageVersion,
+        string targetFramework,
         string hostingModel,
         Uri baseUri)
     {
@@ -156,6 +172,7 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         _projectPath = projectPath;
         _profile = profile;
         _packageVersion = packageVersion;
+        _targetFramework = targetFramework;
         _hostingModel = hostingModel;
         _baseUri = baseUri;
     }
@@ -176,11 +193,20 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
 
         var templateDirectory = GetTemplateDirectory(hostingModel);
         CopyDirectory(templateDirectory, rootDirectory);
-        var appDirectory = GetAppDirectory(rootDirectory, hostingModel);
+        var appDirectory = rootDirectory;
         var projectPath = GetProjectPath(appDirectory, hostingModel);
         var port = GetAvailablePort();
         var baseUri = new Uri($"http://127.0.0.1:{port}");
-        var harness = new SmokeAppHarness(rootDirectory, appDirectory, projectPath, profile, packageVersion, hostingModel, baseUri);
+        var targetFramework = TestEnvironment.ResolveTargetFrameworkMoniker(packageVersion);
+        var harness = new SmokeAppHarness(
+            rootDirectory,
+            appDirectory,
+            projectPath,
+            profile,
+            packageVersion,
+            targetFramework,
+            hostingModel,
+            baseUri);
         await harness.InitializeAsync();
         return harness;
     }
@@ -196,7 +222,11 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
                 "--no-launch-profile",
                 "--no-restore"
             ],
-            _appDirectory);
+            _appDirectory,
+            new Dictionary<string, string>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Development"
+            });
 
         for (var attempt = 0; attempt < 120; attempt++)
         {
@@ -249,25 +279,69 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
 
     private async Task InitializeAsync()
     {
-        await ProcessRunner.RunCheckedAsync(
-            "dotnet",
-            [
-                "add", _projectPath,
-                "package", "LegacyBlazorJs",
-                "--version", _packageVersion,
-                "--source", TestEnvironment.PackageSourceDirectory
-            ],
-            _appDirectory);
+        ReplaceProjectPlaceholders();
+
+        WriteNuGetConfig(_appDirectory);
+
+        if (!HasProjectReferenceToLegacyBlazorJs(_projectPath))
+        {
+            await ProcessRunner.RunCheckedAsync(
+                "dotnet",
+                [
+                    "add", _projectPath,
+                    "package", "LegacyBlazorJs",
+                    "--version", _packageVersion,
+                    "--source", TestEnvironment.PackageSourceDirectory
+                ],
+                _appDirectory);
+        }
 
         await ProcessRunner.RunCheckedAsync(
             "dotnet",
             [
-                "restore", _projectPath,
-                "--source", TestEnvironment.PackageSourceDirectory
+                "restore", _projectPath
             ],
             _appDirectory);
 
-        ReplaceFrameworkScript(Path.Combine(_appDirectory, "Components", "App.razor"));
+        ReplaceFrameworkScript(GetScriptHostPath(_appDirectory, _hostingModel));
+    }
+
+    private static void WriteNuGetConfig(string directory)
+    {
+        var nugetConfigPath = Path.Combine(directory, "NuGet.config");
+        var contents = $"""
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="{TestEnvironment.PackageSourceDirectory.Replace("\\", "/")}" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+  </packageSources>
+</configuration>
+""";
+        File.WriteAllText(nugetConfigPath, contents);
+    }
+
+    private static bool HasProjectReferenceToLegacyBlazorJs(string projectPath)
+    {
+        var contents = File.ReadAllText(projectPath);
+        return contents.Contains("LegacyBlazorJs.csproj", StringComparison.Ordinal);
+    }
+
+    private void ReplaceProjectPlaceholders()
+    {
+        foreach (var projectPath in Directory.EnumerateFiles(_appDirectory, "*.csproj", SearchOption.AllDirectories))
+        {
+            var contents = File.ReadAllText(projectPath);
+            var updated = contents
+                .Replace("__TARGET_FRAMEWORK__", _targetFramework, StringComparison.Ordinal)
+                .Replace("__ASPNETCORE_VERSION__", _packageVersion, StringComparison.Ordinal);
+
+            if (!StringComparer.Ordinal.Equals(contents, updated))
+            {
+                File.WriteAllText(projectPath, updated);
+            }
+        }
     }
 
     private void ReplaceFrameworkScript(string appRazorPath)
@@ -285,26 +359,26 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
     }
 
     private static string GetTemplateDirectory(string hostingModel) =>
-        Path.Combine(TestEnvironment.SmokeAppTemplatesDirectory, hostingModel switch
-        {
-            "Server" => "ServerApp",
-            "WebAssembly" => "WasmApp",
-            _ => throw new InvalidOperationException($"Unsupported hosting model '{hostingModel}'.")
-        });
-
-    private static string GetAppDirectory(string rootDirectory, string hostingModel) =>
         hostingModel switch
         {
-            "Server" => rootDirectory,
-            "WebAssembly" => Path.Combine(rootDirectory, "WasmApp"),
+            "Server" => TestEnvironment.BlazorServerAppTemplateDirectory,
+            "WebAssembly" => TestEnvironment.BlazorWasmAppTemplateDirectory,
+            _ => throw new InvalidOperationException($"Unsupported hosting model '{hostingModel}'.")
+        };
+
+    private static string GetScriptHostPath(string appDirectory, string hostingModel) =>
+        hostingModel switch
+        {
+            "Server" => Path.Combine(appDirectory, "Components", "App.razor"),
+            "WebAssembly" => Path.Combine(appDirectory, "wwwroot", "index.html"),
             _ => throw new InvalidOperationException($"Unsupported hosting model '{hostingModel}'.")
         };
 
     private static string GetProjectPath(string appDirectory, string hostingModel) =>
         hostingModel switch
         {
-            "Server" => Path.Combine(appDirectory, "ServerApp.csproj"),
-            "WebAssembly" => Path.Combine(appDirectory, "WasmApp.csproj"),
+            "Server" => Path.Combine(appDirectory, "BlazorServerApp.csproj"),
+            "WebAssembly" => Path.Combine(appDirectory, "BlazorWasmApp.csproj"),
             _ => throw new InvalidOperationException($"Unsupported hosting model '{hostingModel}'.")
         };
 
@@ -416,11 +490,31 @@ internal sealed class BrowserHarness : IAsyncDisposable
     {
         var page = await _browser.NewPageAsync();
         var errors = new List<string>();
+        var failedResponses = new List<string>();
 
         page.PageError += (_, error) => errors.Add(error);
+        page.Response += (_, response) =>
+        {
+            if (response.Ok)
+            {
+                return;
+            }
+
+            var url = response.Url;
+            if (url.EndsWith("/favicon.ico", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            failedResponses.Add($"{response.Status} {url}");
+        };
         page.Console += (_, message) =>
         {
-            if (message.Type == "error")
+            if (message.Type == "error" &&
+                !string.Equals(
+                    message.Text,
+                    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+                    StringComparison.Ordinal))
             {
                 errors.Add(message.Text);
             }
@@ -458,6 +552,12 @@ internal sealed class BrowserHarness : IAsyncDisposable
         {
             throw new InvalidOperationException(
                 $"{hostingModel} {profile} emitted browser errors:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}");
+        }
+
+        if (failedResponses.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{hostingModel} {profile} returned failing HTTP responses:{Environment.NewLine}{string.Join(Environment.NewLine, failedResponses)}");
         }
 
         try
@@ -567,9 +667,21 @@ internal static class BrowserBinaryResolver
                 "SMOKE_TEST_CHROMIUM_VERSION is required when SMOKE_TEST_CHROMIUM_DOWNLOAD_URL is set.");
         }
 
-        var platform = ResolvePlatform();
-        var browserDirectory = Path.Combine(TestEnvironment.WorkDirectory, "browsers", "chromium", browserVersion, platform.DirectoryName);
-        var executablePath = Path.Combine(browserDirectory, platform.ExecutableRelativePath);
+        var executableRelativePath = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_EXECUTABLE_RELATIVE_PATH");
+        if (string.IsNullOrWhiteSpace(executableRelativePath))
+        {
+            throw new InvalidOperationException(
+                "SMOKE_TEST_CHROMIUM_EXECUTABLE_RELATIVE_PATH is required when SMOKE_TEST_CHROMIUM_DOWNLOAD_URL is set.");
+        }
+
+        var cacheKey = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_CACHE_KEY");
+        if (string.IsNullOrWhiteSpace(cacheKey))
+        {
+            cacheKey = ResolvePlatformCacheKey();
+        }
+
+        var browserDirectory = Path.Combine(TestEnvironment.WorkDirectory, "browsers", "chromium", browserVersion, cacheKey);
+        var executablePath = Path.Combine(browserDirectory, executableRelativePath);
 
         if (File.Exists(executablePath))
         {
@@ -595,36 +707,27 @@ internal static class BrowserBinaryResolver
         if (!File.Exists(executablePath))
         {
             throw new FileNotFoundException(
-                $"Downloaded Chromium archive did not contain the expected executable '{platform.ExecutableRelativePath}'.");
+                $"Downloaded Chromium archive did not contain the expected executable '{executableRelativePath}'.");
         }
 
         return new BrowserLaunchConfiguration(executablePath);
     }
 
-    private static BrowserPlatform ResolvePlatform()
+    private static string ResolvePlatformCacheKey()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            return Environment.Is64BitOperatingSystem
-                ? new BrowserPlatform("win64", Path.Combine("chrome-win64", "chrome.exe"))
-                : new BrowserPlatform("win32", Path.Combine("chrome-win32", "chrome.exe"));
+            return Environment.Is64BitOperatingSystem ? "win-x64" : "win-x86";
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            return new BrowserPlatform("linux64", Path.Combine("chrome-linux64", "chrome"));
+            return "linux-x64";
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            var directoryName = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "mac-arm64" : "mac-x64";
-            var executable = Path.Combine(
-                directoryName == "mac-arm64" ? "chrome-mac-arm64" : "chrome-mac-x64",
-                "Google Chrome for Testing.app",
-                "Contents",
-                "MacOS",
-                "Google Chrome for Testing");
-            return new BrowserPlatform(directoryName, executable);
+            return RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "mac-arm64" : "mac-x64";
         }
 
         throw new PlatformNotSupportedException("Only Windows, Linux, and macOS are supported for browser automation.");
@@ -647,8 +750,6 @@ internal static class BrowserBinaryResolver
             UnixFileMode.OtherRead |
             UnixFileMode.OtherExecute);
     }
-
-    private sealed record BrowserPlatform(string DirectoryName, string ExecutableRelativePath);
 }
 
 internal sealed record BrowserLaunchConfiguration(string? ExecutablePath)
@@ -658,10 +759,19 @@ internal sealed record BrowserLaunchConfiguration(string? ExecutablePath)
 
 internal static class ProcessRunner
 {
-    public static async Task RunCheckedAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory)
+    public static async Task RunCheckedAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        IReadOnlyDictionary<string, string>? environmentVariables = null)
     {
         using var process = new Process();
-        process.StartInfo = CreateStartInfo(fileName, arguments, workingDirectory, redirectOutput: true);
+        process.StartInfo = CreateStartInfo(
+            fileName,
+            arguments,
+            workingDirectory,
+            redirectOutput: true,
+            environmentVariables: environmentVariables);
 
         var standardOutput = new StringBuilder();
         var standardError = new StringBuilder();
@@ -700,7 +810,12 @@ internal static class ProcessRunner
             standardError);
     }
 
-    public static ProcessStartInfo CreateStartInfo(string fileName, IReadOnlyList<string> arguments, string workingDirectory, bool redirectOutput)
+    public static ProcessStartInfo CreateStartInfo(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        bool redirectOutput,
+        IReadOnlyDictionary<string, string>? environmentVariables = null)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -714,6 +829,14 @@ internal static class ProcessRunner
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
+        }
+
+        if (environmentVariables is not null)
+        {
+            foreach (var pair in environmentVariables)
+            {
+                startInfo.Environment[pair.Key] = pair.Value;
+            }
         }
 
         return startInfo;
@@ -734,11 +857,20 @@ internal sealed class CapturedProcess : IAsyncDisposable
 
     public Process Process { get; }
 
-    public static CapturedProcess Start(string fileName, IReadOnlyList<string> arguments, string workingDirectory)
+    public static CapturedProcess Start(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        IReadOnlyDictionary<string, string>? environmentVariables = null)
     {
         var process = new Process
         {
-            StartInfo = ProcessRunner.CreateStartInfo(fileName, arguments, workingDirectory, redirectOutput: true)
+            StartInfo = ProcessRunner.CreateStartInfo(
+                fileName,
+                arguments,
+                workingDirectory,
+                redirectOutput: true,
+                environmentVariables: environmentVariables)
         };
 
         if (!process.Start())

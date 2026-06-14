@@ -5,10 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { readTargetsConfig } from './config-lib.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const chromeForTestingMilestonesUrl =
-  'https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json';
-const chromeForTestingKnownGoodUrl =
-  'https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json';
+const chromiumSnapshotsBaseUrl = 'https://commondatastorage.googleapis.com/chromium-browser-snapshots';
+const chromiumHistoryJsonBaseUrl =
+  'https://raw.githubusercontent.com/vikyd/chromium-history-version-position/master/json/ver-pos-os-link';
 
 export function getRootDir() {
   return rootDir;
@@ -35,66 +34,116 @@ export function getHostingModels() {
   return ['Server', 'WebAssembly'];
 }
 
-export function getChromeForTestingPlatform() {
+export function getChromiumHistoryPlatform() {
   switch (process.platform) {
     case 'linux':
       if (process.arch !== 'x64') {
         throw new Error(`Unsupported Linux architecture '${process.arch}'.`);
       }
-      return 'linux64';
+      return {
+        cacheKey: 'linux-x64',
+        executableRelativePath: path.join('chrome-linux', 'chrome'),
+        historyOs: 'Linux_x64',
+        archiveFileName: 'chrome-linux.zip',
+      };
     case 'win32':
-      return process.arch === 'x64' ? 'win64' : 'win32';
+      return process.arch === 'x64'
+        ? {
+          cacheKey: 'win-x64',
+          executableRelativePath: path.join('chrome-win', 'chrome.exe'),
+          historyOs: 'Win_x64',
+          archiveFileName: 'chrome-win.zip',
+        }
+        : {
+          cacheKey: 'win-x86',
+          executableRelativePath: path.join('chrome-win', 'chrome.exe'),
+          historyOs: 'Win',
+          archiveFileName: 'chrome-win.zip',
+        };
     case 'darwin':
-      return process.arch === 'arm64' ? 'mac-arm64' : 'mac-x64';
+      return process.arch === 'arm64'
+        ? {
+          cacheKey: 'mac-arm64',
+          executableRelativePath: path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+          historyOs: 'Mac_Arm',
+          archiveFileName: 'chrome-mac.zip',
+        }
+        : {
+          cacheKey: 'mac-x64',
+          executableRelativePath: path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+          historyOs: 'Mac',
+          archiveFileName: 'chrome-mac.zip',
+        };
     default:
       throw new Error(`Unsupported platform '${process.platform}'.`);
   }
 }
 
-export async function fetchMilestoneDownloads() {
-  return fetchJson(chromeForTestingMilestonesUrl);
-}
-
-export async function fetchKnownGoodDownloads() {
-  return fetchJson(chromeForTestingKnownGoodUrl);
+export async function fetchChromiumVersionLinks() {
+  const platform = getChromiumHistoryPlatform();
+  return fetchJson(`${chromiumHistoryJsonBaseUrl}/version-position-link-${platform.historyOs}.json`);
 }
 
 export async function resolveCompatibilityBrowsers() {
-  const platform = getChromeForTestingPlatform();
+  const platform = getChromiumHistoryPlatform();
   const profiles = await getCompatibilityProfiles();
-  const [milestoneData, knownGoodData] = await Promise.all([
-    fetchMilestoneDownloads(),
-    fetchKnownGoodDownloads(),
-  ]);
+  const versionLinks = await fetchChromiumVersionLinks();
   const byProfile = new Map();
 
   for (const profile of profiles) {
-    const release = milestoneData.milestones?.[String(profile.chromeMajor)]
-      ?? resolveKnownGoodRelease(knownGoodData, profile.chromeMajor);
+    const release = resolveSnapshotRelease(versionLinks, profile.chromeMajor);
     if (!release) {
-      throw new Error(`Chrome for Testing does not list milestone ${profile.chromeMajor} for ${profile.name}.`);
-    }
-
-    const download = release.downloads?.chrome?.find(entry => entry.platform === platform);
-    if (!download?.url) {
-      throw new Error(`Chrome for Testing does not provide a '${platform}' Chrome download for ${profile.name}.`);
+      throw new Error(`No Chromium snapshot was found for major ${profile.chromeMajor} (${profile.name}).`);
     }
 
     byProfile.set(profile.name, {
       milestone: profile.chromeMajor,
       version: release.version,
-      downloadUrl: download.url,
-      platform,
+      downloadUrl: `${chromiumSnapshotsBaseUrl}/${release.snapshotPrefix}${platform.archiveFileName}`,
+      executableRelativePath: platform.executableRelativePath,
+      cacheKey: platform.cacheKey,
+      source: 'vikyd/chromium-history-version-position',
     });
   }
 
   return byProfile;
 }
 
-function resolveKnownGoodRelease(knownGoodData, chromeMajor) {
+function resolveSnapshotRelease(versionLinks, chromeMajor) {
   const prefix = `${chromeMajor}.`;
-  const versions = knownGoodData.versions?.filter(entry => entry.version?.startsWith(prefix)) ?? [];
-  return versions.at(-1) ?? null;
+  const version = Object.keys(versionLinks)
+    .filter(candidate => candidate.startsWith(prefix))
+    .sort(compareVersions)
+    .at(-1);
+
+  if (!version) {
+    return null;
+  }
+
+  const indexUrl = versionLinks[version];
+  const match = /prefix=([^&]+\/)/.exec(indexUrl);
+  if (!match) {
+    throw new Error(`Could not parse the Chromium snapshot prefix from '${indexUrl}'.`);
+  }
+
+  return {
+    version,
+    snapshotPrefix: match[1],
+  };
+}
+
+function compareVersions(left, right) {
+  const leftParts = left.split('.').map(Number);
+  const rightParts = right.split('.').map(Number);
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) {
+      return difference;
+    }
+  }
+
+  return 0;
 }
 
 async function fetchJson(url) {
@@ -106,7 +155,7 @@ async function fetchJson(url) {
   });
 
   if (!response.ok) {
-    throw new Error(`Chrome for Testing request failed for ${url}: ${response.status} ${response.statusText}`);
+    throw new Error(`Chromium version metadata request failed for ${url}: ${response.status} ${response.statusText}`);
   }
 
   return response.json();

@@ -68,10 +68,12 @@ async function main() {
           SMOKE_TEST_HOSTING_MODEL: hostingModel,
           SMOKE_TEST_CHROMIUM_VERSION: browser.version,
           SMOKE_TEST_CHROMIUM_DOWNLOAD_URL: browser.downloadUrl,
+          SMOKE_TEST_CHROMIUM_EXECUTABLE_RELATIVE_PATH: browser.executableRelativePath,
+          SMOKE_TEST_CHROMIUM_CACHE_KEY: browser.cacheKey,
         };
 
         console.log(
-          `Running ${build.version} ${profile.name} ${hostingModel} on Chromium ${browser.version} (${browser.platform})`);
+          `Running ${build.version} ${profile.name} ${hostingModel} on Chromium ${browser.version} (${browser.source})`);
         const outcome = await run(
           'dotnet',
           ['test', 'tests/PlaywrightTest/PlaywrightTest.csproj', '--logger', 'console;verbosity=minimal'],

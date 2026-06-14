@@ -48,13 +48,13 @@
     }
   },
   "es2015": {
-    "description": "Chrome 49+, Edge 14+, Firefox 45+, Safari 10+",
+    "description": "Chrome 51+, Edge 15+, Firefox 54+, Safari 10+",
     "ecma": 2015,
     "typescriptTarget": "es2015",
     "intendedBrowsers": [
-      "Chrome >= 49",
-      "Edge >= 14",
-      "Firefox >= 45",
+      "Chrome >= 51",
+      "Edge >= 15",
+      "Firefox >= 54",
       "Safari >= 10"
     ]
   },

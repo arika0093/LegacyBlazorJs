@@ -3,11 +3,14 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BlazorWasmApp</title>
     <base href="/" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <link rel="preload" id="webassembly" />
+    <link rel="icon" href="data:," />
+    <script type="importmap"></script>
 </head>
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <div id="app">Loading...</div>
     __LEGACY_BLAZOR_SCRIPT__
 </body>
 </html>

@@ -23,7 +23,7 @@ After referencing the NuGet package, applications can serve each file from `_con
 | `blazor.web.ie9.js` | Internet Explorer 9+ (best effort) | ES5 |
 | `blazor.web.ie10.js` | Internet Explorer 10+ (best effort) | ES5 |
 | `blazor.web.ie11.js` | Internet Explorer 11+ (best effort) | ES5 |
-| `blazor.web.es2015.js` | Chrome 49+, Edge 14+, Firefox 45+, Safari 10+ | ES2015 |
+| `blazor.web.es2015.js` | Chrome 51+, Edge 15+, Firefox 54+, Safari 10+ | ES2015 |
 | `blazor.web.es2016.js` | Chrome 52+, Edge 14+, Firefox 52+, Safari 10.1+ | ES2016 |
 | `blazor.web.es2017.js` | Chrome 58+, Edge 16+, Firefox 54+, Safari 11+ | ES2017 |
 | `blazor.web.es2018.js` | Chrome 64+, Edge 79+, Firefox 58+, Safari 12+ | ES2018 |
@@ -41,7 +41,8 @@ The authoritative profile definitions are in `config/targets.json`. There is int
 
 - Git
 - Node.js 20 or later with Corepack
-- .NET 8 SDK or later
+- .NET 8 SDK for the Playwright harness
+- .NET SDKs for the majors listed in `config/majors.json`
 
 ```bash
 npm ci
@@ -77,9 +78,9 @@ Because the package is a Razor Class Library with static web assets, consumers d
 
 ## Smoke testing
 
-`.github/workflows/smoke-test.yml` builds the generated NuGet package, then runs Playwright smoke tests against the `ES2020` through `ES2022` outputs in both `Blazor Server` and `Blazor WebAssembly` template apps. Each profile is validated against its minimum intended Chromium major by downloading a fixed Chrome for Testing build, for example `es2020 -> Chrome 80`, `es2021 -> Chrome 85`, and `es2022 -> Chrome 94`.
+`.github/workflows/smoke-test.yml` builds the generated NuGet package, then runs Playwright smoke tests against the `ES2020` through `ES2022` outputs in both `Blazor Server` and `Blazor WebAssembly` template apps. Each fixture app is retargeted to the tested upstream major at runtime, for example package `10.0.x` is exercised with `net10.0`. Each profile is validated against its minimum intended Chromium major by downloading a fixed historical Chromium snapshot sourced from `vikyd/chromium-history-version-position`, for example `es2020 -> Chromium 80`, `es2021 -> Chromium 85`, and `es2022 -> Chromium 94`.
 
-The C# smoke test project creates the app, swaps in `_content/LegacyBlazorJs/blazor.web.<profile>.js`, starts the app, launches the pinned Chromium build, and verifies that clicking the Counter button updates the count without browser errors.
+The C# smoke test project copies `tests/BlazorServerApp` or `tests/BlazorWasmApp`, replaces the target framework and script placeholders, starts the app, launches the pinned Chromium build, and verifies that clicking the Counter button updates the count without browser errors.
 
 After building package artifacts, run the compatibility matrix and refresh this README with:
 
@@ -93,7 +94,7 @@ To run only the smoke test project directly, use:
 dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
 ```
 
-The test project resolves the latest `LegacyBlazorJs.*.nupkg` from `artifacts/packages` automatically. Set `PACKAGE_VERSION` to force a specific package version, `SMOKE_TEST_PROFILE` to run a single profile, `SMOKE_TEST_HOSTING_MODEL` to switch between `Server` and `WebAssembly`, or `SMOKE_TEST_CHROMIUM_DOWNLOAD_URL` plus `SMOKE_TEST_CHROMIUM_VERSION` to force a specific Chrome for Testing binary.
+The test project resolves the latest `LegacyBlazorJs.*.nupkg` from `artifacts/packages` automatically. Set `PACKAGE_VERSION` to force a specific package version, `SMOKE_TEST_PROFILE` to run a single profile, `SMOKE_TEST_HOSTING_MODEL` to switch between `Server` and `WebAssembly`, or `SMOKE_TEST_CHROMIUM_DOWNLOAD_URL`, `SMOKE_TEST_CHROMIUM_VERSION`, and `SMOKE_TEST_CHROMIUM_EXECUTABLE_RELATIVE_PATH` to force a specific Chromium binary.
 
 ### ES20x compatibility results
 
