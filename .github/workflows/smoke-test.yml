@@ -1,0 +1,51 @@
+name: Build and smoke test generated scripts
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: npm ci --ignore-scripts
+      - id: version
+        env: { GITHUB_TOKEN: "${{ github.token }}" }
+        run: node scripts/resolve-version.mjs 8
+      - env: { ASPNETCORE_TAG: "${{ steps.version.outputs.tag }}" }
+        run: npm run build -- 8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: |
+            artifacts/packages/*.nupkg
+            dist/${{ steps.version.outputs.tag }}/*
+
+  smoke-test:
+    needs: build-package
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [ie6, ie7, ie8, ie9, ie10, ie11, es2015, es2016, es2017, es2018, es2019, es2020, es2021, es2022]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - uses: actions/download-artifact@v4
+        with: { name: package, path: artifacts/packages }
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: |
+          VERSION=$(basename artifacts/packages/LegacyBlazorJs.*.nupkg | sed -E 's/^LegacyBlazorJs\.(.*)\.nupkg$/\1/')
+          npm run test:smoke -- '${{ matrix.profile }}' "$VERSION"

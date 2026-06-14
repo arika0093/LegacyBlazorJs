@@ -1,0 +1,11 @@
+node_modules/
+.work/
+artifacts/
+dist/*
+!dist/.gitkeep
+src/LegacyBlazorJs/wwwroot/*
+!src/LegacyBlazorJs/wwwroot/.gitkeep
+bin/
+obj/
+*.nupkg
+src/LegacyBlazorJs/UPSTREAM-LICENSE.txt
