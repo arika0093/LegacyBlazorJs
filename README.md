@@ -81,18 +81,22 @@ The authoritative profile definitions are in [config/targets.json](config/target
 ## Development Guide
 ### How it works
 
-1. For every .NET major listed in `config/majors.json`, resolve the latest stable `dotnet/aspnetcore` tag through the GitHub API.
-2. Clone that tag and build the upstream `Microsoft.AspNetCore.Components.Web.JS.npmproj`, including its linked JSInterop and SignalR dependencies.
-3. Rebuild `src/Components/Web.JS` once per profile after changing the upstream TypeScript and webpack/Rollup Terser targets.
-4. Pack `LegacyBlazorJs` using the upstream tag without its `v` prefix. For example `v8.0.27` becomes package version `8.0.27`.
+To be specific, the process is as follows:
 
-### Smoke testing
+1. First, check the tags of the upstream ([dotnet/aspnetcore](https://github.com/dotnet/aspnetcore)) to find the latest versions. As of 2026/06/15, they are `v8.0.28`, `v9.0.17`, and `v10.0.9`.
+2. Clone the upstream (this takes time!).
+3. For .NET 8 and earlier, use yarn; for .NET 9 and later, use npm workspaces.
+4. It is compiled by `@rollup/plugin-typescript`.
+    * Because the source code contains the [named capturing groups](https://caniuse.com/mdn-javascript_regular_expressions_named_capturing_group) feature (ES2018), settings like ES5 will cause errors.
+    * Therefore, it is first built with ES2018 or higher, and then down-leveled with esbuild or babel as needed.
+5. The generated JS files (`blazor.(type).(version).js`) are packaged together into `LegacyBlazorJs`.
+6. Smoke tests are performed (using an old Chromium), and then the package is released.
+    * It is released with the same version as the upstream. For example, it is released as `8.0.28`, `9.0.17`, `10.0.9`.
 
-TODO
+### Compatibility results
 
-### ES20x compatibility results
-
-TODO
+<!-- compatibility-results:start -->
+<!-- compatibility-results:end -->
 
 ## License
 
