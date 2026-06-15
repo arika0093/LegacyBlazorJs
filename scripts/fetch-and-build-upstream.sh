@@ -7,16 +7,20 @@ MAJOR="${1:-${DOTNET_MAJOR:-}}"
 TAG="${2:-${ASPNETCORE_TAG:-}}"
 NODE_BIN="${3:-${NODE_BIN:-node}}"
 
-# Upstream yarn scripts expect a plain 'node' on PATH, so create a tiny wrapper
-# that forwards to the Node binary selected by the caller (useful on WSL/Windows).
-NODE_WRAPPER_DIR="${HOME}/.local/bin"
-mkdir -p "$NODE_WRAPPER_DIR"
-cat > "$NODE_WRAPPER_DIR/node" <<EOF
+# Upstream yarn scripts expect a plain 'node' on PATH. If the selected Node binary
+# is not already the one that would be resolved, create a tiny wrapper so downstream
+# tools find it (useful on WSL/Windows).
+CURRENT_NODE="$(command -v node || true)"
+if [[ "$CURRENT_NODE" != "$NODE_BIN" ]]; then
+  NODE_WRAPPER_DIR="${HOME}/.local/bin"
+  mkdir -p "$NODE_WRAPPER_DIR"
+  cat > "$NODE_WRAPPER_DIR/node" <<EOF
 #!/usr/bin/env bash
 exec "$NODE_BIN" "\$@"
 EOF
-chmod +x "$NODE_WRAPPER_DIR/node"
-export PATH="$NODE_WRAPPER_DIR:$PATH"
+  chmod +x "$NODE_WRAPPER_DIR/node"
+  export PATH="$NODE_WRAPPER_DIR:$PATH"
+fi
 
 # The orchestrator normally resolves tags up front, but this script still supports direct major builds.
 if [[ -z "$TAG" ]]; then
@@ -28,7 +32,8 @@ mkdir -p "$ROOT/.work"
 DIST_DIR="$ROOT/dist/$TAG"
 PACKAGE_WWWROOT="$ROOT/src/LegacyBlazorJs/wwwroot"
 SOURCE_DIR="$(mktemp -d "$ROOT/.work/aspnetcore-$TAG.XXXXXX")"
-trap 'rm -rf "$SOURCE_DIR" >/dev/null 2>&1 || true' EXIT
+# disable cleanup
+# trap 'rm -rf "$SOURCE_DIR" >/dev/null 2>&1 || true' EXIT
 git clone --depth 1 --branch "$TAG" -- https://github.com/dotnet/aspnetcore.git "$SOURCE_DIR"
 corepack prepare yarn@1.22.22 --activate
 
