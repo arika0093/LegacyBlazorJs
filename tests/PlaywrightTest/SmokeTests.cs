@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
@@ -138,7 +139,7 @@ internal static class TestEnvironment
                 $"Could not determine the target framework from package version '{packageVersion}'.");
         }
 
-        return $"net{match.Groups["major"].Value}.0";
+        return "net10.0";
     }
 }
 
@@ -357,7 +358,13 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
     private void ReplaceFrameworkScript(string appRazorPath)
     {
         var contents = File.ReadAllText(appRazorPath);
-        var replacement = $"<script src=\"_content/LegacyBlazorJs/blazor.web.{_profile}.js\"></script>";
+        var scriptName = _hostingModel switch
+        {
+            "Server" => $"blazor.web.{_profile}.js",
+            "WebAssembly" => $"blazor.webassembly.{_profile}.js",
+            _ => throw new InvalidOperationException($"Unsupported hosting model '{_hostingModel}'.")
+        };
+        var replacement = $"<script src=\"_content/LegacyBlazorJs/{scriptName}\"></script>";
         var updated = contents.Replace("__LEGACY_BLAZOR_SCRIPT__", replacement, StringComparison.Ordinal);
 
         if (ReferenceEquals(contents, updated) || contents == updated)
@@ -449,9 +456,6 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
 
 internal sealed class BrowserHarness : IAsyncDisposable
 {
-    private static readonly SemaphoreSlim InstallLock = new(1, 1);
-    private static bool _browsersInstalled;
-
     private readonly IPlaywright _playwright;
     private readonly IBrowser _browser;
 
@@ -464,10 +468,6 @@ internal sealed class BrowserHarness : IAsyncDisposable
     public static async Task<BrowserHarness> CreateAsync()
     {
         var launchConfiguration = await BrowserBinaryResolver.ResolveAsync();
-        if (launchConfiguration.ExecutablePath is null)
-        {
-            await EnsureBrowsersInstalledAsync(force: false);
-        }
 
         var playwright = await Playwright.CreateAsync();
         try
@@ -558,7 +558,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
 
             try
             {
-                await page.WaitForTimeoutAsync(500, interactionCts.Token);
+                await Task.Delay(500, interactionCts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -596,73 +596,6 @@ internal sealed class BrowserHarness : IAsyncDisposable
     {
         await _browser.DisposeAsync();
         _playwright.Dispose();
-    }
-
-    private static async Task EnsureBrowsersInstalledAsync(bool force)
-    {
-        if (!force && _browsersInstalled)
-        {
-            return;
-        }
-
-        await InstallLock.WaitAsync();
-        try
-        {
-            if (!force && _browsersInstalled)
-            {
-                return;
-            }
-
-            var baseDirectory = AppContext.BaseDirectory;
-            string command;
-            string[] arguments;
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                var scriptPath = FindPlaywrightScript(baseDirectory, "playwright.ps1");
-                command = "pwsh";
-                arguments =
-                [
-                    "-File", scriptPath,
-                    "install",
-                    "chromium"
-                ];
-            }
-            else
-            {
-                var scriptPath = FindPlaywrightScript(baseDirectory, "playwright.sh");
-                command = "bash";
-                arguments =
-                [
-                    scriptPath,
-                    "install",
-                    "--with-deps",
-                    "chromium"
-                ];
-            }
-
-            await ProcessRunner.RunCheckedAsync(command, arguments, baseDirectory);
-            _browsersInstalled = true;
-        }
-        finally
-        {
-            InstallLock.Release();
-        }
-    }
-
-    private static string FindPlaywrightScript(string baseDirectory, string fileName)
-    {
-        var scriptPath = Directory
-            .EnumerateFiles(baseDirectory, fileName, SearchOption.AllDirectories)
-            .FirstOrDefault();
-
-        if (scriptPath is null)
-        {
-            throw new FileNotFoundException(
-                $"Could not locate '{fileName}' under '{baseDirectory}'. Build the Playwright test project before running smoke tests.");
-        }
-
-        return scriptPath;
     }
 }
 

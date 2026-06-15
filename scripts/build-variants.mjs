@@ -68,10 +68,18 @@ try {
       throw new Error('Could not locate the upstream bundler/Terser ECMA target.');
     }
     await writeFile(bundlerConfigPath, bundlerConfig);
+    await run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], sourceDir);
     await run('yarn', ['run', 'build:production'], sourceDir);
-    const filename = `blazor.web.${name}.js`;
-    await copyFile(path.join(sourceDir, 'dist/Release/blazor.web.js'), path.join(output, filename));
-    files[name] = { file: filename, description: profile.description, ecma: profile.ecma };
+    const webFilename = `blazor.web.${name}.js`;
+    const webAssemblyFilename = `blazor.webassembly.${name}.js`;
+    await copyFile(path.join(sourceDir, 'dist/Release/blazor.web.js'), path.join(output, webFilename));
+    await copyFile(path.join(sourceDir, 'dist/Release/blazor.webassembly.js'), path.join(output, webAssemblyFilename));
+    files[name] = {
+      file: webFilename,
+      webAssemblyFile: webAssemblyFilename,
+      description: profile.description,
+      ecma: profile.ecma
+    };
   }
 } finally {
   // Always restore upstream files so repeated builds start from a clean checkout.

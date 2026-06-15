@@ -36,7 +36,7 @@ run_yarn_build() {
   local project_dir="$1"
   local build_script="${2:-build}"
   pushd "$project_dir" >/dev/null
-  yarn install --mutex network --frozen-lockfile || yarn install --mutex network --frozen-lockfile
+  yarn install --mutex network --frozen-lockfile --ignore-engines || yarn install --mutex network --frozen-lockfile --ignore-engines
   yarn run "$build_script"
   local exit_code=$?
   popd >/dev/null
@@ -46,7 +46,7 @@ run_yarn_build() {
 # Build only the linked JavaScript packages instead of restoring the full ASP.NET Core engineering toolset.
 run_yarn_build "$SOURCE_DIR/src/JSInterop/Microsoft.JSInterop.JS/src" build
 pushd "$SOURCE_DIR/src/SignalR/clients/ts/common" >/dev/null
-yarn install --mutex network --frozen-lockfile || yarn install --mutex network --frozen-lockfile
+yarn install --mutex network --frozen-lockfile --ignore-engines || yarn install --mutex network --frozen-lockfile --ignore-engines
 popd >/dev/null
 run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr" build
 run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr-protocol-msgpack" build
