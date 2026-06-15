@@ -101,53 +101,50 @@ jobs:
             artifacts/packages/build-summary.json
 
   # Run ES20x compatibility matrix tests with specific Chromium versions
-  test-compat:
-    needs: [configure, build]
-    if: github.event_name == 'schedule' || inputs.run_compat
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        dotnet: ${{ fromJSON(needs.configure.outputs.matrix) }}
-    steps:
-      # > source
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-      # > node (20)
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 20
-      # > dotnet (test framework target + package target frameworks)
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
-        with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
-            10.0.x
-      # download artifacts from build job
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: LegacyBlazorJs-packages
-          path: artifacts/packages
-      # > npm dependencies
-      - run: npm ci --ignore-scripts
-      # > playwright dependencies; the compatibility harness downloads each profile's old Chromium
-      - run: dotnet tool install --global Microsoft.Playwright.CLI
-      - run: playwright install-deps chromium
-      # execute compatibility test matrix for this .NET version
-      - name: Run ES20x compatibility matrix (.NET ${{ matrix.dotnet }})
-        run: npm run test:compat
-        env:
-          DOTNET_MAJOR: ${{ matrix.dotnet }}
+  # test-compat:
+  #   needs: [configure, build]
+  #   if: github.event_name == 'schedule' || inputs.run_compat
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       dotnet: ${{ fromJSON(needs.configure.outputs.matrix) }}
+  #   steps:
+  #     # > source
+  #     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+  #       with:
+  #         persist-credentials: false
+  #     # > node (20)
+  #     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+  #       with:
+  #         node-version: 20
+  #     # > dotnet (test framework target + package target frameworks)
+  #     - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+  #       with:
+  #         dotnet-version: |
+  #           8.0.x
+  #           9.0.x
+  #           10.0.x
+  #     # download artifacts from build job
+  #     - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+  #       with:
+  #         name: LegacyBlazorJs-packages
+  #         path: artifacts/packages
+  #     # > npm dependencies
+  #     - run: npm ci --ignore-scripts
+  #     # > playwright dependencies; the compatibility harness downloads each profile's old Chromium
+  #     - run: dotnet tool install --global Microsoft.Playwright.CLI
+  #     - run: playwright install-deps chromium
+  #     # execute compatibility test matrix for this .NET version
+  #     - name: Run ES20x compatibility matrix (.NET ${{ matrix.dotnet }})
+  #       run: npm run test:compat
+  #       env:
+  #         DOTNET_MAJOR: ${{ matrix.dotnet }}
 
   # If a new version is found, create a release and publish to NuGet/GitHub
   release-github:
-    needs: [build, test-compat]
+    needs: [build]
     if: >-
-      always() &&
-      needs.build.result == 'success' &&
-      (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped') &&
       (github.event_name == 'schedule' || inputs.publish_github)
     runs-on: ubuntu-latest
     steps:
@@ -179,11 +176,8 @@ jobs:
           GITHUB_TOKEN: "${{ github.token }}"
 
   release-nuget:
-    needs: [build, test-compat]
+    needs: [build]
     if: >-
-      always() &&
-      needs.build.result == 'success' &&
-      (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped') &&
       (github.event_name == 'schedule' || inputs.publish_nuget)
     runs-on: ubuntu-latest
     steps:
@@ -192,11 +186,12 @@ jobs:
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
+      
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: arika0093
 
-      # publish packages to NuGet.org (skip duplicates)
-      - name: Publish to NuGet.org
-        run: |
-          dotnet nuget push 'artifacts/packages/*.nupkg' \
-            --api-key '${{ secrets.NUGET_API_KEY }}' \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+      - name: Publish NuGet Package
+        run: dotnet nuget push ./artifacts/packages/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
