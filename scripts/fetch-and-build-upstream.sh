@@ -7,6 +7,26 @@ MAJOR="${1:-${DOTNET_MAJOR:-}}"
 TAG="${2:-${ASPNETCORE_TAG:-}}"
 NODE_BIN="${3:-${NODE_BIN:-node}}"
 
+# Run a command up to N times, waiting between failures, to survive transient network errors.
+retry() {
+  local max_attempts="$1"
+  local delay="$2"
+  shift 2
+  local attempt=1
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+    if [[ "$attempt" -ge "$max_attempts" ]]; then
+      echo "Command failed after $max_attempts attempt(s): $*" >&2
+      return 1
+    fi
+    echo "Attempt $attempt/$max_attempts failed; retrying in ${delay}s..." >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+}
+
 # Upstream scripts expect a plain 'node' on PATH. If the selected Node binary
 # is not already the one that would be resolved, create a tiny wrapper so downstream
 # tools find it (useful on WSL/Windows).
@@ -50,7 +70,7 @@ if [[ "$USE_NPM_WORKSPACES" -eq 1 ]]; then
   # ASP.NET Core 9+ ships an older tslib that does not include helpers like __spreadArray used for ES5 down-leveling.
   # Force a newer tslib across the workspace before installing.
   "$NODE_BIN" "$ROOT/scripts/patch-tslib-override.mjs" "$SOURCE_DIR/package.json"
-  npm install --ignore-scripts
+  retry 3 15 npm install --ignore-scripts
   # Build the shared packages referenced by Web.JS. The Web.JS build itself is handled by build-variants.mjs.
   npm run build --workspace=src/JSInterop/Microsoft.JSInterop.JS/src
   npm run build --workspace=src/SignalR/clients/ts/signalr
@@ -63,7 +83,7 @@ else
     local project_dir="$1"
     local build_script="${2:-build}"
     pushd "$project_dir" >/dev/null
-    yarn install --mutex network --frozen-lockfile --ignore-engines || yarn install --mutex network --frozen-lockfile --ignore-engines
+    retry 3 15 yarn install --mutex network --frozen-lockfile --ignore-engines
     yarn run "$build_script"
     local exit_code=$?
     popd >/dev/null
@@ -73,7 +93,7 @@ else
   # Build only the linked JavaScript packages instead of restoring the full ASP.NET Core engineering toolset.
   run_yarn_build "$SOURCE_DIR/src/JSInterop/Microsoft.JSInterop.JS/src" build
   pushd "$SOURCE_DIR/src/SignalR/clients/ts/common" >/dev/null
-  yarn install --mutex network --frozen-lockfile --ignore-engines || yarn install --mutex network --frozen-lockfile --ignore-engines
+  retry 3 15 yarn install --mutex network --frozen-lockfile --ignore-engines
   popd >/dev/null
   run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr" build
   run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr-protocol-msgpack" build
