@@ -1,0 +1,94 @@
+name: Smoke test generated scripts
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # build the latest ASP.NET Core source for .NET 10 and upload the NuGet package
+  build-package:
+    runs-on: ubuntu-latest
+    steps:
+      # setup environment
+      # > source
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      # > node (20)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+      # > dotnet (10)
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .work/aspnetcore-*
+          key: smoke-build-${{ runner.os }}-upstream-${{ hashFiles('scripts/build-all.mjs', 'scripts/build-variants.mjs', 'scripts/fetch-and-build-upstream.sh', 'scripts/config-lib.mjs', 'config/targets.json') }}
+          restore-keys: |
+            smoke-build-${{ runner.os }}-upstream-
+      # > npm dependencies
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      # fetch upstream source for .NET 10 and pack NuGet
+      - name: Build upstream source and NuGet package
+        run: npm run build -- 10
+        env:
+          BUILD_TARGET_PROFILES: es5
+          GITHUB_TOKEN: "${{ github.token }}"
+
+      # upload packages
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: LegacyBlazorJs-packages
+          path: artifacts/packages/*.nupkg
+
+  # Run a single smoke test against the ES5 variant using Blazor Server
+  # smoke-test:
+  #   needs: build-package
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     # > source
+  #     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+  #       with:
+  #         persist-credentials: false
+  #     # > node (20)
+  #     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+  #       with:
+  #         node-version: 20
+  #         cache: npm
+  #     # > dotnet (10)
+  #     - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+  #       with:
+  #         dotnet-version: 10.0.x
+  #     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+  #       with:
+  #         path: .work/browsers/chromium
+  #         key: smoke-test-${{ runner.os }}-chromium-${{ hashFiles('scripts/export-browser-env.mjs', 'scripts/compat-lib.mjs', 'config/targets.json') }}
+  #         restore-keys: |
+  #           smoke-test-${{ runner.os }}-chromium-
+  #     # download artifacts from build job
+  #     - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+  #       with:
+  #         name: LegacyBlazorJs-packages
+  #         path: artifacts/packages
+  #     # > npm dependencies
+  #     - run: npm ci --ignore-scripts
+  #     # > playwright dependencies; the test harness downloads the older ES2020-era Chromium below
+  #     - run: dotnet tool install --global Microsoft.Playwright.CLI
+  #     - run: dotnet build tests/PlaywrightTest/PlaywrightTest.csproj
+  #     - run: playwright -p tests/PlaywrightTest/PlaywrightTest.csproj install-deps chromium
+  #     - name: Select old Chromium for smoke test
+  #       run: node scripts/export-browser-env.mjs es2020
+  #     # execute a single smoke test for the ES5 variant on Blazor Server
+  #     - name: Run smoke test (ES5, Blazor Server)
+  #       run: xvfb-run -a dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
+  #       env:
+  #         SMOKE_TEST_PROFILE: es5
+  #         SMOKE_TEST_HOSTING_MODEL: Server
