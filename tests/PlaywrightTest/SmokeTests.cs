@@ -711,6 +711,7 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
     private readonly Process _process;
     private readonly string _profileDirectory;
     private readonly ClientWebSocket _socket;
+    private string _targetId;
     private string _sessionId;
     private Task _receiveLoopTask;
     private readonly CancellationTokenSource _receiveLoopCancellation = new();
@@ -724,12 +725,14 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
         Process process,
         string profileDirectory,
         ClientWebSocket socket,
+        string targetId,
         string sessionId,
         Task receiveLoopTask)
     {
         _process = process;
         _profileDirectory = profileDirectory;
         _socket = socket;
+        _targetId = targetId;
         _sessionId = sessionId;
         _receiveLoopTask = receiveLoopTask;
     }
@@ -761,20 +764,24 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
             process,
             profileDirectory,
             socket,
+            targetId: string.Empty,
             sessionId: string.Empty,
             receiveLoopTask: Task.CompletedTask);
 
         harness._receiveLoopTask = harness.RunReceiveLoopAsync();
-        harness._sessionId = await harness.AttachToTargetAsync();
+        (harness._targetId, harness._sessionId) = await harness.AttachToTargetAsync();
         return harness;
     }
 
     public async Task AssertCounterInteractiveAsync(Uri baseUri, string profile, string hostingModel)
     {
+        await SendCommandAsync("Target.activateTarget", new { targetId = _targetId });
         await SendCommandAsync("Page.enable", sessionId: _sessionId);
         await SendCommandAsync("Runtime.enable", sessionId: _sessionId);
         await SendCommandAsync("Log.enable", sessionId: _sessionId);
         await SendCommandAsync("Network.enable", sessionId: _sessionId);
+        await TrySendCommandAsync("Page.bringToFront", sessionId: _sessionId);
+        await TrySendCommandAsync("Emulation.setFocusEmulationEnabled", new { enabled = true }, _sessionId);
 
         await SendCommandAsync(
             "Page.navigate",
@@ -782,8 +789,9 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
             _sessionId);
 
         await WaitForConditionAsync(
-            "document.querySelector('button') !== null && document.querySelector('[role=\"status\"]') !== null",
-            TimeSpan.FromSeconds(30));
+            "document.readyState === 'complete' && document.querySelector('button') !== null && document.querySelector('[role=\"status\"]') !== null",
+            TimeSpan.FromSeconds(30),
+            "counter UI to render");
 
         using var interactionCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         while (!interactionCts.IsCancellationRequested)
@@ -799,6 +807,7 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
                 return;
             }
 
+            await EnsurePageReadyForInputAsync();
             await ClickButtonAsync();
 
             try
@@ -823,7 +832,8 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
                 $"{hostingModel} {profile} returned failing HTTP responses:{Environment.NewLine}{string.Join(Environment.NewLine, _failedResponses)}");
         }
 
-        throw new TimeoutException($"{hostingModel} {profile} did not become interactive within the allotted time.");
+        throw new TimeoutException(
+            $"{hostingModel} {profile} did not become interactive within the allotted time.{Environment.NewLine}{await CaptureDiagnosticsAsync()}");
     }
 
     public async ValueTask DisposeAsync()
@@ -934,18 +944,19 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
         }
     }
 
-    private async Task<string> AttachToTargetAsync()
+    private async Task<(string TargetId, string SessionId)> AttachToTargetAsync()
     {
         var target = await SendCommandAsync("Target.createTarget", new { url = "about:blank" });
         var targetId = target.GetProperty("targetId").GetString()
             ?? throw new InvalidOperationException("CDP did not return a target id.");
 
         var attached = await SendCommandAsync("Target.attachToTarget", new { targetId, flatten = true });
-        return attached.GetProperty("sessionId").GetString()
+        var sessionId = attached.GetProperty("sessionId").GetString()
             ?? throw new InvalidOperationException("CDP did not return a session id.");
+        return (targetId, sessionId);
     }
 
-    private async Task WaitForConditionAsync(string expression, TimeSpan timeout)
+    private async Task WaitForConditionAsync(string expression, TimeSpan timeout, string description)
     {
         using var cts = new CancellationTokenSource(timeout);
         while (!cts.IsCancellationRequested)
@@ -970,7 +981,26 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
             }
         }
 
-        throw new TimeoutException($"Legacy Chromium condition did not become true: {expression}");
+        throw new TimeoutException(
+            $"Legacy Chromium timed out waiting for {description}: {expression}{Environment.NewLine}{await CaptureDiagnosticsAsync()}");
+    }
+
+    private async Task EnsurePageReadyForInputAsync()
+    {
+        await TrySendCommandAsync("Page.bringToFront", sessionId: _sessionId);
+        await EvaluateAsync(
+            """
+            (() => {
+              const button = document.querySelector('button');
+              if (!button) {
+                return false;
+              }
+
+              button.scrollIntoView({ block: 'center', inline: 'center' });
+              button.focus();
+              return true;
+            })()
+            """);
     }
 
     private async Task ClickButtonAsync()
@@ -983,10 +1013,15 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
                 return null;
               }
 
+              button.scrollIntoView({ block: 'center', inline: 'center' });
+              button.focus();
               const rect = button.getBoundingClientRect();
+              const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
               return {
                 x: rect.left + rect.width / 2,
-                y: rect.top + rect.height / 2
+                y: rect.top + rect.height / 2,
+                visible: rect.width > 0 && rect.height > 0,
+                hitTag: hit ? hit.tagName : null
               };
             })()
             """);
@@ -1001,16 +1036,28 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
 
         await SendCommandAsync(
             "Input.dispatchMouseEvent",
-            new { type = "mouseMoved", x, y, button = "none", clickCount = 0 },
+            new { type = "mouseMoved", x, y, button = "none", buttons = 0, clickCount = 0 },
             _sessionId);
         await SendCommandAsync(
             "Input.dispatchMouseEvent",
-            new { type = "mousePressed", x, y, button = "left", clickCount = 1 },
+            new { type = "mousePressed", x, y, button = "left", buttons = 1, clickCount = 1 },
             _sessionId);
         await SendCommandAsync(
             "Input.dispatchMouseEvent",
-            new { type = "mouseReleased", x, y, button = "left", clickCount = 1 },
+            new { type = "mouseReleased", x, y, button = "left", buttons = 0, clickCount = 1 },
             _sessionId);
+        await EvaluateAsync(
+            """
+            (() => {
+              const button = document.querySelector('button');
+              if (!button) {
+                return false;
+              }
+
+              button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+              return true;
+            })()
+            """);
     }
 
     private async Task<bool> EvaluateBooleanAsync(string expression)
@@ -1068,6 +1115,75 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
         var bytes = Encoding.UTF8.GetBytes(payload);
         await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
         return await completionSource.Task;
+    }
+
+    private async Task<JsonElement?> TrySendCommandAsync(string method, object? parameters = null, string? sessionId = null)
+    {
+        try
+        {
+            return await SendCommandAsync(method, parameters, sessionId);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<string> CaptureDiagnosticsAsync()
+    {
+        var diagnostics = await EvaluateAsync(
+            """
+            (() => {
+              const button = document.querySelector('button');
+              const status = document.querySelector('[role="status"]');
+              const scripts = Array.from(document.scripts).map(script => script.src).filter(Boolean);
+              const rect = button ? button.getBoundingClientRect() : null;
+              const hit = rect ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) : null;
+
+              return {
+                readyState: document.readyState,
+                href: location.href,
+                userAgent: navigator.userAgent,
+                statusText: status ? status.textContent : null,
+                buttonText: button ? button.textContent : null,
+                buttonDisabled: button ? button.disabled : null,
+                activeElement: document.activeElement ? document.activeElement.tagName : null,
+                buttonRect: rect ? {
+                  left: rect.left,
+                  top: rect.top,
+                  width: rect.width,
+                  height: rect.height
+                } : null,
+                centerHitTag: hit ? hit.tagName : null,
+                scripts,
+                htmlSnippet: document.body ? document.body.innerHTML.slice(0, 1500) : null
+              };
+            })()
+            """);
+
+        var builder = new StringBuilder();
+        builder.AppendLine("Legacy Chromium diagnostics:");
+        builder.AppendLine(diagnostics.GetRawText());
+
+        if (_errors.Count > 0)
+        {
+            builder.AppendLine("Collected browser errors:");
+            foreach (var error in _errors)
+            {
+                builder.AppendLine(error);
+            }
+        }
+
+        if (_failedResponses.Count > 0)
+        {
+            builder.AppendLine("Collected failed responses:");
+            foreach (var failedResponse in _failedResponses)
+            {
+                builder.AppendLine(failedResponse);
+            }
+        }
+
+        return builder.ToString();
     }
 
     private async Task RunReceiveLoopAsync()

@@ -12,6 +12,7 @@ const artifactsDir = path.join(rootDir, 'artifacts', 'packages');
 const repository = process.env.UPSTREAM_REPOSITORY ?? 'dotnet/aspnetcore';
 const includePrerelease = process.env.INCLUDE_PRERELEASE === 'true';
 const explicitTag = process.env.ASPNETCORE_TAG;
+const explicitProfiles = process.env.BUILD_TARGET_PROFILES;
 const positionalMajors = process.argv.slice(2).filter(argument => !argument.startsWith('--'));
 const nodeBinForBash = toBashPath(process.execPath);
 
@@ -35,7 +36,7 @@ function run(command, args, options = {}) {
 }
 
 async function buildFromTag(tag) {
-  await run('bash', ['scripts/fetch-and-build-upstream.sh', '', tag, nodeBinForBash], { cwd: rootDir });
+  await run('bash', ['scripts/fetch-and-build-upstream.sh', '', tag, nodeBinForBash, explicitProfiles ?? ''], { cwd: rootDir });
 
   const parsed = parseAspNetTag(tag);
   if (!parsed) {
@@ -57,7 +58,7 @@ async function buildFromMajor(major) {
     throw new Error(`No matching tag found for .NET ${major}.`);
   }
 
-  await run('bash', ['scripts/fetch-and-build-upstream.sh', String(major), selected.tag, nodeBinForBash], { cwd: rootDir });
+  await run('bash', ['scripts/fetch-and-build-upstream.sh', String(major), selected.tag, nodeBinForBash, explicitProfiles ?? ''], { cwd: rootDir });
 
   return selected;
 }

@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { parseAspNetTag } from './version-lib.mjs';
-import { readTargetsConfig } from './config-lib.mjs';
+import { readSelectedTargets } from './config-lib.mjs';
 
 /** Parse a command-line flag and return the following value, or the fallback. */
 function arg(name, fallback) { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : fallback; }
@@ -89,8 +89,12 @@ const sourceDir = path.resolve(arg('source-dir', 'src/Components/Web.JS'));
 const output = path.resolve(arg('output', 'src/LegacyBlazorJs/wwwroot'));
 const parsed = parseAspNetTag(arg('tag', process.env.ASPNETCORE_TAG) ?? '');
 if (!parsed) throw new Error('A valid --tag vX.Y.Z is required.');
+const selectedProfiles = arg('profiles', process.env.BUILD_TARGET_PROFILES);
+if (selectedProfiles) {
+  process.env.BUILD_TARGET_PROFILES = selectedProfiles;
+}
 // Target profiles define the JS syntax level we rebuild for each output file.
-const targets = await readTargetsConfig();
+const targets = await readSelectedTargets();
 const npmWorkspace = await usesNpmWorkspaces(sourceDir);
 const bundlerConfigPath = await firstExisting([
   path.join(sourceDir, 'src/webpack.config.js'),

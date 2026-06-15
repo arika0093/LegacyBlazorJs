@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MAJOR="${1:-${DOTNET_MAJOR:-}}"
 TAG="${2:-${ASPNETCORE_TAG:-}}"
 NODE_BIN="${3:-${NODE_BIN:-node}}"
+BUILD_PROFILES="${4:-${BUILD_TARGET_PROFILES:-}}"
 
 # Run a command up to N times, waiting between failures, to survive transient network errors.
 retry() {
@@ -53,10 +54,16 @@ TARGET_FRAMEWORK="net${UPSTREAM_MAJOR}.0"
 mkdir -p "$ROOT/.work"
 DIST_DIR="$ROOT/dist/$TAG"
 PACKAGE_WWWROOT="$ROOT/src/LegacyBlazorJs/wwwroot"
-SOURCE_DIR="$(mktemp -d "$ROOT/.work/aspnetcore-$TAG.XXXXXX")"
-# disable cleanup
-# trap 'rm -rf "$SOURCE_DIR" >/dev/null 2>&1 || true' EXIT
-git clone --depth 1 --branch "$TAG" -- https://github.com/dotnet/aspnetcore.git "$SOURCE_DIR"
+SOURCE_DIR="$ROOT/.work/aspnetcore-$TAG"
+if [[ -d "$SOURCE_DIR/.git" ]]; then
+  pushd "$SOURCE_DIR" >/dev/null
+  git fetch --depth 1 origin "$TAG"
+  git checkout --detach FETCH_HEAD
+  popd >/dev/null
+else
+  rm -rf "$SOURCE_DIR"
+  git clone --depth 1 --branch "$TAG" -- https://github.com/dotnet/aspnetcore.git "$SOURCE_DIR"
+fi
 
 # ASP.NET Core 9+ uses npm workspaces; earlier versions use Yarn v1 with package links.
 if [[ -f "$SOURCE_DIR/package-lock.json" ]] || [[ -f "$SOURCE_DIR/package.json" && -n "$("$NODE_BIN" -e "const fs=require('fs');try{const p=JSON.parse(fs.readFileSync('$SOURCE_DIR/package.json','utf8'));console.log(Array.isArray(p.workspaces)&&p.workspaces.length>0?'workspaces':'')}catch{}")" ]]; then
@@ -100,7 +107,7 @@ else
 fi
 
 # Generate one JS variant per target profile and copy the outputs into the package wwwroot.
-"$NODE_BIN" "$ROOT/scripts/build-variants.mjs" --source-dir "$SOURCE_DIR/src/Components/Web.JS" --output "$DIST_DIR" --tag "$TAG"
+BUILD_TARGET_PROFILES="$BUILD_PROFILES" "$NODE_BIN" "$ROOT/scripts/build-variants.mjs" --source-dir "$SOURCE_DIR/src/Components/Web.JS" --output "$DIST_DIR" --tag "$TAG"
 rm -rf "$PACKAGE_WWWROOT"
 mkdir -p "$PACKAGE_WWWROOT"
 cp -R "$DIST_DIR"/. "$PACKAGE_WWWROOT"/
