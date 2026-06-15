@@ -499,7 +499,11 @@ internal sealed class BrowserHarness : IAsyncDisposable
 
     public async Task AssertCounterInteractiveAsync(Uri baseUri, string profile, string hostingModel)
     {
-        var page = await _browser.NewPageAsync();
+        await using var context = await _browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            AcceptDownloads = false
+        });
+        var page = await context.NewPageAsync();
         var errors = new List<string>();
         var failedResponses = new List<string>();
 
