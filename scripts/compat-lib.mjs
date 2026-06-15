@@ -196,6 +196,10 @@ export async function readBuildSummary() {
 
 /** Extract the minimum Chrome major version declared for a target profile. */
 function parseChromeMajor(profile) {
+  if (profile.intendedBrowsers?.chrome) {
+    return Number(profile.intendedBrowsers.chrome);
+  }
+
   const text = Array.isArray(profile.intendedBrowsers)
     ? profile.intendedBrowsers.find(entry => /^Chrome\s*>=\s*\d+/.test(entry))
     : profile.description;

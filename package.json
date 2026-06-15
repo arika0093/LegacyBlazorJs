@@ -7,7 +7,7 @@
     "resolve-version": "node scripts/resolve-version.mjs",
     "build:variants": "node scripts/build-variants.mjs",
     "build": "node scripts/build-all.mjs",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test",
     "test:smoke": "dotnet test tests/PlaywrightTest/PlaywrightTest.csproj",
     "test:compat": "node scripts/run-compat-tests.mjs",
     "readme:compat": "node scripts/update-readme-compat.mjs",
@@ -18,8 +18,6 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
-    "@babel/preset-env": "^7.29.7",
-    "esbuild": "^0.28.1",
-    "esprima": "^4.0.1"
+    "@babel/preset-env": "^7.29.7"
   }
 }

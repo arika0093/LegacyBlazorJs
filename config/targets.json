@@ -10,7 +10,10 @@
   "es5": {
     "description": "comprehensive ES5 support",
     "ecma": 5,
-    "typescriptTarget": "es5"
+    "typescriptTarget": "es5",
+    "intendedBrowsers": {
+      "ie": "11"
+    }
   },
   "es2015": {
     "description": "comprehensive ES2015 support",
@@ -25,16 +28,25 @@
   "es2020": {
     "description": "comprehensive ES2020 support",
     "ecma": 2020,
-    "typescriptTarget": "es2020"
+    "typescriptTarget": "es2020",
+    "intendedBrowsers": {
+      "chrome": "80"
+    }
   },
   "es2021": {
     "description": "comprehensive ES2021 support",
     "ecma": 2021,
-    "typescriptTarget": "es2021"
+    "typescriptTarget": "es2021",
+    "intendedBrowsers": {
+      "chrome": "85"
+    }
   },
   "es2022": {
     "description": "comprehensive ES2022 support",
     "ecma": 2022,
-    "typescriptTarget": "es2022"
+    "typescriptTarget": "es2022",
+    "intendedBrowsers": {
+      "chrome": "94"
+    }
   }
 }

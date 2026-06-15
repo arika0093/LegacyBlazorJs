@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -139,7 +140,55 @@ internal static class TestEnvironment
                 $"Could not determine the target framework from package version '{packageVersion}'.");
         }
 
-        return "net10.0";
+        return $"net{match.Groups["major"].Value}.0";
+    }
+
+    public static string ResolveScriptProfile(string requestedProfile)
+    {
+        var availableProfiles = GetAvailableScriptProfiles();
+        if (availableProfiles.Contains(requestedProfile))
+        {
+            return requestedProfile;
+        }
+
+        if (string.Equals(requestedProfile, "es5", StringComparison.Ordinal))
+        {
+            var ieFallback = availableProfiles
+                .Where(profile => profile.StartsWith("ie", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(profile => profile, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+            if (ieFallback is not null)
+            {
+                return ieFallback;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"No generated script matching profile '{requestedProfile}' was found in '{PackageSourceDirectory}'. Available profiles: {string.Join(", ", availableProfiles)}");
+    }
+
+    private static IReadOnlyList<string> GetAvailableScriptProfiles()
+    {
+        var packageDirectory = new DirectoryInfo(PackageSourceDirectory);
+        var package = packageDirectory
+            .GetFiles("LegacyBlazorJs.*.nupkg")
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .FirstOrDefault();
+
+        if (package is null)
+        {
+            throw new FileNotFoundException(
+                $"No LegacyBlazorJs package was found in '{PackageSourceDirectory}'. Build the package before running smoke tests.");
+        }
+
+        using var archive = ZipFile.OpenRead(package.FullName);
+        return archive.Entries
+            .Select(entry => Regex.Match(entry.FullName, @"^staticwebassets/blazor\.web\.(.+)\.js$"))
+            .Where(match => match.Success)
+            .Select(match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(profile => profile, StringComparer.Ordinal)
+            .ToArray();
     }
 }
 
@@ -156,6 +205,7 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
     private readonly string _packageVersion;
     private readonly string _targetFramework;
     private readonly string _hostingModel;
+    private readonly string _scriptProfile;
     private readonly Uri _baseUri;
     private CapturedProcess? _serverProcess;
 
@@ -164,6 +214,7 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         string appDirectory,
         string projectPath,
         string profile,
+        string scriptProfile,
         string packageVersion,
         string targetFramework,
         string hostingModel,
@@ -173,6 +224,7 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         _appDirectory = appDirectory;
         _projectPath = projectPath;
         _profile = profile;
+        _scriptProfile = scriptProfile;
         _packageVersion = packageVersion;
         _targetFramework = targetFramework;
         _hostingModel = hostingModel;
@@ -200,11 +252,13 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         var port = GetAvailablePort();
         var baseUri = new Uri($"http://127.0.0.1:{port}");
         var targetFramework = TestEnvironment.ResolveTargetFrameworkMoniker(packageVersion);
+        var scriptProfile = TestEnvironment.ResolveScriptProfile(profile);
         var harness = new SmokeAppHarness(
             rootDirectory,
             appDirectory,
             projectPath,
             profile,
+            scriptProfile,
             packageVersion,
             targetFramework,
             hostingModel,
@@ -252,7 +306,10 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
             }
             catch (TaskCanceledException)
             {
-                break;
+                if (readyCts.IsCancellationRequested)
+                {
+                    break;
+                }
             }
 
             try
@@ -291,21 +348,9 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
     private async Task InitializeAsync()
     {
         ReplaceProjectPlaceholders();
+        NormalizeLegacyBlazorReference();
 
         WriteNuGetConfig(_appDirectory);
-
-        if (!HasProjectReferenceToLegacyBlazorJs(_projectPath))
-        {
-            await ProcessRunner.RunCheckedAsync(
-                "dotnet",
-                [
-                    "add", _projectPath,
-                    "package", "LegacyBlazorJs",
-                    "--version", _packageVersion,
-                    "--source", TestEnvironment.PackageSourceDirectory
-                ],
-                _appDirectory);
-        }
 
         await ProcessRunner.RunCheckedAsync(
             "dotnet",
@@ -333,10 +378,23 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         File.WriteAllText(nugetConfigPath, contents);
     }
 
-    private static bool HasProjectReferenceToLegacyBlazorJs(string projectPath)
+    private void NormalizeLegacyBlazorReference()
     {
-        var contents = File.ReadAllText(projectPath);
-        return contents.Contains("LegacyBlazorJs.csproj", StringComparison.Ordinal);
+        var contents = File.ReadAllText(_projectPath);
+        const string projectReference = "<ProjectReference Include=\"..\\..\\src\\LegacyBlazorJs\\LegacyBlazorJs.csproj\" />";
+        var packageReference = $"<PackageReference Include=\"LegacyBlazorJs\" Version=\"{_packageVersion}\" />";
+        var updated = contents.Replace(projectReference, packageReference, StringComparison.Ordinal);
+
+        if (contents == updated && !contents.Contains("<PackageReference Include=\"LegacyBlazorJs\"", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Could not normalize the LegacyBlazorJs reference in '{_projectPath}'.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(contents, updated))
+        {
+            File.WriteAllText(_projectPath, updated);
+        }
     }
 
     private void ReplaceProjectPlaceholders()
@@ -360,8 +418,8 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         var contents = File.ReadAllText(appRazorPath);
         var scriptName = _hostingModel switch
         {
-            "Server" => $"blazor.web.{_profile}.js",
-            "WebAssembly" => $"blazor.webassembly.{_profile}.js",
+            "Server" => $"blazor.web.{_scriptProfile}.js",
+            "WebAssembly" => $"blazor.webassembly.{_scriptProfile}.js",
             _ => throw new InvalidOperationException($"Unsupported hosting model '{_hostingModel}'.")
         };
         var replacement = $"<script src=\"_content/LegacyBlazorJs/{scriptName}\"></script>";
@@ -456,26 +514,73 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
 
 internal sealed class BrowserHarness : IAsyncDisposable
 {
-    private readonly IPlaywright _playwright;
-    private readonly IBrowser _browser;
+    private readonly PlaywrightBrowserHarness? _playwrightHarness;
+    private readonly LegacyChromiumHarness? _legacyHarness;
 
-    private BrowserHarness(IPlaywright playwright, IBrowser browser)
+    private BrowserHarness(PlaywrightBrowserHarness playwrightHarness)
     {
-        _playwright = playwright;
-        _browser = browser;
+        _playwrightHarness = playwrightHarness;
+    }
+
+    private BrowserHarness(LegacyChromiumHarness legacyHarness)
+    {
+        _legacyHarness = legacyHarness;
     }
 
     public static async Task<BrowserHarness> CreateAsync()
     {
         var launchConfiguration = await BrowserBinaryResolver.ResolveAsync();
+        if (!string.IsNullOrWhiteSpace(launchConfiguration.ExecutablePath))
+        {
+            return new BrowserHarness(await LegacyChromiumHarness.CreateAsync(launchConfiguration.ExecutablePath!));
+        }
 
+        return new BrowserHarness(await PlaywrightBrowserHarness.CreateAsync(launchConfiguration.ExecutablePath));
+    }
+
+    public async Task AssertCounterInteractiveAsync(Uri baseUri, string profile, string hostingModel)
+    {
+        if (_legacyHarness is not null)
+        {
+            await _legacyHarness.AssertCounterInteractiveAsync(baseUri, profile, hostingModel);
+            return;
+        }
+
+        await _playwrightHarness!.AssertCounterInteractiveAsync(baseUri, profile, hostingModel);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_legacyHarness is not null)
+        {
+            await _legacyHarness.DisposeAsync();
+            return;
+        }
+
+        await _playwrightHarness!.DisposeAsync();
+    }
+}
+
+internal sealed class PlaywrightBrowserHarness : IAsyncDisposable
+{
+    private readonly IPlaywright _playwright;
+    private readonly IBrowser _browser;
+
+    private PlaywrightBrowserHarness(IPlaywright playwright, IBrowser browser)
+    {
+        _playwright = playwright;
+        _browser = browser;
+    }
+
+    public static async Task<PlaywrightBrowserHarness> CreateAsync(string? executablePath)
+    {
         var playwright = await Playwright.CreateAsync();
         try
         {
             var options = new BrowserTypeLaunchOptions
             {
                 Headless = true,
-                ExecutablePath = launchConfiguration.ExecutablePath
+                ExecutablePath = executablePath
             };
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -487,7 +592,7 @@ internal sealed class BrowserHarness : IAsyncDisposable
             }
 
             var browser = await playwright.Chromium.LaunchAsync(options);
-            return new BrowserHarness(playwright, browser);
+            return new PlaywrightBrowserHarness(playwright, browser);
         }
         catch
         {
@@ -498,7 +603,8 @@ internal sealed class BrowserHarness : IAsyncDisposable
 
     public async Task AssertCounterInteractiveAsync(Uri baseUri, string profile, string hostingModel)
     {
-        var page = await _browser.NewPageAsync();
+        await using var context = await _browser.NewContextAsync();
+        var page = await context.NewPageAsync();
         var errors = new List<string>();
         var failedResponses = new List<string>();
 
@@ -599,9 +705,589 @@ internal sealed class BrowserHarness : IAsyncDisposable
     }
 }
 
+internal sealed class LegacyChromiumHarness : IAsyncDisposable
+{
+    private static readonly Regex DevToolsListeningPattern = new(@"DevTools listening on (?<url>ws://\S+)", RegexOptions.Compiled);
+    private readonly Process _process;
+    private readonly string _profileDirectory;
+    private readonly ClientWebSocket _socket;
+    private string _targetId;
+    private string _sessionId;
+    private Task _receiveLoopTask;
+    private readonly CancellationTokenSource _receiveLoopCancellation = new();
+    private readonly Dictionary<int, TaskCompletionSource<JsonElement>> _pending = [];
+    private readonly object _pendingLock = new();
+    private readonly List<string> _errors = [];
+    private readonly List<string> _failedResponses = [];
+    private int _messageId;
+
+    private LegacyChromiumHarness(
+        Process process,
+        string profileDirectory,
+        ClientWebSocket socket,
+        string targetId,
+        string sessionId,
+        Task receiveLoopTask)
+    {
+        _process = process;
+        _profileDirectory = profileDirectory;
+        _socket = socket;
+        _targetId = targetId;
+        _sessionId = sessionId;
+        _receiveLoopTask = receiveLoopTask;
+    }
+
+    public static async Task<LegacyChromiumHarness> CreateAsync(string executablePath)
+    {
+        var profileDirectory = Path.Combine(TestEnvironment.WorkDirectory, "browser-profiles", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(profileDirectory);
+
+        var process = new Process
+        {
+            StartInfo = ProcessRunner.CreateStartInfo(
+                executablePath,
+                BuildBrowserArguments(profileDirectory),
+                TestEnvironment.RepositoryRoot,
+                redirectOutput: true)
+        };
+
+        if (!process.Start())
+        {
+            throw new InvalidOperationException($"Failed to start legacy Chromium '{executablePath}'.");
+        }
+
+        var endpoint = await WaitForDevToolsEndpointAsync(process);
+        var socket = new ClientWebSocket();
+        await socket.ConnectAsync(new Uri(endpoint), CancellationToken.None);
+
+        var harness = new LegacyChromiumHarness(
+            process,
+            profileDirectory,
+            socket,
+            targetId: string.Empty,
+            sessionId: string.Empty,
+            receiveLoopTask: Task.CompletedTask);
+
+        harness._receiveLoopTask = harness.RunReceiveLoopAsync();
+        (harness._targetId, harness._sessionId) = await harness.AttachToTargetAsync();
+        return harness;
+    }
+
+    public async Task AssertCounterInteractiveAsync(Uri baseUri, string profile, string hostingModel)
+    {
+        await SendCommandAsync("Target.activateTarget", new { targetId = _targetId });
+        await SendCommandAsync("Page.enable", sessionId: _sessionId);
+        await SendCommandAsync("Runtime.enable", sessionId: _sessionId);
+        await SendCommandAsync("Log.enable", sessionId: _sessionId);
+        await SendCommandAsync("Network.enable", sessionId: _sessionId);
+        await TrySendCommandAsync("Page.bringToFront", sessionId: _sessionId);
+        await TrySendCommandAsync("Emulation.setFocusEmulationEnabled", new { enabled = true }, _sessionId);
+
+        await SendCommandAsync(
+            "Page.navigate",
+            new { url = new Uri(baseUri, "/counter").ToString() },
+            _sessionId);
+
+        await WaitForConditionAsync(
+            "document.readyState === 'complete' && document.querySelector('button') !== null && document.querySelector('[role=\"status\"]') !== null",
+            TimeSpan.FromSeconds(30),
+            "counter UI to render");
+
+        using var interactionCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        while (!interactionCts.IsCancellationRequested)
+        {
+            if (_errors.Count > 0 || _failedResponses.Count > 0)
+            {
+                break;
+            }
+
+            var countText = await EvaluateStringAsync("document.querySelector('[role=\"status\"]')?.textContent ?? ''");
+            if (string.Equals(countText?.Trim(), "Current count: 1", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            await EnsurePageReadyForInputAsync();
+            await ClickButtonAsync();
+
+            try
+            {
+                await Task.Delay(500, interactionCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        if (_errors.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{hostingModel} {profile} emitted browser errors:{Environment.NewLine}{string.Join(Environment.NewLine, _errors)}");
+        }
+
+        if (_failedResponses.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{hostingModel} {profile} returned failing HTTP responses:{Environment.NewLine}{string.Join(Environment.NewLine, _failedResponses)}");
+        }
+
+        throw new TimeoutException(
+            $"{hostingModel} {profile} did not become interactive within the allotted time.{Environment.NewLine}{await CaptureDiagnosticsAsync()}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _receiveLoopCancellation.Cancel();
+
+        if (_socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+        {
+            try
+            {
+                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "disposing", CancellationToken.None);
+            }
+            catch
+            {
+            }
+        }
+
+        _socket.Dispose();
+
+        try
+        {
+            if (!_process.HasExited)
+            {
+                _process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        _process.Dispose();
+
+        try
+        {
+            await _receiveLoopTask;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            if (Directory.Exists(_profileDirectory))
+            {
+                Directory.Delete(_profileDirectory, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static IReadOnlyList<string> BuildBrowserArguments(string profileDirectory)
+    {
+        var arguments = new List<string>
+        {
+            "--disable-gpu",
+            "--disable-dev-shm-usage",
+            "--remote-debugging-port=0",
+            $"--user-data-dir={profileDirectory}",
+            "about:blank"
+        };
+
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISPLAY")))
+        {
+            arguments.Insert(0, "--headless");
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            arguments.Add("--no-sandbox");
+        }
+
+        return arguments;
+    }
+
+    private static async Task<string> WaitForDevToolsEndpointAsync(Process process)
+    {
+        var endpointTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void TrySetEndpoint(string? line)
+        {
+            if (line is null)
+            {
+                return;
+            }
+
+            var match = DevToolsListeningPattern.Match(line);
+            if (match.Success)
+            {
+                endpointTcs.TrySetResult(match.Groups["url"].Value);
+            }
+        }
+
+        process.OutputDataReceived += (_, args) => TrySetEndpoint(args.Data);
+        process.ErrorDataReceived += (_, args) => TrySetEndpoint(args.Data);
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        await using var _ = cts.Token.Register(() => endpointTcs.TrySetCanceled(cts.Token));
+
+        try
+        {
+            return await endpointTcs.Task;
+        }
+        catch (TaskCanceledException)
+        {
+            throw new TimeoutException("Timed out waiting for the legacy Chromium DevTools endpoint.");
+        }
+    }
+
+    private async Task<(string TargetId, string SessionId)> AttachToTargetAsync()
+    {
+        var target = await SendCommandAsync("Target.createTarget", new { url = "about:blank" });
+        var targetId = target.GetProperty("targetId").GetString()
+            ?? throw new InvalidOperationException("CDP did not return a target id.");
+
+        var attached = await SendCommandAsync("Target.attachToTarget", new { targetId, flatten = true });
+        var sessionId = attached.GetProperty("sessionId").GetString()
+            ?? throw new InvalidOperationException("CDP did not return a session id.");
+        return (targetId, sessionId);
+    }
+
+    private async Task WaitForConditionAsync(string expression, TimeSpan timeout, string description)
+    {
+        using var cts = new CancellationTokenSource(timeout);
+        while (!cts.IsCancellationRequested)
+        {
+            if (_errors.Count > 0 || _failedResponses.Count > 0)
+            {
+                return;
+            }
+
+            if (await EvaluateBooleanAsync(expression))
+            {
+                return;
+            }
+
+            try
+            {
+                await Task.Delay(500, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        throw new TimeoutException(
+            $"Legacy Chromium timed out waiting for {description}: {expression}{Environment.NewLine}{await CaptureDiagnosticsAsync()}");
+    }
+
+    private async Task EnsurePageReadyForInputAsync()
+    {
+        await TrySendCommandAsync("Page.bringToFront", sessionId: _sessionId);
+        await EvaluateAsync(
+            """
+            (() => {
+              const button = document.querySelector('button');
+              if (!button) {
+                return false;
+              }
+
+              button.scrollIntoView({ block: 'center', inline: 'center' });
+              button.focus();
+              return true;
+            })()
+            """);
+    }
+
+    private async Task ClickButtonAsync()
+    {
+        var buttonCenter = await EvaluateAsync(
+            """
+            (() => {
+              const button = document.querySelector('button');
+              if (!button) {
+                return null;
+              }
+
+              button.scrollIntoView({ block: 'center', inline: 'center' });
+              button.focus();
+              const rect = button.getBoundingClientRect();
+              const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+              return {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2,
+                visible: rect.width > 0 && rect.height > 0,
+                hitTag: hit ? hit.tagName : null
+              };
+            })()
+            """);
+
+        if (buttonCenter.ValueKind == JsonValueKind.Null)
+        {
+            return;
+        }
+
+        var x = buttonCenter.GetProperty("x").GetDouble();
+        var y = buttonCenter.GetProperty("y").GetDouble();
+
+        await SendCommandAsync(
+            "Input.dispatchMouseEvent",
+            new { type = "mouseMoved", x, y, button = "none", buttons = 0, clickCount = 0 },
+            _sessionId);
+        await SendCommandAsync(
+            "Input.dispatchMouseEvent",
+            new { type = "mousePressed", x, y, button = "left", buttons = 1, clickCount = 1 },
+            _sessionId);
+        await SendCommandAsync(
+            "Input.dispatchMouseEvent",
+            new { type = "mouseReleased", x, y, button = "left", buttons = 0, clickCount = 1 },
+            _sessionId);
+        await EvaluateAsync(
+            """
+            (() => {
+              const button = document.querySelector('button');
+              if (!button) {
+                return false;
+              }
+
+              button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+              return true;
+            })()
+            """);
+    }
+
+    private async Task<bool> EvaluateBooleanAsync(string expression)
+    {
+        var value = await EvaluateAsync(expression);
+        return value.ValueKind == JsonValueKind.True ||
+            (value.ValueKind == JsonValueKind.False ? false : value.GetBoolean());
+    }
+
+    private async Task<string?> EvaluateStringAsync(string expression)
+    {
+        var value = await EvaluateAsync(expression);
+        return value.ValueKind == JsonValueKind.Null ? null : value.GetString();
+    }
+
+    private async Task<JsonElement> EvaluateAsync(string expression)
+    {
+        var response = await SendCommandAsync(
+            "Runtime.evaluate",
+            new
+            {
+                expression,
+                awaitPromise = true,
+                returnByValue = true
+            },
+            _sessionId);
+
+        if (response.TryGetProperty("exceptionDetails", out var exceptionDetails))
+        {
+            throw new InvalidOperationException(
+                $"Legacy Chromium evaluation failed: {exceptionDetails.GetRawText()}");
+        }
+
+        if (response.GetProperty("result").TryGetProperty("value", out var value))
+        {
+            return value;
+        }
+
+        return default;
+    }
+
+    private async Task<JsonElement> SendCommandAsync(string method, object? parameters = null, string? sessionId = null)
+    {
+        var id = Interlocked.Increment(ref _messageId);
+        var payload = sessionId is null
+            ? JsonSerializer.Serialize(new { id, method, @params = parameters ?? new { } })
+            : JsonSerializer.Serialize(new { id, method, @params = parameters ?? new { }, sessionId });
+
+        var completionSource = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_pendingLock)
+        {
+            _pending[id] = completionSource;
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(payload);
+        await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
+        return await completionSource.Task;
+    }
+
+    private async Task<JsonElement?> TrySendCommandAsync(string method, object? parameters = null, string? sessionId = null)
+    {
+        try
+        {
+            return await SendCommandAsync(method, parameters, sessionId);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<string> CaptureDiagnosticsAsync()
+    {
+        var diagnostics = await EvaluateAsync(
+            """
+            (() => {
+              const button = document.querySelector('button');
+              const status = document.querySelector('[role="status"]');
+              const scripts = Array.from(document.scripts).map(script => script.src).filter(Boolean);
+              const rect = button ? button.getBoundingClientRect() : null;
+              const hit = rect ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) : null;
+
+              return {
+                readyState: document.readyState,
+                href: location.href,
+                userAgent: navigator.userAgent,
+                statusText: status ? status.textContent : null,
+                buttonText: button ? button.textContent : null,
+                buttonDisabled: button ? button.disabled : null,
+                activeElement: document.activeElement ? document.activeElement.tagName : null,
+                buttonRect: rect ? {
+                  left: rect.left,
+                  top: rect.top,
+                  width: rect.width,
+                  height: rect.height
+                } : null,
+                centerHitTag: hit ? hit.tagName : null,
+                scripts,
+                htmlSnippet: document.body ? document.body.innerHTML.slice(0, 1500) : null
+              };
+            })()
+            """);
+
+        var builder = new StringBuilder();
+        builder.AppendLine("Legacy Chromium diagnostics:");
+        builder.AppendLine(diagnostics.GetRawText());
+
+        if (_errors.Count > 0)
+        {
+            builder.AppendLine("Collected browser errors:");
+            foreach (var error in _errors)
+            {
+                builder.AppendLine(error);
+            }
+        }
+
+        if (_failedResponses.Count > 0)
+        {
+            builder.AppendLine("Collected failed responses:");
+            foreach (var failedResponse in _failedResponses)
+            {
+                builder.AppendLine(failedResponse);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private async Task RunReceiveLoopAsync()
+    {
+        var buffer = new byte[16 * 1024];
+        var builder = new StringBuilder();
+
+        while (!_receiveLoopCancellation.IsCancellationRequested && _socket.State == WebSocketState.Open)
+        {
+            var result = await _socket.ReceiveAsync(buffer, _receiveLoopCancellation.Token);
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                return;
+            }
+
+            builder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+            if (!result.EndOfMessage)
+            {
+                continue;
+            }
+
+            using var document = JsonDocument.Parse(builder.ToString());
+            builder.Clear();
+            HandleMessage(document.RootElement.Clone());
+        }
+    }
+
+    private void HandleMessage(JsonElement message)
+    {
+        if (message.TryGetProperty("id", out var idElement))
+        {
+            var id = idElement.GetInt32();
+            TaskCompletionSource<JsonElement>? completionSource;
+            lock (_pendingLock)
+            {
+                _pending.TryGetValue(id, out completionSource);
+                _pending.Remove(id);
+            }
+
+            if (completionSource is null)
+            {
+                return;
+            }
+
+            if (message.TryGetProperty("error", out var error))
+            {
+                completionSource.TrySetException(
+                    new InvalidOperationException(error.GetProperty("message").GetString()));
+                return;
+            }
+
+            completionSource.TrySetResult(message.GetProperty("result").Clone());
+            return;
+        }
+
+        if (!message.TryGetProperty("method", out var methodElement))
+        {
+            return;
+        }
+
+        switch (methodElement.GetString())
+        {
+            case "Runtime.exceptionThrown":
+                _errors.Add(message.GetProperty("params").GetProperty("exceptionDetails").GetRawText());
+                break;
+            case "Log.entryAdded":
+                var entry = message.GetProperty("params").GetProperty("entry");
+                var text = entry.GetProperty("text").GetString() ?? entry.GetRawText();
+                if (string.Equals(entry.GetProperty("level").GetString(), "error", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(
+                        text,
+                        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+                        StringComparison.Ordinal))
+                {
+                    _errors.Add(text);
+                }
+
+                break;
+            case "Network.responseReceived":
+                var response = message.GetProperty("params").GetProperty("response");
+                var status = response.GetProperty("status").GetDouble();
+                var url = response.GetProperty("url").GetString() ?? string.Empty;
+                if (status >= 400 &&
+                    !url.EndsWith("/favicon.ico", StringComparison.OrdinalIgnoreCase))
+                {
+                    _failedResponses.Add($"{status:0} {url}");
+                }
+
+                break;
+        }
+    }
+}
+
 internal static class BrowserBinaryResolver
 {
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient HttpClient = new()
+    {
+        Timeout = TimeSpan.FromMinutes(10)
+    };
 
     public static async Task<BrowserLaunchConfiguration> ResolveAsync()
     {
@@ -644,12 +1330,7 @@ internal static class BrowserBinaryResolver
         var archivePath = Path.Combine(browserDirectory, Path.GetFileName(new Uri(downloadUrl).AbsolutePath));
         if (!File.Exists(archivePath))
         {
-            using var response = await HttpClient.GetAsync(downloadUrl);
-            response.EnsureSuccessStatusCode();
-
-            await using var archiveStream = await response.Content.ReadAsStreamAsync();
-            await using var fileStream = File.Create(archivePath);
-            await archiveStream.CopyToAsync(fileStream);
+            await DownloadBrowserArchiveWithRetryAsync(downloadUrl, archivePath);
         }
 
         ZipFile.ExtractToDirectory(archivePath, browserDirectory, overwriteFiles: true);
@@ -662,6 +1343,34 @@ internal static class BrowserBinaryResolver
         }
 
         return new BrowserLaunchConfiguration(executablePath);
+    }
+
+    private static async Task DownloadBrowserArchiveWithRetryAsync(string downloadUrl, string archivePath)
+    {
+        const int maxAttempts = 3;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                using var response = await HttpClient.GetAsync(downloadUrl);
+                response.EnsureSuccessStatusCode();
+
+                await using var archiveStream = await response.Content.ReadAsStreamAsync();
+                await using var fileStream = File.Create(archivePath);
+                await archiveStream.CopyToAsync(fileStream);
+                return;
+            }
+            catch when (attempt < maxAttempts)
+            {
+                if (File.Exists(archivePath))
+                {
+                    File.Delete(archivePath);
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(2 * attempt));
+            }
+        }
     }
 
     private static string ResolvePlatformCacheKey()

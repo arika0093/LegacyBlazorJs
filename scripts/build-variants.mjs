@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { parseAspNetTag } from './version-lib.mjs';
-import { readTargetsConfig } from './config-lib.mjs';
+import { readSelectedTargets } from './config-lib.mjs';
 
 /** Parse a command-line flag and return the following value, or the fallback. */
 function arg(name, fallback) { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : fallback; }
@@ -56,14 +56,29 @@ async function usesNpmWorkspaces(sourceDir) {
   return null;
 }
 
-/** Down-level the already-bundled JS files when the upstream bundler cannot target older ECMA versions. */
-async function postProcessForProfile(distDir, profile) {
-  const files = ['blazor.web.js', 'blazor.webassembly.js', 'blazor.server.js', 'blazor.webview.js'];
-  const targets = {
+/** Resolve the browser target list used when Babel down-levels a generated bundle. */
+function resolveBabelTargets(profile) {
+  if (profile.intendedBrowsers && typeof profile.intendedBrowsers === 'object' && !Array.isArray(profile.intendedBrowsers)) {
+    return profile.intendedBrowsers;
+  }
+
+  const fallbackTargets = {
     5: { ie: '11' },
     2015: { chrome: '49', firefox: '45', safari: '10', edge: '12' },
     2017: { chrome: '58', firefox: '54', safari: '11', edge: '16' },
   };
+
+  const targets = fallbackTargets[profile.ecma];
+  if (!targets) {
+    throw new Error(`No Babel fallback target is configured for ECMA ${profile.ecma}.`);
+  }
+
+  return targets;
+}
+
+/** Down-level the already-bundled JS files when the upstream bundler cannot target older ECMA versions. */
+async function postProcessForProfile(distDir, profile) {
+  const files = ['blazor.web.js', 'blazor.webassembly.js', 'blazor.server.js', 'blazor.webview.js'];
 
   if (profile.ecma >= 2018) {
     return;
@@ -71,13 +86,16 @@ async function postProcessForProfile(distDir, profile) {
 
   const legacyRequire = createRequire(path.join(process.cwd(), 'package.json'));
   const babel = legacyRequire('@babel/core');
+  const targets = resolveBabelTargets(profile);
   for (const file of files) {
     const filePath = path.join(distDir, file);
     const source = await readFile(filePath, 'utf8');
     const result = babel.transformSync(source, {
-      presets: [['@babel/preset-env', { targets: targets[profile.ecma] }]],
+      presets: [['@babel/preset-env', { targets }]],
       filename: file,
-      compact: true,
+      // Preserve the upstream bundle's formatting. Forcing compact output made small bundles such as
+      // blazor.webview.js look disproportionately smaller only for profiles that pass through Babel.
+      compact: false,
     });
     await writeFile(filePath, result.code);
   }
@@ -87,8 +105,12 @@ const sourceDir = path.resolve(arg('source-dir', 'src/Components/Web.JS'));
 const output = path.resolve(arg('output', 'src/LegacyBlazorJs/wwwroot'));
 const parsed = parseAspNetTag(arg('tag', process.env.ASPNETCORE_TAG) ?? '');
 if (!parsed) throw new Error('A valid --tag vX.Y.Z is required.');
+const selectedProfiles = arg('profiles', process.env.BUILD_TARGET_PROFILES);
+if (selectedProfiles) {
+  process.env.BUILD_TARGET_PROFILES = selectedProfiles;
+}
 // Target profiles define the JS syntax level we rebuild for each output file.
-const targets = await readTargetsConfig();
+const targets = await readSelectedTargets();
 const npmWorkspace = await usesNpmWorkspaces(sourceDir);
 const bundlerConfigPath = await firstExisting([
   path.join(sourceDir, 'src/webpack.config.js'),
@@ -137,9 +159,9 @@ try {
       await run('yarn', ['run', 'build:production'], sourceDir);
     }
 
-    if (npmWorkspace && profile.ecma < 2018) {
+    if (profile.ecma < 2018) {
       const distDir = path.join(sourceDir, 'dist', 'Release');
-      await postProcessForProfile(distDir, profile, npmWorkspace);
+      await postProcessForProfile(distDir, profile);
     }
 
     // copy build results
