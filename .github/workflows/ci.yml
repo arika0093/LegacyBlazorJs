@@ -3,8 +3,20 @@ name: Build and publish latest ASP.NET Core tags to NuGet
 on:
   workflow_dispatch:
     inputs:
-      publish:
-        description: Publish packages to NuGet.org and create GitHub releases
+      majors:
+        description: Space- or comma-separated .NET majors to build and test
+        type: string
+        default: '8 9 10'
+      run_compat:
+        description: Run compatibility tests for the selected majors
+        type: boolean
+        default: true
+      publish_github:
+        description: Create GitHub releases
+        type: boolean
+        default: false
+      publish_nuget:
+        description: Publish packages to NuGet.org
         type: boolean
         default: false
   schedule:
@@ -14,8 +26,38 @@ permissions:
   contents: write
 
 jobs:
+  # Validate manual inputs and expose one normalized major list to all following jobs.
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+      majors: ${{ steps.majors.outputs.args }}
+      matrix: ${{ steps.majors.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - id: majors
+        name: Resolve selected .NET majors
+        env:
+          REQUESTED_MAJORS: ${{ github.event_name == 'workflow_dispatch' && inputs.majors || '' }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const supported = JSON.parse(fs.readFileSync('config/majors.json', 'utf8')).supportedMajors;
+          const requested = process.env.REQUESTED_MAJORS.trim()
+            ? process.env.REQUESTED_MAJORS.split(/[\s,]+/).filter(Boolean).map(Number)
+            : supported;
+          const majors = [...new Set(requested)];
+          const invalid = majors.filter(major => !supported.includes(major));
+          if (majors.length === 0 || invalid.length > 0 || majors.some(Number.isNaN)) {
+            throw new Error(`Select one or more supported majors (${supported.join(', ')}). Invalid values: ${invalid.join(', ')}`);
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `args=${majors.join(' ')}\nmatrix=${JSON.stringify(majors)}\n`);
+          NODE
+
   # build the latest ASP.NET Core source, create browser variants and NuGet package, and upload artifacts for release
   build:
+    needs: configure
     runs-on: ubuntu-latest
     steps:
       # setup environment
@@ -40,7 +82,7 @@ jobs:
 
       # fetch upstream source, build browser variants, and pack NuGet
       - name: Build upstream source, browser variants, and NuGet package
-        run: npm run build
+        run: npm run build -- ${{ needs.configure.outputs.majors }}
         env:
           GITHUB_TOKEN: "${{ github.token }}"
 
@@ -60,12 +102,13 @@ jobs:
 
   # Run ES20x compatibility matrix tests with specific Chromium versions
   test-compat:
-    needs: build
+    needs: [configure, build]
+    if: github.event_name == 'schedule' || inputs.run_compat
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        dotnet: [8, 9, 10]
+        dotnet: ${{ fromJSON(needs.configure.outputs.matrix) }}
     steps:
       # > source
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -101,7 +144,11 @@ jobs:
   # If a new version is found, create a release and publish to NuGet/GitHub
   release-github:
     needs: [build, test-compat]
-    if: github.event_name == 'schedule' || inputs.publish
+    if: >-
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped') &&
+      (github.event_name == 'schedule' || inputs.publish_github)
     runs-on: ubuntu-latest
     steps:
       # download artifacts from build job
@@ -133,7 +180,11 @@ jobs:
 
   release-nuget:
     needs: [build, test-compat]
-    if: github.event_name == 'schedule' || inputs.publish
+    if: >-
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped') &&
+      (github.event_name == 'schedule' || inputs.publish_nuget)
     runs-on: ubuntu-latest
     steps:
       # download artifacts from build job

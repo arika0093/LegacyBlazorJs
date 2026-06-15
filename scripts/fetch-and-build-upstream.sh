@@ -28,6 +28,8 @@ if [[ -z "$TAG" ]]; then
   TAG="$("$NODE_BIN" "$ROOT/scripts/resolve-version.mjs" "$MAJOR" | "$NODE_BIN" -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).tag))")"
 fi
 VERSION="${TAG#v}"
+UPSTREAM_MAJOR="${VERSION%%.*}"
+TARGET_FRAMEWORK="net${UPSTREAM_MAJOR}.0"
 mkdir -p "$ROOT/.work"
 DIST_DIR="$ROOT/dist/$TAG"
 PACKAGE_WWWROOT="$ROOT/src/LegacyBlazorJs/wwwroot"
@@ -84,5 +86,8 @@ mkdir -p "$PACKAGE_WWWROOT"
 cp -R "$DIST_DIR"/. "$PACKAGE_WWWROOT"/
 cp "$SOURCE_DIR/LICENSE.txt" "$ROOT/src/LegacyBlazorJs/UPSTREAM-LICENSE.txt"
 
-# Pack the Razor class library as a NuGet package with the upstream version.
-dotnet pack "$ROOT/src/LegacyBlazorJs/LegacyBlazorJs.csproj" -c Release -p:PackageVersion="$VERSION" -o "$ROOT/artifacts/packages"
+# Pack the Razor class library with the upstream version and its matching target framework.
+dotnet pack "$ROOT/src/LegacyBlazorJs/LegacyBlazorJs.csproj" -c Release \
+  -p:PackageVersion="$VERSION" \
+  -p:LegacyBlazorTargetFramework="$TARGET_FRAMEWORK" \
+  -o "$ROOT/artifacts/packages"

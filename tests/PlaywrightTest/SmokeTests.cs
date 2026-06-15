@@ -139,7 +139,7 @@ internal static class TestEnvironment
                 $"Could not determine the target framework from package version '{packageVersion}'.");
         }
 
-        return "net10.0";
+        return $"net{match.Groups["major"].Value}.0";
     }
 }
 

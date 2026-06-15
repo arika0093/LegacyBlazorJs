@@ -77,7 +77,9 @@ async function postProcessForProfile(distDir, profile) {
     const result = babel.transformSync(source, {
       presets: [['@babel/preset-env', { targets: targets[profile.ecma] }]],
       filename: file,
-      compact: true,
+      // Preserve the upstream bundle's formatting. Forcing compact output made small bundles such as
+      // blazor.webview.js look disproportionately smaller only for profiles that pass through Babel.
+      compact: false,
     });
     await writeFile(filePath, result.code);
   }

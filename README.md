@@ -88,7 +88,7 @@ To be specific, the process is as follows:
 3. For .NET 8 and earlier, use yarn; for .NET 9 and later, use npm workspaces.
 4. It is compiled by `@rollup/plugin-typescript`.
     * Because the source code contains the [named capturing groups](https://caniuse.com/mdn-javascript_regular_expressions_named_capturing_group) feature (ES2018), settings like ES5 will cause errors.
-    * Therefore, it is first built with ES2018 or higher, and then down-leveled with esbuild or babel as needed.
+    * Therefore, it is first built with ES2018 or higher, and then down-leveled with Babel as needed.
 5. The generated JS files (`blazor.(type).(version).js`) are packaged together into `LegacyBlazorJs`.
 6. Smoke tests are performed (using an old Chromium), and then the package is released.
     * It is released with the same version as the upstream. For example, it is released as `8.0.28`, `9.0.17`, `10.0.9`.
