@@ -324,11 +324,11 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
     private void NormalizeLegacyBlazorReference()
     {
         var contents = File.ReadAllText(_projectPath);
-        const string projectReference = """<ProjectReference Include="..\..\src\LegacyBlazorJs\LegacyBlazorJs.csproj" />""";
-        var packageReference = $"""<PackageReference Include="LegacyBlazorJs" Version="{_packageVersion}" />""";
+        const string projectReference = "<ProjectReference Include=\"..\\..\\src\\LegacyBlazorJs\\LegacyBlazorJs.csproj\" />";
+        var packageReference = $"<PackageReference Include=\"LegacyBlazorJs\" Version=\"{_packageVersion}\" />";
         var updated = contents.Replace(projectReference, packageReference, StringComparison.Ordinal);
 
-        if (contents == updated && !contents.Contains("""<PackageReference Include="LegacyBlazorJs"""", StringComparison.Ordinal))
+        if (contents == updated && !contents.Contains("<PackageReference Include=\"LegacyBlazorJs\"", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Could not normalize the LegacyBlazorJs reference in '{_projectPath}'.");
