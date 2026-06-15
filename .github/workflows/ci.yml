@@ -175,23 +175,23 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ github.token }}"
 
-  release-nuget:
-    needs: [build]
-    if: >-
-      (github.event_name == 'schedule' || inputs.publish_nuget)
-    runs-on: ubuntu-latest
-    steps:
-      # download artifacts from build job
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: LegacyBlazorJs-packages
-          path: artifacts/packages
+  # release-nuget:
+  #   needs: [build]
+  #   if: >-
+  #     (github.event_name == 'schedule' || inputs.publish_nuget)
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     # download artifacts from build job
+  #     - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+  #       with:
+  #         name: LegacyBlazorJs-packages
+  #         path: artifacts/packages
       
-      - name: NuGet login
-        uses: NuGet/login@v1
-        id: login
-        with:
-          user: arika0093
+  #     - name: NuGet login
+  #       uses: NuGet/login@v1
+  #       id: login
+  #       with:
+  #         user: arika0093
 
-      - name: Publish NuGet Package
-        run: dotnet nuget push ./artifacts/packages/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+  #     - name: Publish NuGet Package
+  #       run: dotnet nuget push ./artifacts/packages/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
