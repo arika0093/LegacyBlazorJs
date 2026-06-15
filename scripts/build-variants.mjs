@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { readFile, writeFile, mkdir, rm, copyFile, access, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm, copyFile, access } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { parseAspNetTag } from './version-lib.mjs';
@@ -55,6 +56,33 @@ async function usesNpmWorkspaces(sourceDir) {
   return null;
 }
 
+/** Down-level the already-bundled JS files when the upstream bundler cannot target older ECMA versions. */
+async function postProcessForProfile(distDir, profile) {
+  const files = ['blazor.web.js', 'blazor.webassembly.js', 'blazor.server.js', 'blazor.webview.js'];
+  const targets = {
+    5: { ie: '11' },
+    2015: { chrome: '49', firefox: '45', safari: '10', edge: '12' },
+    2017: { chrome: '58', firefox: '54', safari: '11', edge: '16' },
+  };
+
+  if (profile.ecma >= 2018) {
+    return;
+  }
+
+  const legacyRequire = createRequire(path.join(process.cwd(), 'package.json'));
+  const babel = legacyRequire('@babel/core');
+  for (const file of files) {
+    const filePath = path.join(distDir, file);
+    const source = await readFile(filePath, 'utf8');
+    const result = babel.transformSync(source, {
+      presets: [['@babel/preset-env', { targets: targets[profile.ecma] }]],
+      filename: file,
+      compact: true,
+    });
+    await writeFile(filePath, result.code);
+  }
+}
+
 const sourceDir = path.resolve(arg('source-dir', 'src/Components/Web.JS'));
 const output = path.resolve(arg('output', 'src/LegacyBlazorJs/wwwroot'));
 const parsed = parseAspNetTag(arg('tag', process.env.ASPNETCORE_TAG) ?? '');
@@ -85,6 +113,11 @@ try {
       // ASP.NET Core 9+ workspaces ship an older tslib that does not include helpers like __spreadArray.
       // Emit helpers inline so the build succeeds across all down-level targets.
       tsconfig.compilerOptions.importHelpers = false;
+      if (profile.ecma < 2018) {
+        // The upstream source uses ES2018 syntax (e.g. named capturing groups) that TypeScript refuses
+        // to emit when targeting older ECMA versions. Compile to ES2018 first, then post-process down.
+        tsconfig.compilerOptions.target = 'es2018';
+      }
     }
     await writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
 
@@ -102,6 +135,11 @@ try {
       // Older ASP.NET Core versions use Yarn v1 with package links.
       await run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], sourceDir);
       await run('yarn', ['run', 'build:production'], sourceDir);
+    }
+
+    if (npmWorkspace && profile.ecma < 2018) {
+      const distDir = path.join(sourceDir, 'dist', 'Release');
+      await postProcessForProfile(distDir, profile, npmWorkspace);
     }
 
     // copy build results
