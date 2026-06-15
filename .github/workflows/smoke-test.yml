@@ -67,7 +67,8 @@ jobs:
       - run: npm ci --ignore-scripts
       # > playwright dependencies; the test harness downloads the older ES2020-era Chromium below
       - run: dotnet tool install --global Microsoft.Playwright.CLI
-      - run: playwright install-deps chromium
+      - run: dotnet build tests/PlaywrightTest/PlaywrightTest.csproj
+      - run: playwright -p tests/PlaywrightTest/PlaywrightTest.csproj install-deps chromium
       - name: Select old Chromium for smoke test
         run: node scripts/export-browser-env.mjs es2020
       # execute a single smoke test for the ES5 variant on Blazor Server
