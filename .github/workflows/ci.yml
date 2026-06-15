@@ -132,9 +132,9 @@ jobs:
           path: artifacts/packages
       # > npm dependencies
       - run: npm ci --ignore-scripts
-      # > playwright (bundled chromium is sufficient for smoke testing all JS targets)
+      # > playwright dependencies; the compatibility harness downloads each profile's old Chromium
       - run: dotnet tool install --global Microsoft.Playwright.CLI
-      - run: playwright install --with-deps chromium
+      - run: playwright install-deps chromium
       # execute compatibility test matrix for this .NET version
       - name: Run ES20x compatibility matrix (.NET ${{ matrix.dotnet }})
         run: npm run test:compat
