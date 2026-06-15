@@ -51,21 +51,32 @@ Specifically, it will not work on the following browsers.
 
 see [CanIUse](https://caniuse.com/wasm) for more details.
 
-## Included files and intended browser targets
+## Included files
+### Overview
 
-After referencing the NuGet package, applications can serve each file from `_content/LegacyBlazorJs/blazor.<arch>.<version>.js`.
+The following files are included under `_content/LegacyBlazorJs/`:
 
-| Version | Intended browser target | WASM |
-|---|---|---|
-| `ie11`   | ES5 + Internet Explorer 11 (best effort) | ❌️ |
-| `es5`    | Chrome 23+, Edge 12+, Firefox 21+, Safari 6+ | ❌️ |
-| `es2015` | Chrome 51+, Edge 15+, Firefox 54+, Safari 10+ | ⚠️ |
-| `es2017` | Chrome 58+, Edge 16+, Firefox 54+, Safari 11+ | ✅️ |
-| `es2020` | Chrome 80+, Edge 80+, Firefox 74+, Safari 13.1+ | ✅️ |
-| `es2021` | Chrome 85+, Edge 85+, Firefox 79+, Safari 14.1+ | ✅️ |
-| `es2022` | Chrome 94+, Edge 94+, Firefox 93+, Safari 15.4+ | ✅️ |
+- blazor.web.{version}.js
+- blazor.server.{version}.js
+- blazor.webassembly.{version}.js
+- blazor.webview.{version}.js
+
+The versions listed below are available.
+
+| Version | Intended browser target |
+|---------|-------------------------|
+| `ie11`   | ES5 + Internet Explorer 11 (best effort) |
+| `es5`    | Chrome 23+, Edge 12+, Firefox 21+, Safari 6+ |
+| `es2015` | Chrome 51+, Edge 15+, Firefox 54+, Safari 10+ |
+| `es2017` | Chrome 58+, Edge 16+, Firefox 54+, Safari 11+ |
+| `es2020` | Chrome 80+, Edge 80+, Firefox 74+, Safari 13.1+ |
+| `es2021` | Chrome 85+, Edge 85+, Firefox 79+, Safari 14.1+ |
+| `es2022` | Chrome 94+, Edge 94+, Firefox 93+, Safari 15.4+ |
 
 The authoritative profile definitions are in [config/targets.json](config/targets.json).
+
+> [!NOTE]
+> If you need additional targets, please feel free to submit a PR.
 
 ## Development Guide
 ### How it works

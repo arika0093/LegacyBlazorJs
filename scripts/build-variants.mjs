@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, writeFile, mkdir, rm, copyFile, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm, copyFile, access, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
@@ -12,9 +12,9 @@ function arg(name, fallback) { const i = process.argv.indexOf(`--${name}`); retu
 /** Run a command in the given directory and fail on non-zero exit codes. */
 function run(command, args, cwd) {
   return new Promise((resolve, reject) => {
-    // On Windows, yarn may not be directly executable, so invoke it through cmd.exe.
-    const invocation = process.platform === 'win32' && command === 'yarn'
-      ? { command: 'cmd.exe', args: ['/d', '/s', '/c', 'yarn', ...args] }
+    // On Windows, npm/yarn may not be directly executable, so invoke them through cmd.exe.
+    const invocation = process.platform === 'win32' && (command === 'yarn' || command === 'npm')
+      ? { command: 'cmd.exe', args: ['/d', '/s', '/c', command, ...args] }
       : { command, args };
     const child = spawn(invocation.command, invocation.args, { cwd, stdio: 'inherit' });
     child.once('error', reject);
@@ -35,12 +35,33 @@ async function firstExisting(paths) {
   throw new Error(`None of the expected upstream files exist:\n${paths.join('\n')}`);
 }
 
+/** Determine whether the upstream source uses npm workspaces instead of Yarn. */
+async function usesNpmWorkspaces(sourceDir) {
+  // Walk up from the Web.JS folder to find the upstream repository root (where package.json defines workspaces).
+  let current = path.resolve(sourceDir);
+  for (let depth = 0; depth < 5; depth++) {
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+    try {
+      const rootPackage = JSON.parse(await readFile(path.join(current, 'package.json'), 'utf8'));
+      if (Array.isArray(rootPackage.workspaces) && rootPackage.workspaces.length > 0) {
+        return { root: current, workspacePath: path.relative(current, sourceDir) };
+      }
+    } catch {
+      // Continue walking up.
+    }
+  }
+  return null;
+}
+
 const sourceDir = path.resolve(arg('source-dir', 'src/Components/Web.JS'));
 const output = path.resolve(arg('output', 'src/LegacyBlazorJs/wwwroot'));
 const parsed = parseAspNetTag(arg('tag', process.env.ASPNETCORE_TAG) ?? '');
 if (!parsed) throw new Error('A valid --tag vX.Y.Z is required.');
 // Target profiles define the JS syntax level we rebuild for each output file.
 const targets = await readTargetsConfig();
+const npmWorkspace = await usesNpmWorkspaces(sourceDir);
 const bundlerConfigPath = await firstExisting([
   path.join(sourceDir, 'src/webpack.config.js'),
   path.join(sourceDir, '../Shared.JS/rollup.config.mjs'),
@@ -60,6 +81,11 @@ try {
     const tsconfig = JSON.parse(originalTsconfig);
     tsconfig.compilerOptions.target = profile.typescriptTarget;
     if (profile.typescriptTarget === 'es5') tsconfig.compilerOptions.downlevelIteration = true;
+    if (npmWorkspace) {
+      // ASP.NET Core 9+ workspaces ship an older tslib that does not include helpers like __spreadArray.
+      // Emit helpers inline so the build succeeds across all down-level targets.
+      tsconfig.compilerOptions.importHelpers = false;
+    }
     await writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
 
     // The bundler also needs the matching ECMA level so minification does not re-introduce newer syntax.
@@ -68,8 +94,15 @@ try {
       throw new Error('Could not locate the upstream bundler/Terser ECMA target.');
     }
     await writeFile(bundlerConfigPath, bundlerConfig);
-    await run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], sourceDir);
-    await run('yarn', ['run', 'build:production'], sourceDir);
+
+    if (npmWorkspace) {
+      // ASP.NET Core 9+ uses npm workspaces; run the Web.JS build from the repository root.
+      await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], npmWorkspace.root);
+    } else {
+      // Older ASP.NET Core versions use Yarn v1 with package links.
+      await run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], sourceDir);
+      await run('yarn', ['run', 'build:production'], sourceDir);
+    }
 
     // copy build results
     const webFilename = `blazor.web.${name}.js`;

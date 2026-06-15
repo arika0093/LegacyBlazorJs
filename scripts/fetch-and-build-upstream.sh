@@ -7,7 +7,7 @@ MAJOR="${1:-${DOTNET_MAJOR:-}}"
 TAG="${2:-${ASPNETCORE_TAG:-}}"
 NODE_BIN="${3:-${NODE_BIN:-node}}"
 
-# Upstream yarn scripts expect a plain 'node' on PATH. If the selected Node binary
+# Upstream scripts expect a plain 'node' on PATH. If the selected Node binary
 # is not already the one that would be resolved, create a tiny wrapper so downstream
 # tools find it (useful on WSL/Windows).
 CURRENT_NODE="$(command -v node || true)"
@@ -35,26 +35,47 @@ SOURCE_DIR="$(mktemp -d "$ROOT/.work/aspnetcore-$TAG.XXXXXX")"
 # disable cleanup
 # trap 'rm -rf "$SOURCE_DIR" >/dev/null 2>&1 || true' EXIT
 git clone --depth 1 --branch "$TAG" -- https://github.com/dotnet/aspnetcore.git "$SOURCE_DIR"
-corepack prepare yarn@1.22.22 --activate
 
-run_yarn_build() {
-  local project_dir="$1"
-  local build_script="${2:-build}"
-  pushd "$project_dir" >/dev/null
-  yarn install --mutex network --frozen-lockfile --ignore-engines || yarn install --mutex network --frozen-lockfile --ignore-engines
-  yarn run "$build_script"
-  local exit_code=$?
+# ASP.NET Core 9+ uses npm workspaces; earlier versions use Yarn v1 with package links.
+if [[ -f "$SOURCE_DIR/package-lock.json" ]] || [[ -f "$SOURCE_DIR/package.json" && -n "$("$NODE_BIN" -e "const fs=require('fs');try{const p=JSON.parse(fs.readFileSync('$SOURCE_DIR/package.json','utf8'));console.log(Array.isArray(p.workspaces)&&p.workspaces.length>0?'workspaces':'')}catch{}")" ]]; then
+  USE_NPM_WORKSPACES=1
+else
+  USE_NPM_WORKSPACES=0
+fi
+
+if [[ "$USE_NPM_WORKSPACES" -eq 1 ]]; then
+  pushd "$SOURCE_DIR" >/dev/null
+  # ASP.NET Core 9+ ships an older tslib that does not include helpers like __spreadArray used for ES5 down-leveling.
+  # Force a newer tslib across the workspace before installing.
+  "$NODE_BIN" "$ROOT/scripts/patch-tslib-override.mjs" "$SOURCE_DIR/package.json"
+  npm install --ignore-scripts
+  # Build the shared packages referenced by Web.JS. The Web.JS build itself is handled by build-variants.mjs.
+  npm run build --workspace=src/JSInterop/Microsoft.JSInterop.JS/src
+  npm run build --workspace=src/SignalR/clients/ts/signalr
+  npm run build --workspace=src/SignalR/clients/ts/signalr-protocol-msgpack
   popd >/dev/null
-  return $exit_code
-}
+else
+  corepack prepare yarn@1.22.22 --activate
 
-# Build only the linked JavaScript packages instead of restoring the full ASP.NET Core engineering toolset.
-run_yarn_build "$SOURCE_DIR/src/JSInterop/Microsoft.JSInterop.JS/src" build
-pushd "$SOURCE_DIR/src/SignalR/clients/ts/common" >/dev/null
-yarn install --mutex network --frozen-lockfile --ignore-engines || yarn install --mutex network --frozen-lockfile --ignore-engines
-popd >/dev/null
-run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr" build
-run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr-protocol-msgpack" build
+  run_yarn_build() {
+    local project_dir="$1"
+    local build_script="${2:-build}"
+    pushd "$project_dir" >/dev/null
+    yarn install --mutex network --frozen-lockfile --ignore-engines || yarn install --mutex network --frozen-lockfile --ignore-engines
+    yarn run "$build_script"
+    local exit_code=$?
+    popd >/dev/null
+    return $exit_code
+  }
+
+  # Build only the linked JavaScript packages instead of restoring the full ASP.NET Core engineering toolset.
+  run_yarn_build "$SOURCE_DIR/src/JSInterop/Microsoft.JSInterop.JS/src" build
+  pushd "$SOURCE_DIR/src/SignalR/clients/ts/common" >/dev/null
+  yarn install --mutex network --frozen-lockfile --ignore-engines || yarn install --mutex network --frozen-lockfile --ignore-engines
+  popd >/dev/null
+  run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr" build
+  run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr-protocol-msgpack" build
+fi
 
 # Generate one JS variant per target profile and copy the outputs into the package wwwroot.
 "$NODE_BIN" "$ROOT/scripts/build-variants.mjs" --source-dir "$SOURCE_DIR/src/Components/Web.JS" --output "$DIST_DIR" --tag "$TAG"
