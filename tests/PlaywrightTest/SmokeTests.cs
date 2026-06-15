@@ -291,21 +291,9 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
     private async Task InitializeAsync()
     {
         ReplaceProjectPlaceholders();
+        NormalizeLegacyBlazorReference();
 
         WriteNuGetConfig(_appDirectory);
-
-        if (!HasProjectReferenceToLegacyBlazorJs(_projectPath))
-        {
-            await ProcessRunner.RunCheckedAsync(
-                "dotnet",
-                [
-                    "add", _projectPath,
-                    "package", "LegacyBlazorJs",
-                    "--version", _packageVersion,
-                    "--source", TestEnvironment.PackageSourceDirectory
-                ],
-                _appDirectory);
-        }
 
         await ProcessRunner.RunCheckedAsync(
             "dotnet",
@@ -333,10 +321,23 @@ internal sealed class SmokeAppHarness : IAsyncDisposable
         File.WriteAllText(nugetConfigPath, contents);
     }
 
-    private static bool HasProjectReferenceToLegacyBlazorJs(string projectPath)
+    private void NormalizeLegacyBlazorReference()
     {
-        var contents = File.ReadAllText(projectPath);
-        return contents.Contains("LegacyBlazorJs.csproj", StringComparison.Ordinal);
+        var contents = File.ReadAllText(_projectPath);
+        const string projectReference = """<ProjectReference Include="..\..\src\LegacyBlazorJs\LegacyBlazorJs.csproj" />""";
+        var packageReference = $"""<PackageReference Include="LegacyBlazorJs" Version="{_packageVersion}" />""";
+        var updated = contents.Replace(projectReference, packageReference, StringComparison.Ordinal);
+
+        if (contents == updated && !contents.Contains("""<PackageReference Include="LegacyBlazorJs"""", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Could not normalize the LegacyBlazorJs reference in '{_projectPath}'.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(contents, updated))
+        {
+            File.WriteAllText(_projectPath, updated);
+        }
     }
 
     private void ReplaceProjectPlaceholders()
