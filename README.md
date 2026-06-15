@@ -60,10 +60,7 @@ After referencing the NuGet package, applications can serve each file from `_con
 | `ie11`   | ES5 + Internet Explorer 11 (best effort) | ❌️ |
 | `es5`    | Chrome 23+, Edge 12+, Firefox 21+, Safari 6+ | ❌️ |
 | `es2015` | Chrome 51+, Edge 15+, Firefox 54+, Safari 10+ | ⚠️ |
-| `es2016` | Chrome 52+, Edge 14+, Firefox 52+, Safari 10.1+ | ⚠️ |
 | `es2017` | Chrome 58+, Edge 16+, Firefox 54+, Safari 11+ | ✅️ |
-| `es2018` | Chrome 64+, Edge 79+, Firefox 58+, Safari 12+ | ✅️ |
-| `es2019` | Chrome 73+, Edge 79+, Firefox 67+, Safari 12.1+ | ✅️ |
 | `es2020` | Chrome 80+, Edge 80+, Firefox 74+, Safari 13.1+ | ✅️ |
 | `es2021` | Chrome 85+, Edge 85+, Firefox 79+, Safari 14.1+ | ✅️ |
 | `es2022` | Chrome 94+, Edge 94+, Firefox 93+, Safari 15.4+ | ✅️ |
