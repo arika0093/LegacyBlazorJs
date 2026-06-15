@@ -56,14 +56,29 @@ async function usesNpmWorkspaces(sourceDir) {
   return null;
 }
 
-/** Down-level the already-bundled JS files when the upstream bundler cannot target older ECMA versions. */
-async function postProcessForProfile(distDir, profile) {
-  const files = ['blazor.web.js', 'blazor.webassembly.js', 'blazor.server.js', 'blazor.webview.js'];
-  const targets = {
+/** Resolve the browser target list used when Babel down-levels a generated bundle. */
+function resolveBabelTargets(profile) {
+  if (profile.intendedBrowsers && typeof profile.intendedBrowsers === 'object' && !Array.isArray(profile.intendedBrowsers)) {
+    return profile.intendedBrowsers;
+  }
+
+  const fallbackTargets = {
     5: { ie: '11' },
     2015: { chrome: '49', firefox: '45', safari: '10', edge: '12' },
     2017: { chrome: '58', firefox: '54', safari: '11', edge: '16' },
   };
+
+  const targets = fallbackTargets[profile.ecma];
+  if (!targets) {
+    throw new Error(`No Babel fallback target is configured for ECMA ${profile.ecma}.`);
+  }
+
+  return targets;
+}
+
+/** Down-level the already-bundled JS files when the upstream bundler cannot target older ECMA versions. */
+async function postProcessForProfile(distDir, profile) {
+  const files = ['blazor.web.js', 'blazor.webassembly.js', 'blazor.server.js', 'blazor.webview.js'];
 
   if (profile.ecma >= 2018) {
     return;
@@ -71,11 +86,12 @@ async function postProcessForProfile(distDir, profile) {
 
   const legacyRequire = createRequire(path.join(process.cwd(), 'package.json'));
   const babel = legacyRequire('@babel/core');
+  const targets = resolveBabelTargets(profile);
   for (const file of files) {
     const filePath = path.join(distDir, file);
     const source = await readFile(filePath, 'utf8');
     const result = babel.transformSync(source, {
-      presets: [['@babel/preset-env', { targets: targets[profile.ecma] }]],
+      presets: [['@babel/preset-env', { targets }]],
       filename: file,
       // Preserve the upstream bundle's formatting. Forcing compact output made small bundles such as
       // blazor.webview.js look disproportionately smaller only for profiles that pass through Babel.
@@ -143,9 +159,9 @@ try {
       await run('yarn', ['run', 'build:production'], sourceDir);
     }
 
-    if (npmWorkspace && profile.ecma < 2018) {
+    if (profile.ecma < 2018) {
       const distDir = path.join(sourceDir, 'dist', 'Release');
-      await postProcessForProfile(distDir, profile, npmWorkspace);
+      await postProcessForProfile(distDir, profile);
     }
 
     // copy build results
