@@ -1,48 +1,4 @@
 {
-  "ie6": {
-    "description": "Deprecated: IE6 is not supported for Blazor WebAssembly; likely to fail even when transpiled.",
-    "ecma": 5,
-    "typescriptTarget": "es5",
-    "intendedBrowsers": {
-      "ie": "6"
-    },
-    "deprecated": true
-  },
-  "ie7": {
-    "description": "Deprecated: IE7 is not supported for Blazor WebAssembly; likely to fail even when transpiled.",
-    "ecma": 5,
-    "typescriptTarget": "es5",
-    "intendedBrowsers": {
-      "ie": "7"
-    },
-    "deprecated": true
-  },
-  "ie8": {
-    "description": "Deprecated: IE8 is not supported for Blazor WebAssembly; likely to fail even when transpiled.",
-    "ecma": 5,
-    "typescriptTarget": "es5",
-    "intendedBrowsers": {
-      "ie": "8"
-    },
-    "deprecated": true
-  },
-  "ie9": {
-    "description": "Deprecated: IE9 is not supported for Blazor WebAssembly; likely to fail even when transpiled.",
-    "ecma": 5,
-    "typescriptTarget": "es5",
-    "intendedBrowsers": {
-      "ie": "9"
-    },
-    "deprecated": true
-  },
-  "ie10": {
-    "description": "Internet Explorer 10+ (best effort)",
-    "ecma": 5,
-    "typescriptTarget": "es5",
-    "intendedBrowsers": {
-      "ie": "10"
-    }
-  },
   "ie11": {
     "description": "Internet Explorer 11+ (best effort)",
     "ecma": 5,
@@ -50,6 +6,17 @@
     "intendedBrowsers": {
       "ie": "11"
     }
+  },
+  "es5": {
+    "description": "Chrome 23+, Edge 12+, Firefox 21+, Safari 6+ (comprehensive ES5 support)",
+    "ecma": 5,
+    "typescriptTarget": "es5",
+    "intendedBrowsers": [
+      "Chrome >= 23",
+      "Edge >= 12",
+      "Firefox >= 21",
+      "Safari >= 6"
+    ]
   },
   "es2015": {
     "description": "Chrome 58+, Edge 79+, Firefox 54+, Safari 10+ (comprehensive ES2015 support)",
