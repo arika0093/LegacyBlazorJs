@@ -70,13 +70,21 @@ try {
     await writeFile(bundlerConfigPath, bundlerConfig);
     await run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], sourceDir);
     await run('yarn', ['run', 'build:production'], sourceDir);
+
+    // copy build results
     const webFilename = `blazor.web.${name}.js`;
     const webAssemblyFilename = `blazor.webassembly.${name}.js`;
+    const serverFilename = `blazor.server.${name}.js`;
+    const webviewFilename = `blazor.webview.${name}.js`;
     await copyFile(path.join(sourceDir, 'dist/Release/blazor.web.js'), path.join(output, webFilename));
     await copyFile(path.join(sourceDir, 'dist/Release/blazor.webassembly.js'), path.join(output, webAssemblyFilename));
+    await copyFile(path.join(sourceDir, 'dist/Release/blazor.server.js'), path.join(output, serverFilename));
+    await copyFile(path.join(sourceDir, 'dist/Release/blazor.webview.js'), path.join(output, webviewFilename));
     files[name] = {
       file: webFilename,
       webAssemblyFile: webAssemblyFilename,
+      serverFile: serverFilename,
+      webviewFile: webviewFilename,
       description: profile.description,
       ecma: profile.ecma
     };
