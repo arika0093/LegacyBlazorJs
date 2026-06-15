@@ -88,7 +88,7 @@ jobs:
         run: node scripts/export-browser-env.mjs es2020
       # execute a single smoke test for the ES5 variant on Blazor Server
       - name: Run smoke test (ES5, Blazor Server)
-        run: dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
+        run: xvfb-run -a dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
         env:
           SMOKE_TEST_PROFILE: es5
           SMOKE_TEST_HOSTING_MODEL: Server

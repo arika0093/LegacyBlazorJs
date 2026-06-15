@@ -893,12 +893,17 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
     {
         var arguments = new List<string>
         {
-            "--headless",
             "--disable-gpu",
+            "--disable-dev-shm-usage",
             "--remote-debugging-port=0",
             $"--user-data-dir={profileDirectory}",
             "about:blank"
         };
+
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISPLAY")))
+        {
+            arguments.Insert(0, "--headless");
+        }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
