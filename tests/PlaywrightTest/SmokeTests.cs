@@ -799,7 +799,7 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
                 return;
             }
 
-            await EvaluateAsync("document.querySelector('button')?.click();");
+            await ClickButtonAsync();
 
             try
             {
@@ -971,6 +971,46 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
         }
 
         throw new TimeoutException($"Legacy Chromium condition did not become true: {expression}");
+    }
+
+    private async Task ClickButtonAsync()
+    {
+        var buttonCenter = await EvaluateAsync(
+            """
+            (() => {
+              const button = document.querySelector('button');
+              if (!button) {
+                return null;
+              }
+
+              const rect = button.getBoundingClientRect();
+              return {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+              };
+            })()
+            """);
+
+        if (buttonCenter.ValueKind == JsonValueKind.Null)
+        {
+            return;
+        }
+
+        var x = buttonCenter.GetProperty("x").GetDouble();
+        var y = buttonCenter.GetProperty("y").GetDouble();
+
+        await SendCommandAsync(
+            "Input.dispatchMouseEvent",
+            new { type = "mouseMoved", x, y, button = "none", clickCount = 0 },
+            _sessionId);
+        await SendCommandAsync(
+            "Input.dispatchMouseEvent",
+            new { type = "mousePressed", x, y, button = "left", clickCount = 1 },
+            _sessionId);
+        await SendCommandAsync(
+            "Input.dispatchMouseEvent",
+            new { type = "mouseReleased", x, y, button = "left", clickCount = 1 },
+            _sessionId);
     }
 
     private async Task<bool> EvaluateBooleanAsync(string expression)
