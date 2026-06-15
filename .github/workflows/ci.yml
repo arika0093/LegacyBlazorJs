@@ -1,0 +1,151 @@
+name: Build and publish latest ASP.NET Core tags to NuGet
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish packages to NuGet.org and create GitHub releases
+        type: boolean
+        default: false
+  schedule:
+    - cron: '23 5 * * 1'
+
+permissions:
+  contents: write
+
+jobs:
+  # build the latest ASP.NET Core source, create browser variants and NuGet package, and upload artifacts for release
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # setup environment
+      # > source
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      # > node (20)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+      # > dotnet (all supported majors + test framework target)
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      # > npm dependencies
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      # fetch upstream source, build browser variants, and pack NuGet
+      - name: Build upstream source, browser variants, and NuGet package
+        run: npm run build
+        env:
+          GITHUB_TOKEN: "${{ github.token }}"
+
+      # upload artifacts
+      # > build output (js files)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: LegacyBlazorJs-build-output
+          path: dist/**/*.js
+      # > packages (nupkg + build summary)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: LegacyBlazorJs-packages
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/build-summary.json
+
+  # Run ES20x compatibility matrix tests with specific Chromium versions
+  test-compat:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dotnet: [8, 9, 10]
+    steps:
+      # > source
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      # > node (20)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+      # > dotnet (test framework target + package target frameworks)
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      # download artifacts from build job
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: LegacyBlazorJs-packages
+          path: artifacts/packages
+      # > npm dependencies
+      - run: npm ci --ignore-scripts
+      # > playwright (bundled chromium is sufficient for smoke testing all JS targets)
+      - run: dotnet tool install --global Microsoft.Playwright.CLI
+      - run: playwright install --with-deps chromium
+      # execute compatibility test matrix for this .NET version
+      - name: Run ES20x compatibility matrix (.NET ${{ matrix.dotnet }})
+        run: npm run test:compat
+        env:
+          DOTNET_MAJOR: ${{ matrix.dotnet }}
+
+  # If a new version is found, create a release and publish to NuGet/GitHub
+  release-github:
+    needs: [build, test-compat]
+    if: github.event_name == 'schedule' || inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      # download artifacts from build job
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: LegacyBlazorJs-packages
+          path: artifacts/packages
+
+      # create a GitHub release per package version (skip already-released versions)
+      - name: Create GitHub releases
+        run: |
+          for nupkg in artifacts/packages/*.nupkg; do
+            VERSION="$(basename "$nupkg" | sed -E 's/^LegacyBlazorJs\.(.+)\.nupkg$/\1/')"
+            if [ -z "$VERSION" ] || [ "$VERSION" = "$(basename "$nupkg")" ]; then
+              echo "::warning::Could not parse version from $(basename "$nupkg"), skipping."
+              continue
+            fi
+            if gh release view "$VERSION" >/dev/null 2>&1; then
+              echo "Version $VERSION is already released. Skipping."
+            else
+              echo "Creating release for $VERSION"
+              gh release create "$VERSION" "$nupkg" \
+                --title "LegacyBlazorJs $VERSION" \
+                --notes "Automated release of LegacyBlazorJs $VERSION built from the latest ASP.NET Core source."
+            fi
+          done
+        env:
+          GITHUB_TOKEN: "${{ github.token }}"
+
+  release-nuget:
+    needs: [build, test-compat]
+    if: github.event_name == 'schedule' || inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      # download artifacts from build job
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: LegacyBlazorJs-packages
+          path: artifacts/packages
+
+      # publish packages to NuGet.org (skip duplicates)
+      - name: Publish to NuGet.org
+        run: |
+          dotnet nuget push 'artifacts/packages/*.nupkg' \
+            --api-key '${{ secrets.NUGET_API_KEY }}' \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
