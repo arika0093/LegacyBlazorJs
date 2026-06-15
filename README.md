@@ -2,7 +2,7 @@
 
 LegacyBlazorJs rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
 
-## Why this project
+## Why use this project?
 
 The official ASP.NET Core [Blazor browser support](https://learn.microsoft.com/en-us/aspnet/core/blazor/supported-platforms) targets "evergreen" browsers only.
 
@@ -15,6 +15,7 @@ This project aims to make Blazor available on older browsers by rebuilding the B
 ### Blazor Server
 
 Install the NuGet package `LegacyBlazorJs` in your Blazor application.
+
 For example, if you are using dotnet(aspnetcore) 10.0.1, the version you should install is `10.0.1`.
 
 ```bash
@@ -52,7 +53,7 @@ see [CanIUse](https://caniuse.com/wasm) for more details.
 
 ## Included files and intended browser targets
 
-After referencing the NuGet package, applications can serve each file from `_content/LegacyBlazorJs/blazor.web.<version>.js`.
+After referencing the NuGet package, applications can serve each file from `_content/LegacyBlazorJs/blazor.<arch>.<version>.js`.
 
 | Version | Intended browser target | WASM |
 |---|---|---|
@@ -67,7 +68,7 @@ After referencing the NuGet package, applications can serve each file from `_con
 | `es2021` | Chrome 85+, Edge 85+, Firefox 79+, Safari 14.1+ | ✅️ |
 | `es2022` | Chrome 94+, Edge 94+, Firefox 93+, Safari 15.4+ | ✅️ |
 
-The authoritative profile definitions are in `config/targets.json`.
+The authoritative profile definitions are in [config/targets.json](config/targets.json).
 
 ## Development Guide
 ### How it works
@@ -88,4 +89,5 @@ TODO
 ## License
 
 [This repository](./LICENSE) itself is licensed under the MIT License.
+
 The generated js files included in the build artifacts are licensed under the MIT License of [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore/blob/main/LICENSE.txt).
