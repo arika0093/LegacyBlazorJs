@@ -55,6 +55,9 @@ mkdir -p "$ROOT/.work"
 DIST_DIR="$ROOT/dist/$TAG"
 PACKAGE_WWWROOT="$ROOT/src/LegacyBlazorJs/wwwroot"
 SOURCE_DIR="$ROOT/.work/aspnetcore-$TAG"
+
+echo "---------------------------------------"
+echo " Clone Upstream source: $VERSION"
 if [[ -d "$SOURCE_DIR/.git" ]]; then
   pushd "$SOURCE_DIR" >/dev/null
   git fetch --depth 1 origin "$TAG"
@@ -72,6 +75,8 @@ else
   USE_NPM_WORKSPACES=0
 fi
 
+echo "---------------------------------------"
+echo " Build required packages(JSInteop, SignalR, and relation packages)"
 if [[ "$USE_NPM_WORKSPACES" -eq 1 ]]; then
   pushd "$SOURCE_DIR" >/dev/null
   # ASP.NET Core 9+ ships an older tslib that does not include helpers like __spreadArray used for ES5 down-leveling.
@@ -111,13 +116,16 @@ else
 fi
 
 # Generate one JS variant per target profile and copy the outputs into the package wwwroot.
+echo "---------------------------------------"
+echo " Build Web.JS per profile target"
 BUILD_TARGET_PROFILES="$BUILD_PROFILES" "$NODE_BIN" "$ROOT/scripts/build-variants.mjs" --source-dir "$SOURCE_DIR/src/Components/Web.JS" --output "$DIST_DIR" --tag "$TAG"
 rm -rf "$PACKAGE_WWWROOT"
 mkdir -p "$PACKAGE_WWWROOT"
 cp -R "$DIST_DIR"/. "$PACKAGE_WWWROOT"/
-cp "$SOURCE_DIR/LICENSE.txt" "$ROOT/src/LegacyBlazorJs/UPSTREAM-LICENSE.txt"
 
 # Pack the Razor class library with the upstream version and its matching target framework.
+echo "---------------------------------------"
+echo " Pack the Razor class library with the upstream version"
 dotnet pack "$ROOT/src/LegacyBlazorJs/LegacyBlazorJs.csproj" -c Release \
   -p:PackageVersion="$VERSION" \
   -p:LegacyBlazorTargetFramework="$TARGET_FRAMEWORK" \

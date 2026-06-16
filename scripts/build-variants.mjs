@@ -58,22 +58,7 @@ async function usesNpmWorkspaces(sourceDir) {
 
 /** Resolve the browser target list used when Babel down-levels a generated bundle. */
 function resolveBabelTargets(profile) {
-  if (profile.intendedBrowsers && typeof profile.intendedBrowsers === 'object' && !Array.isArray(profile.intendedBrowsers)) {
-    return profile.intendedBrowsers;
-  }
-
-  const fallbackTargets = {
-    5: { ie: '11' },
-    2015: { chrome: '49', firefox: '45', safari: '10', edge: '12' },
-    2017: { chrome: '58', firefox: '54', safari: '11', edge: '16' },
-  };
-
-  const targets = fallbackTargets[profile.ecma];
-  if (!targets) {
-    throw new Error(`No Babel fallback target is configured for ECMA ${profile.ecma}.`);
-  }
-
-  return targets;
+  return profile.intendedBrowsers;
 }
 
 /** Down-level the already-bundled JS files when the upstream bundler cannot target older ECMA versions. */
@@ -87,11 +72,17 @@ async function postProcessForProfile(distDir, profile) {
   const legacyRequire = createRequire(path.join(process.cwd(), 'package.json'));
   const babel = legacyRequire('@babel/core');
   const targets = resolveBabelTargets(profile);
+
+  console.log(`*** transform execute (profile=${profile.description}) `)
   for (const file of files) {
     const filePath = path.join(distDir, file);
     const source = await readFile(filePath, 'utf8');
+    console.log(`* transform: ${file}`)
     const result = babel.transformSync(source, {
-      presets: [['@babel/preset-env', { targets }]],
+      presets: [[
+        '@babel/preset-env', {
+          targets,
+        }]],
       filename: file,
       compact: true,
     });
@@ -125,6 +116,8 @@ const files = {};
 
 try {
   for (const [name, profile] of Object.entries(targets)) {
+    console.log(`****** Build "${name}" (target: ${profile.typescriptTarget}) ******`);
+
     // Rewrite the upstream TypeScript target before each rebuild so the emitted syntax matches the profile.
     const tsconfig = JSON.parse(originalTsconfig);
     tsconfig.compilerOptions.target = profile.typescriptTarget;
@@ -176,6 +169,7 @@ try {
       webAssemblyFile: webAssemblyFilename,
       serverFile: serverFilename,
       webviewFile: webviewFilename,
+      name: name,
       description: profile.description,
       ecma: profile.ecma
     };
