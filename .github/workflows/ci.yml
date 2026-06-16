@@ -175,7 +175,7 @@ jobs:
           GITHUB_TOKEN: "${{ github.token }}"
 
   release-nuget:
-    needs: [build]
+    needs: [build, test-compat]
     if: inputs.publish_nuget
     runs-on: ubuntu-latest
     steps:
