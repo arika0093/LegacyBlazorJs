@@ -4,7 +4,6 @@
     "ecma": 5,
     "typescriptTarget": "es5",
     "intendedBrowsers": {
-      "chrome": "23",
       "ie": "11"
     }
   },
@@ -13,7 +12,7 @@
     "ecma": 5,
     "typescriptTarget": "es5",
     "intendedBrowsers": {
-      "chrome": "23"
+      "chrome": "38"
     }
   },
   "es2015": {

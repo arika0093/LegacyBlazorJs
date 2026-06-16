@@ -26,38 +26,8 @@ permissions:
   contents: write
 
 jobs:
-  # Validate manual inputs and expose one normalized major list to all following jobs.
-  configure:
-    runs-on: ubuntu-latest
-    outputs:
-      majors: ${{ steps.majors.outputs.args }}
-      matrix: ${{ steps.majors.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          persist-credentials: false
-      - id: majors
-        name: Resolve selected .NET majors
-        env:
-          REQUESTED_MAJORS: ${{ github.event_name == 'workflow_dispatch' && inputs.majors || '' }}
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const supported = JSON.parse(fs.readFileSync('config/majors.json', 'utf8')).supportedMajors;
-          const requested = process.env.REQUESTED_MAJORS.trim()
-            ? process.env.REQUESTED_MAJORS.split(/[\s,]+/).filter(Boolean).map(Number)
-            : supported;
-          const majors = [...new Set(requested)];
-          const invalid = majors.filter(major => !supported.includes(major));
-          if (majors.length === 0 || invalid.length > 0 || majors.some(Number.isNaN)) {
-            throw new Error(`Select one or more supported majors (${supported.join(', ')}). Invalid values: ${invalid.join(', ')}`);
-          }
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `args=${majors.join(' ')}\nmatrix=${JSON.stringify(majors)}\n`);
-          NODE
-
   # build the latest ASP.NET Core source, create browser variants and NuGet package, and upload artifacts for release
   build:
-    needs: configure
     runs-on: ubuntu-latest
     steps:
       # setup environment
@@ -82,7 +52,7 @@ jobs:
 
       # fetch upstream source, build browser variants, and pack NuGet
       - name: Build upstream source, browser variants, and NuGet package
-        run: npm run build -- ${{ needs.configure.outputs.majors }}
+        run: npm run build -- 8 9 10
         env:
           GITHUB_TOKEN: "${{ github.token }}"
 
@@ -102,13 +72,13 @@ jobs:
 
   # Run ES20x compatibility matrix tests with specific Chromium versions
   test-compat:
-    needs: [configure, build]
+    needs: [build]
     if: inputs.run_compat
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        dotnet: ${{ fromJSON(needs.configure.outputs.matrix) }}
+        dotnet: [8, 9, 10]
     steps:
       # > source
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -121,10 +91,7 @@ jobs:
       # > dotnet (test framework target + package target frameworks)
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
-            10.0.x
+          dotnet-version: ${{ matrix.dotnet }}.0.x
       # download artifacts from build job
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -134,7 +101,7 @@ jobs:
       - run: npm ci --ignore-scripts
       # > playwright dependencies; the compatibility harness downloads each profile's old Chromium
       - run: dotnet tool install --global Microsoft.Playwright.CLI
-      - run: playwright install-deps chromium
+      - run: playwright install-deps chromium -p tests/PlaywrightTest/PlaywrightTest.csproj
       # execute compatibility test matrix for this .NET version
       - name: Run ES20x compatibility matrix (.NET ${{ matrix.dotnet }})
         run: npm run test:compat
