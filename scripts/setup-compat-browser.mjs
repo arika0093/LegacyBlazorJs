@@ -6,7 +6,7 @@ import { resolveCompatibilityBrowsers } from './compat-lib.mjs';
 
 const profile = process.argv[2];
 if (!profile) {
-  throw new Error('Usage: node scripts/export-browser-env.mjs <profile>');
+  throw new Error('Usage: node scripts/setup-compat-browser.mjs <profile>');
 }
 
 const browser = (await resolveCompatibilityBrowsers()).get(profile);

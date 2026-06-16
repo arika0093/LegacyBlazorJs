@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
+import { setupCompatibilityBrowser } from './browser-setup-lib.mjs';
 import {
   getCompatibilityProfiles,
   getCompatibilityResultsPath,
@@ -73,6 +74,7 @@ async function main() {
   for (const build of buildSummary.builds) {
     for (const profile of profiles) {
       const browser = browsersByProfile.get(profile.name);
+      const executablePath = await setupCompatibilityBrowser(browser);
       for (const hostingModel of hostingModels) {
         const startedAt = new Date().toISOString();
         const started = Date.now();
@@ -82,9 +84,7 @@ async function main() {
           SMOKE_TEST_PROFILE: profile.name,
           SMOKE_TEST_HOSTING_MODEL: hostingModel,
           SMOKE_TEST_CHROMIUM_VERSION: browser.version,
-          SMOKE_TEST_CHROMIUM_DOWNLOAD_URL: browser.downloadUrl,
-          SMOKE_TEST_CHROMIUM_EXECUTABLE_RELATIVE_PATH: browser.executableRelativePath,
-          SMOKE_TEST_CHROMIUM_CACHE_KEY: browser.cacheKey,
+          SMOKE_TEST_CHROMIUM_EXECUTABLE_PATH: executablePath,
         };
 
         console.log(

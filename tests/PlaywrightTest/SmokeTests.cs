@@ -1284,113 +1284,23 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
 
 internal static class BrowserBinaryResolver
 {
-    private static readonly HttpClient HttpClient = new()
+    public static Task<BrowserLaunchConfiguration> ResolveAsync()
     {
-        Timeout = TimeSpan.FromMinutes(10)
-    };
-
-    public static async Task<BrowserLaunchConfiguration> ResolveAsync()
-    {
-        var downloadUrl = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_DOWNLOAD_URL");
-        if (string.IsNullOrWhiteSpace(downloadUrl))
+        var executablePath = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_EXECUTABLE_PATH");
+        if (string.IsNullOrWhiteSpace(executablePath))
         {
-            return BrowserLaunchConfiguration.Bundled;
+            return Task.FromResult(BrowserLaunchConfiguration.Bundled);
         }
-
-        var browserVersion = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_VERSION");
-        if (string.IsNullOrWhiteSpace(browserVersion))
-        {
-            throw new InvalidOperationException(
-                "SMOKE_TEST_CHROMIUM_VERSION is required when SMOKE_TEST_CHROMIUM_DOWNLOAD_URL is set.");
-        }
-
-        var executableRelativePath = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_EXECUTABLE_RELATIVE_PATH");
-        if (string.IsNullOrWhiteSpace(executableRelativePath))
-        {
-            throw new InvalidOperationException(
-                "SMOKE_TEST_CHROMIUM_EXECUTABLE_RELATIVE_PATH is required when SMOKE_TEST_CHROMIUM_DOWNLOAD_URL is set.");
-        }
-
-        var cacheKey = Environment.GetEnvironmentVariable("SMOKE_TEST_CHROMIUM_CACHE_KEY");
-        if (string.IsNullOrWhiteSpace(cacheKey))
-        {
-            cacheKey = ResolvePlatformCacheKey();
-        }
-
-        var browserDirectory = Path.Combine(TestEnvironment.WorkDirectory, "browsers", "chromium", browserVersion, cacheKey);
-        var executablePath = Path.Combine(browserDirectory, executableRelativePath);
-
-        if (File.Exists(executablePath))
-        {
-            EnsureExecutablePermissions(executablePath);
-            return new BrowserLaunchConfiguration(executablePath);
-        }
-
-        Directory.CreateDirectory(browserDirectory);
-        var archivePath = Path.Combine(browserDirectory, Path.GetFileName(new Uri(downloadUrl).AbsolutePath));
-        if (!File.Exists(archivePath))
-        {
-            await DownloadBrowserArchiveWithRetryAsync(downloadUrl, archivePath);
-        }
-
-        ZipFile.ExtractToDirectory(archivePath, browserDirectory, overwriteFiles: true);
-        EnsureExecutablePermissions(executablePath);
 
         if (!File.Exists(executablePath))
         {
             throw new FileNotFoundException(
-                $"Downloaded Chromium archive did not contain the expected executable '{executableRelativePath}'.");
+                $"Configured Chromium executable was not found at '{executablePath}'. Run 'npm run setup:compat-browser -- <profile>' before executing dotnet smoke tests that require a compatibility browser.",
+                executablePath);
         }
 
-        return new BrowserLaunchConfiguration(executablePath);
-    }
-
-    private static async Task DownloadBrowserArchiveWithRetryAsync(string downloadUrl, string archivePath)
-    {
-        const int maxAttempts = 3;
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            try
-            {
-                using var response = await HttpClient.GetAsync(downloadUrl);
-                response.EnsureSuccessStatusCode();
-
-                await using var archiveStream = await response.Content.ReadAsStreamAsync();
-                await using var fileStream = File.Create(archivePath);
-                await archiveStream.CopyToAsync(fileStream);
-                return;
-            }
-            catch when (attempt < maxAttempts)
-            {
-                if (File.Exists(archivePath))
-                {
-                    File.Delete(archivePath);
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(2 * attempt));
-            }
-        }
-    }
-
-    private static string ResolvePlatformCacheKey()
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return Environment.Is64BitOperatingSystem ? "win-x64" : "win-x86";
-        }
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return "linux-x64";
-        }
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "mac-arm64" : "mac-x64";
-        }
-
-        throw new PlatformNotSupportedException("Only Windows, Linux, and macOS are supported for browser automation.");
+        EnsureExecutablePermissions(executablePath);
+        return Task.FromResult(new BrowserLaunchConfiguration(executablePath));
     }
 
     private static void EnsureExecutablePermissions(string executablePath)
