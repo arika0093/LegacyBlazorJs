@@ -77,6 +77,10 @@ if [[ "$USE_NPM_WORKSPACES" -eq 1 ]]; then
   # ASP.NET Core 9+ ships an older tslib that does not include helpers like __spreadArray used for ES5 down-leveling.
   # Force a newer tslib across the workspace before installing.
   "$NODE_BIN" "$ROOT/scripts/patch-tslib-override.mjs" "$SOURCE_DIR/package.json"
+  # Work around Babel's named-capturing-groups transform interacting badly with
+  # `new RegExp(/regex/)` when down-leveling to ES2017 and earlier.  See the
+  # patch script for the full explanation.
+  "$NODE_BIN" "$ROOT/scripts/patch-blazor-regex.mjs" "$SOURCE_DIR/src/Components/Web.JS/src/Services/ComponentDescriptorDiscovery.ts"
   retry 3 15 npm install --ignore-scripts
   # Build the shared packages referenced by Web.JS. The Web.JS build itself is handled by build-variants.mjs.
   npm run build --workspace=src/JSInterop/Microsoft.JSInterop.JS/src
