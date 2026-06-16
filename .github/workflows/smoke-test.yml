@@ -26,7 +26,7 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 10.0.x
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .work/aspnetcore-*
           key: smoke-build-${{ runner.os }}-upstream-${{ hashFiles('scripts/build-all.mjs', 'scripts/build-variants.mjs', 'scripts/fetch-and-build-upstream.sh', 'scripts/config-lib.mjs', 'config/targets.json') }}
@@ -67,7 +67,7 @@ jobs:
   #     - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
   #       with:
   #         dotnet-version: 10.0.x
-  #     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+  #     - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
   #       with:
   #         path: .work/browsers/chromium
   #         key: smoke-test-${{ runner.os }}-chromium-${{ hashFiles('scripts/export-browser-env.mjs', 'scripts/compat-lib.mjs', 'config/targets.json') }}
