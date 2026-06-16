@@ -101,7 +101,7 @@ jobs:
       - run: npm ci --ignore-scripts
       # > playwright dependencies; the compatibility harness downloads each profile's old Chromium
       - run: dotnet tool install --global Microsoft.Playwright.CLI
-      - run: playwright install-deps chromium -p tests/PlaywrightTest/PlaywrightTest.csproj
+      - run: playwright -p tests/PlaywrightTest/PlaywrightTest.csproj install-deps chromium
       # execute compatibility test matrix for this .NET version
       - name: Run ES20x compatibility matrix (.NET ${{ matrix.dotnet }})
         run: npm run test:compat
