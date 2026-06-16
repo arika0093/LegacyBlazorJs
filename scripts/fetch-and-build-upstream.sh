@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SKIP_PREBUILD=0
+
+
 # Resolve repository root so the script can be invoked from any working directory.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MAJOR="${1:-${DOTNET_MAJOR:-}}"
@@ -77,42 +80,46 @@ fi
 
 echo "---------------------------------------"
 echo " Build required packages(JSInteop, SignalR, and relation packages)"
-if [[ "$USE_NPM_WORKSPACES" -eq 1 ]]; then
-  pushd "$SOURCE_DIR" >/dev/null
-  # ASP.NET Core 9+ ships an older tslib that does not include helpers like __spreadArray used for ES5 down-leveling.
-  # Force a newer tslib across the workspace before installing.
-  "$NODE_BIN" "$ROOT/scripts/patch-tslib-override.mjs" "$SOURCE_DIR/package.json"
-  # Work around Babel's named-capturing-groups transform interacting badly with
-  # `new RegExp(/regex/)` when down-leveling to ES2017 and earlier.  See the
-  # patch script for the full explanation.
-  "$NODE_BIN" "$ROOT/scripts/patch-blazor-regex.mjs" "$SOURCE_DIR/src/Components/Web.JS/src/Services/ComponentDescriptorDiscovery.ts"
-  retry 3 15 npm install --ignore-scripts
-  # Build the shared packages referenced by Web.JS. The Web.JS build itself is handled by build-variants.mjs.
-  npm run build --workspace=src/JSInterop/Microsoft.JSInterop.JS/src
-  npm run build --workspace=src/SignalR/clients/ts/signalr
-  npm run build --workspace=src/SignalR/clients/ts/signalr-protocol-msgpack
-  popd >/dev/null
-else
-  corepack prepare yarn@1.22.22 --activate
-
-  run_yarn_build() {
-    local project_dir="$1"
-    local build_script="${2:-build}"
-    pushd "$project_dir" >/dev/null
-    retry 3 15 yarn install --mutex network --frozen-lockfile --ignore-engines
-    yarn run "$build_script"
-    local exit_code=$?
+if [[ "$SKIP_PREBUILD" -ne 1 ]]; then
+  if [[ "$USE_NPM_WORKSPACES" -eq 1 ]]; then
+    pushd "$SOURCE_DIR" >/dev/null
+    # ASP.NET Core 9+ ships an older tslib that does not include helpers like __spreadArray used for ES5 down-leveling.
+    # Force a newer tslib across the workspace before installing.
+    "$NODE_BIN" "$ROOT/scripts/patch-tslib-override.mjs" "$SOURCE_DIR/package.json"
+    # Work around Babel's named-capturing-groups transform interacting badly with
+    # `new RegExp(/regex/)` when down-leveling to ES2017 and earlier.  See the
+    # patch script for the full explanation.
+    "$NODE_BIN" "$ROOT/scripts/patch-blazor-regex.mjs" "$SOURCE_DIR/src/Components/Web.JS/src/Services/ComponentDescriptorDiscovery.ts"
+    retry 3 15 npm install --ignore-scripts
+    # Build the shared packages referenced by Web.JS. The Web.JS build itself is handled by build-variants.mjs.
+    npm run build --workspace=src/JSInterop/Microsoft.JSInterop.JS/src
+    npm run build --workspace=src/SignalR/clients/ts/signalr
+    npm run build --workspace=src/SignalR/clients/ts/signalr-protocol-msgpack
     popd >/dev/null
-    return $exit_code
-  }
+  else
+    corepack prepare yarn@1.22.22 --activate
 
-  # Build only the linked JavaScript packages instead of restoring the full ASP.NET Core engineering toolset.
-  run_yarn_build "$SOURCE_DIR/src/JSInterop/Microsoft.JSInterop.JS/src" build
-  pushd "$SOURCE_DIR/src/SignalR/clients/ts/common" >/dev/null
-  retry 3 15 yarn install --mutex network --frozen-lockfile --ignore-engines
-  popd >/dev/null
-  run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr" build
-  run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr-protocol-msgpack" build
+    run_yarn_build() {
+      local project_dir="$1"
+      local build_script="${2:-build}"
+      pushd "$project_dir" >/dev/null
+      retry 3 15 yarn install --mutex network --frozen-lockfile --ignore-engines
+      yarn run "$build_script"
+      local exit_code=$?
+      popd >/dev/null
+      return $exit_code
+    }
+
+    # Build only the linked JavaScript packages instead of restoring the full ASP.NET Core engineering toolset.
+    run_yarn_build "$SOURCE_DIR/src/JSInterop/Microsoft.JSInterop.JS/src" build
+    pushd "$SOURCE_DIR/src/SignalR/clients/ts/common" >/dev/null
+    retry 3 15 yarn install --mutex network --frozen-lockfile --ignore-engines
+    popd >/dev/null
+    run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr" build
+    run_yarn_build "$SOURCE_DIR/src/SignalR/clients/ts/signalr-protocol-msgpack" build
+  fi
+else
+  echo " ... Skipped (SKIP_PREBUILD = 1)"
 fi
 
 # Generate one JS variant per target profile and copy the outputs into the package wwwroot.
