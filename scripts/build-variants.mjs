@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { readFile, writeFile, mkdir, rm, copyFile, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm, copyFile, access, unlink } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 import { parseAspNetTag } from './version-lib.mjs';
 import { readSelectedTargets } from './config-lib.mjs';
@@ -61,6 +62,56 @@ function resolveBabelTargets(profile) {
   return profile.intendedBrowsers;
 }
 
+
+/** Write the Rollup Babel bridge module next to the upstream Rollup config. */
+async function writeRollupBabelBridge(bundlerConfigPath) {
+  const legacyRequire = createRequire(path.join(process.cwd(), 'package.json'));
+  const babelPluginPath = legacyRequire.resolve('@rollup/plugin-babel');
+  const presetEnvPath = legacyRequire.resolve('@babel/preset-env');
+  const bridgePath = path.join(path.dirname(bundlerConfigPath), 'legacy-blazor-babel-plugin.mjs');
+  const bridgeSource = `import { babel } from ${JSON.stringify(pathToFileURL(babelPluginPath).href)};
+import presetEnv from ${JSON.stringify(pathToFileURL(presetEnvPath).href)};
+
+export function legacyBlazorBabelPlugin() {
+  const targets = JSON.parse(process.env.LEGACY_BLAZOR_BABEL_TARGETS ?? '{}');
+  return babel({
+    babelHelpers: 'bundled',
+    extensions: ['.js', '.mjs', '.ts'],
+    exclude: /node_modules/,
+    presets: [[
+      presetEnv, {
+        targets,
+        modules: false,
+        bugfixes: true,
+        useBuiltIns: 'usage',
+        corejs: '3'
+      }
+    ]]
+  });
+}
+`;
+  await writeFile(bridgePath, bridgeSource);
+  return bridgePath;
+}
+
+/** Inject Babel into the upstream Rollup plugin chain before Terser so polyfills are bundled and minified. */
+function withRollupBabelPlugin(configSource) {
+  const importLine = "import { legacyBlazorBabelPlugin } from './legacy-blazor-babel-plugin.mjs';";
+  const withImport = configSource.includes(importLine)
+    ? configSource
+    : `${importLine}\n${configSource}`;
+
+  if (withImport.includes('legacyBlazorBabelPlugin(),')) {
+    return withImport;
+  }
+
+  const patched = withImport.replace(/(\n\s*)terser\(\{/m, '$1legacyBlazorBabelPlugin(),$1terser({');
+  if (patched === withImport) {
+    throw new Error('Could not locate the upstream Rollup Terser plugin to insert Babel before it.');
+  }
+  return patched;
+}
+
 /** Down-level the already-bundled JS files when the upstream bundler cannot target older ECMA versions. */
 async function postProcessForProfile(distDir, profile) {
   const files = ['blazor.web.js', 'blazor.webassembly.js', 'blazor.server.js', 'blazor.webview.js'];
@@ -108,6 +159,8 @@ const bundlerConfigPath = await firstExisting([
 const tsconfigPath = bundlerConfigPath.endsWith('webpack.config.js')
   ? path.join(sourceDir, 'tsconfig.json')
   : path.join(sourceDir, '../Shared.JS/tsconfig.json');
+const isRollupBuild = bundlerConfigPath.endsWith('rollup.config.mjs');
+const rollupBabelBridgePath = isRollupBuild ? await writeRollupBabelBridge(bundlerConfigPath) : null;
 const originalTsconfig = await readFile(tsconfigPath, 'utf8');
 const originalBundlerConfig = await readFile(bundlerConfigPath, 'utf8');
 await rm(output, { recursive: true, force: true });
@@ -128,17 +181,21 @@ try {
       tsconfig.compilerOptions.importHelpers = false;
       if (profile.ecma < 2018) {
         // The upstream source uses ES2018 syntax (e.g. named capturing groups) that TypeScript refuses
-        // to emit when targeting older ECMA versions. Compile to ES2018 first, then post-process down.
+        // to emit when targeting older ECMA versions. Compile to ES2018 first, then let Babel down-level it.
         tsconfig.compilerOptions.target = 'es2018';
       }
     }
     await writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
 
     // The bundler also needs the matching ECMA level so minification does not re-introduce newer syntax.
-    const bundlerConfig = originalBundlerConfig.replace(/ecma:\s*\d+/g, `ecma: ${profile.ecma}`);
-    if (bundlerConfig === originalBundlerConfig && !originalBundlerConfig.includes(`ecma: ${profile.ecma}`)) {
+    const ecmaPatchedBundlerConfig = originalBundlerConfig.replace(/ecma:\s*\d+/g, `ecma: ${profile.ecma}`);
+    if (ecmaPatchedBundlerConfig === originalBundlerConfig && !originalBundlerConfig.includes(`ecma: ${profile.ecma}`)) {
       throw new Error('Could not locate the upstream bundler/Terser ECMA target.');
     }
+    const bundlerConfig = isRollupBuild && profile.ecma < 2018
+      ? withRollupBabelPlugin(ecmaPatchedBundlerConfig)
+      : ecmaPatchedBundlerConfig;
+    process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
     await writeFile(bundlerConfigPath, bundlerConfig);
 
     if (npmWorkspace) {
@@ -150,7 +207,7 @@ try {
       await run('yarn', ['run', 'build:production'], sourceDir);
     }
 
-    if (profile.ecma < 2018) {
+    if (!isRollupBuild && profile.ecma < 2018) {
       const distDir = path.join(sourceDir, 'dist', 'Release');
       await postProcessForProfile(distDir, profile);
     }
@@ -178,6 +235,8 @@ try {
   // Always restore upstream files so repeated builds start from a clean checkout.
   await writeFile(tsconfigPath, originalTsconfig);
   await writeFile(bundlerConfigPath, originalBundlerConfig);
+  if (rollupBabelBridgePath) await unlink(rollupBabelBridgePath).catch(() => {});
+  delete process.env.LEGACY_BLAZOR_BABEL_TARGETS;
 }
 await writeFile(path.join(output, 'build-manifest.json'), `${JSON.stringify({ upstreamTag: parsed.tag, packageVersion: parsed.version, files }, null, 2)}\n`);
 console.log(`Built ${Object.keys(files).length} upstream variants for ${parsed.tag} in ${output}`);
