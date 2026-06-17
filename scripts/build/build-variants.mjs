@@ -98,10 +98,18 @@ function withRollupLegacyPlugins(configSource) {
     return withImport;
   }
 
-  const patched = withImport.replace(/(\n\s*)terser\(\{/m, '$1...legacyBlazorPlugins(),$1terser({');
+  let patched = withImport.replace(/(\n\s*)terser\(\{/m, '$1...legacyBlazorPlugins(),$1terser({');
   if (patched === withImport) {
     throw new Error('Could not locate the upstream Rollup Terser plugin to insert legacy plugins before it.');
   }
+
+  // Fix dotnet.js path for LegacyBlazorJs
+  //   in default, blazor.web.js and dotnet.js are in the same directory (under _framework), so the import path is './dotnet.js'.
+  //   but in LegacyBlazorJs, blazor.web.js is anywhere (but not under _framework), so the import path should be updated to '/_framework/dotnet.js'.
+  patched = patched.replace(
+    /if\s*\(\s*source\s*===\s*'\.\/dotnet\.js'\s*\)\s*\{[^}]*return\s*\{[^}]*id:\s*'\.\/dotnet\.js'[^}]*\};/g,
+    "if (source === './dotnet.js') { return { id: '/_framework/dotnet.js', moduleSideEffects: false, external: true }; }"
+  );
 
   return patched;
 }

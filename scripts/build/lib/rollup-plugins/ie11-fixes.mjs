@@ -1,5 +1,16 @@
 /**
  * Fix IE11 compatibility issues in the output
+ * 
+ * These fixes cannot be handled by Babel because they are:
+ * 1. Runtime logic issues (not syntax issues)
+ * 2. Framework-specific patterns that Babel doesn't recognize
+ * 3. Issues that appear after Babel transformation
+ * 
+ * Q: Are these IE11-specific?
+ * A: Mostly yes, but some fixes also benefit other legacy browsers:
+ *    - _mergeNamespaces: Affects any browser where Object.keys(primitive) throws
+ *    - shouldAutoStart: Affects IE11 specifically (document.currentScript)
+ *    - userAgent checks: Prevents errors when userAgent is not a string
  */
 export function legacyIE11FixesPlugin() {
   return {
@@ -7,15 +18,19 @@ export function legacyIE11FixesPlugin() {
     renderChunk(code, chunk) {
       let transformed = code;
       
-      // Fix _mergeNamespaces to properly check for object type (IE11 compatibility)
+      // Fix 1: _mergeNamespaces type checking
+      // Why Babel can't fix: This is a Rollup-generated helper with a logic bug.
+      // Babel only transpiles syntax, not runtime logic.
       // Without this, primitives like 'true' cause "Object.keys: argument is not an object" error
       transformed = transformed.replace(
         /e && typeof e !== 'string' && !Array\.isArray\(e\) && Object\.keys\(e\)/g,
         "e && typeof e === 'object' && typeof e !== 'string' && !Array.isArray(e) && Object.keys(e)"
       );
       
-      // Fix shouldAutoStart for IE11 - document.currentScript may be null in IE11
-      // Default to autostart if currentScript is not available
+      // Fix 2: shouldAutoStart for IE11
+      // Why Babel can't fix: This requires changing the function logic, not syntax.
+      // IE11's document.currentScript is null in IIFE contexts.
+      // Solution: Fall back to getElementsByTagName('script')
       transformed = transformed.replace(
         /function shouldAutoStart\(\)\s*\{[^}]+\}/,
         `function shouldAutoStart() {
@@ -28,16 +43,13 @@ export function legacyIE11FixesPlugin() {
   }`
       );
       
-      // Fix userAgent?.match() patterns - add proper null checks
-      // Pattern: if (condition && userAgent$N) { ... userAgent$N.match(...) }
-      // Replace with: if (condition && userAgent$N && typeof userAgent$N.match === 'function')
-      // Or simpler: add try-catch or explicit string check
+      // Fix 3: userAgent.match() safety check
+      // Why Babel can't fix: This is a defensive runtime check.
+      // Babel transpiles syntax but doesn't add null-safety checks.
+      // Without this, userAgent being non-string causes "object does not support match" error
       transformed = transformed.replace(
-        /(\w+Agent\$?\d*)\s*&&\s*(\w+Agent\$?\d*)(\s*\)\s*\{[^}]*?)(\2)\.match\(/g,
-        (match, var1, var2, middle, var3) => {
-          // Add typeof check for string
-          return `${var1} && typeof ${var2} === 'string'${middle}${var3}.match(`;
-        }
+        /if\s*\(\s*!version\s*&&\s*userAgent(\$\d+)\s*\)\s*\{/g,
+        'if (!version && userAgent$1 && typeof userAgent$1 === \'string\') {'
       );
       
       return transformed === code ? null : { code: transformed, map: null };
