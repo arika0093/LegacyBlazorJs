@@ -39,32 +39,57 @@ export async function retry(maxAttempts, delayMs, operation) {
 }
 
 export function run(command, args, options = {}) {
-  const { cwd, env, stdio = 'inherit', timeoutMs } = options;
+  const { cwd, env, stdio = ['ignore', 'inherit', 'inherit'], timeoutMs } = options;
   const childEnv = withNodeProxyEnv(env ?? process.env);
 
   return new Promise((resolve, reject) => {
     const invocation = resolveInvocation(command, args);
+    process.stdout.write(`[DEBUG] Running: ${invocation.command} ${invocation.args.join(' ')}\n`);
     const child = spawn(invocation.command, invocation.args, {
       cwd,
       env: childEnv,
       stdio,
+      shell: false,
     });
 
+    if (!child.pid) {
+      process.stdout.write(`[DEBUG] WARNING: Process failed to spawn (no PID)\n`);
+    } else {
+      process.stdout.write(`[DEBUG] Process spawned with PID: ${child.pid}\n`);
+    }
+
     let timer;
+    let aliveTimer;
+    
+    // Periodic "still alive" check for long-running processes
+    if (!timeoutMs || timeoutMs > 30000) {
+      aliveTimer = setInterval(() => {
+        if (child.pid && !child.killed) {
+          process.stdout.write(`[DEBUG] Process ${child.pid} still running...\n`);
+        }
+      }, 10000); // Check every 10 seconds
+    }
+    
     if (timeoutMs) {
       timer = setTimeout(() => {
+        clearInterval(aliveTimer);
+        process.stdout.write(`[DEBUG] Process timeout (${timeoutMs}ms), killing PID: ${child.pid}\n`);
         child.kill('SIGTERM');
         reject(new Error(`Process '${command}' timed out after ${timeoutMs}ms.`));
       }, timeoutMs);
     }
 
     child.once('error', error => {
+      clearInterval(aliveTimer);
       clearTimeout(timer);
+      process.stdout.write(`[DEBUG] Process error: ${error.message}\n`);
       reject(error);
     });
 
     child.once('exit', code => {
+      clearInterval(aliveTimer);
       clearTimeout(timer);
+      process.stdout.write(`[DEBUG] Process exited with code: ${code}\n`);
       if (code === 0) {
         resolve();
         return;
@@ -107,11 +132,13 @@ export async function prepareNodeShim(nodeBin) {
 
   const shimDirectory = await mkdtemp(path.join(tmpdir(), 'legacy-blazor-node-'));
   const shimPath = path.join(shimDirectory, 'node');
-  const shimSource = `#!/usr/bin/env node
+  
+  // Use the resolved node path directly in the shebang to avoid infinite loop
+  const shimSource = `#!${resolvedNode}
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 
-const result = spawnSync(${JSON.stringify(nodeBin)}, process.argv.slice(2), { stdio: 'inherit' });
+const result = spawnSync(${JSON.stringify(nodeBin)}, process.argv.slice(2), { stdio: ['ignore', 'inherit', 'inherit'] });
 if (result.error) {
   throw result.error;
 }
