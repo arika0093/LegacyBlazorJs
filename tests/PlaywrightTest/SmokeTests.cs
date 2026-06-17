@@ -708,6 +708,7 @@ internal sealed class PlaywrightBrowserHarness : IAsyncDisposable
 internal sealed class LegacyChromiumHarness : IAsyncDisposable
 {
     private static readonly Regex DevToolsListeningPattern = new(@"DevTools listening on (?<url>ws://\S+)", RegexOptions.Compiled);
+    private static readonly HttpClient DevToolsHttpClient = new() { Timeout = TimeSpan.FromSeconds(2) };
     private readonly Process _process;
     private readonly string _profileDirectory;
     private readonly ClientWebSocket _socket;
@@ -741,12 +742,14 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
     {
         var profileDirectory = Path.Combine(TestEnvironment.WorkDirectory, "browser-profiles", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(profileDirectory);
+        var remoteDebuggingPort = GetAvailablePort();
+        var startupLog = new StringBuilder();
 
         var process = new Process
         {
             StartInfo = ProcessRunner.CreateStartInfo(
                 executablePath,
-                BuildBrowserArguments(profileDirectory),
+                BuildBrowserArguments(profileDirectory, remoteDebuggingPort),
                 TestEnvironment.RepositoryRoot,
                 redirectOutput: true)
         };
@@ -756,7 +759,7 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
             throw new InvalidOperationException($"Failed to start legacy Chromium '{executablePath}'.");
         }
 
-        var endpoint = await WaitForDevToolsEndpointAsync(process);
+        var endpoint = await WaitForDevToolsEndpointAsync(process, remoteDebuggingPort, startupLog);
         var socket = new ClientWebSocket();
         await socket.ConnectAsync(new Uri(endpoint), CancellationToken.None);
 
@@ -889,13 +892,13 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
         }
     }
 
-    private static IReadOnlyList<string> BuildBrowserArguments(string profileDirectory)
+    private static IReadOnlyList<string> BuildBrowserArguments(string profileDirectory, int remoteDebuggingPort)
     {
         var arguments = new List<string>
         {
             "--disable-gpu",
             "--disable-dev-shm-usage",
-            "--remote-debugging-port=0",
+            $"--remote-debugging-port={remoteDebuggingPort}",
             $"--user-data-dir={profileDirectory}",
             "about:blank"
         };
@@ -913,7 +916,7 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
         return arguments;
     }
 
-    private static async Task<string> WaitForDevToolsEndpointAsync(Process process)
+    private static async Task<string> WaitForDevToolsEndpointAsync(Process process, int remoteDebuggingPort, StringBuilder startupLog)
     {
         var endpointTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -924,6 +927,11 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
                 return;
             }
 
+            lock (startupLog)
+            {
+                startupLog.AppendLine(line);
+            }
+
             var match = DevToolsListeningPattern.Match(line);
             if (match.Success)
             {
@@ -931,13 +939,38 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
             }
         }
 
+        process.EnableRaisingEvents = true;
+        process.Exited += (_, _) =>
+        {
+            endpointTcs.TrySetException(
+                new InvalidOperationException(BuildDevToolsStartupFailureMessage(process, startupLog)));
+        };
         process.OutputDataReceived += (_, args) => TrySetEndpoint(args.Data);
         process.ErrorDataReceived += (_, args) => TrySetEndpoint(args.Data);
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        await using var _ = cts.Token.Register(() => endpointTcs.TrySetCanceled(cts.Token));
+        using var registration = cts.Token.Register(() => endpointTcs.TrySetCanceled(cts.Token));
+
+        while (!cts.IsCancellationRequested && !endpointTcs.Task.IsCompleted)
+        {
+            var endpoint = await TryResolveDevToolsEndpointFromHttpAsync(remoteDebuggingPort, cts.Token);
+            if (endpoint is not null)
+            {
+                endpointTcs.TrySetResult(endpoint);
+                break;
+            }
+
+            try
+            {
+                await Task.Delay(250, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
 
         try
         {
@@ -945,8 +978,104 @@ internal sealed class LegacyChromiumHarness : IAsyncDisposable
         }
         catch (TaskCanceledException)
         {
-            throw new TimeoutException("Timed out waiting for the legacy Chromium DevTools endpoint.");
+            throw new TimeoutException(
+                $"Timed out waiting for the legacy Chromium DevTools endpoint on port {remoteDebuggingPort}.{Environment.NewLine}{BuildStartupLog(startupLog)}");
         }
+    }
+
+    private static async Task<string?> TryResolveDevToolsEndpointFromHttpAsync(int remoteDebuggingPort, CancellationToken cancellationToken)
+    {
+        var baseUri = new Uri($"http://127.0.0.1:{remoteDebuggingPort}");
+
+        using var versionEndpoint = await TryReadJsonAsync(new Uri(baseUri, "/json/version"), cancellationToken);
+        if (versionEndpoint is not null &&
+            versionEndpoint.RootElement.ValueKind == JsonValueKind.Object &&
+            TryReadWebSocketDebuggerUrl(versionEndpoint.RootElement, out var websocketDebuggerUrl))
+        {
+            return websocketDebuggerUrl;
+        }
+
+        using var targetsEndpoint = await TryReadJsonAsync(new Uri(baseUri, "/json/list"), cancellationToken)
+            ?? await TryReadJsonAsync(new Uri(baseUri, "/json"), cancellationToken);
+        if (targetsEndpoint is not null && targetsEndpoint.RootElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var target in targetsEndpoint.RootElement.EnumerateArray())
+            {
+                if (TryReadWebSocketDebuggerUrl(target, out websocketDebuggerUrl))
+                {
+                    return websocketDebuggerUrl;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static async Task<JsonDocument?> TryReadJsonAsync(Uri uri, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await DevToolsHttpClient.GetAsync(uri, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            return await JsonDocument.ParseAsync(
+                await response.Content.ReadAsStreamAsync(cancellationToken),
+                cancellationToken: cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static bool TryReadWebSocketDebuggerUrl(JsonElement element, out string endpoint)
+    {
+        if (element.TryGetProperty("webSocketDebuggerUrl", out var endpointElement) &&
+            endpointElement.GetString() is { Length: > 0 } url)
+        {
+            endpoint = url;
+            return true;
+        }
+
+        endpoint = string.Empty;
+        return false;
+    }
+
+    private static string BuildDevToolsStartupFailureMessage(Process process, StringBuilder startupLog)
+    {
+        int? exitCode = process.HasExited ? process.ExitCode : null;
+        var suffix = exitCode is null
+            ? "Legacy Chromium exited before opening the DevTools endpoint."
+            : $"Legacy Chromium exited before opening the DevTools endpoint (exit code {exitCode}).";
+        return $"{suffix}{Environment.NewLine}{BuildStartupLog(startupLog)}";
+    }
+
+    private static string BuildStartupLog(StringBuilder startupLog)
+    {
+        lock (startupLog)
+        {
+            return startupLog.Length == 0
+                ? "No browser startup output was captured."
+                : $"Browser startup output:{Environment.NewLine}{startupLog}";
+        }
+    }
+
+    private static int GetAvailablePort()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
     private async Task<(string TargetId, string SessionId)> AttachToTargetAsync()
