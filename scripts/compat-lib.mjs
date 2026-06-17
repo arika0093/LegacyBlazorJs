@@ -20,7 +20,7 @@ export function getCompatibilityResultsPath() {
 export async function getCompatibilityProfiles() {
   const targets = await readTargetsConfig();
   return Object.entries(targets)
-    .filter(([, profile]) => Number(profile.ecma) >= 2020)
+    .filter(([, profile]) => hasChromeTarget(profile))
     .map(([name, profile]) => ({
       name,
       ecma: Number(profile.ecma),
@@ -194,6 +194,17 @@ export async function readBuildSummary() {
   }
 }
 
+function hasChromeTarget(profile) {
+  if (profile.intendedBrowsers?.chrome) {
+    return true;
+  }
+
+  const text = Array.isArray(profile.intendedBrowsers)
+    ? profile.intendedBrowsers.join('\n')
+    : profile.description;
+  return /Chrome\s*(?:>=|\+)\s*\d+/i.test(text);
+}
+
 /** Extract the minimum Chrome major version declared for a target profile. */
 function parseChromeMajor(profile) {
   if (profile.intendedBrowsers?.chrome) {
@@ -201,7 +212,7 @@ function parseChromeMajor(profile) {
   }
 
   const text = Array.isArray(profile.intendedBrowsers)
-    ? profile.intendedBrowsers.find(entry => /^Chrome\s*>=\s*\d+/.test(entry))
+    ? profile.intendedBrowsers.find(entry => /^Chrome\s*(?:>=|\+)\s*\d+/i.test(entry))
     : profile.description;
   const match = /Chrome\s*(?:>=|\+)\s*(\d+)/i.exec(text);
   if (!match) {

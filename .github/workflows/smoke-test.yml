@@ -40,7 +40,7 @@ jobs:
       - name: Build upstream source and NuGet package
         run: npm run build -- 10
         env:
-          BUILD_TARGET_PROFILES: es2020
+          BUILD_TARGET_PROFILES: es5
           GITHUB_TOKEN: "${{ github.token }}"
 
       # upload packages
@@ -49,7 +49,7 @@ jobs:
           name: LegacyBlazorJs-packages
           path: artifacts/packages/*.nupkg
 
-  # Run a single smoke test against the ES2020 variant using Blazor Server
+  # Run a single smoke test against the ES5 variant using Blazor Server
   smoke-test:
     needs: build-package
     runs-on: ubuntu-latest
@@ -74,15 +74,15 @@ jobs:
           path: artifacts/packages
       # > npm dependencies
       - run: npm ci --ignore-scripts
-      # > playwright dependencies; browser setup downloads the ES2020-era Chromium below
+      # > playwright dependencies; browser setup downloads the ES5-era Chromium below
       - run: dotnet tool install --global Microsoft.Playwright.CLI
       - run: dotnet build tests/PlaywrightTest/PlaywrightTest.csproj
       - run: playwright -p tests/PlaywrightTest/PlaywrightTest.csproj install-deps chromium
       - name: Select old Chromium for smoke test
-        run: node scripts/export-browser-env.mjs es2020
-      # execute a single smoke test for the ES2020 variant on Blazor Server
-      - name: Run smoke test (ES2020, Blazor Server)
+        run: node scripts/export-browser-env.mjs es5
+      # execute a single smoke test for the ES5 variant on Blazor Server
+      - name: Run smoke test (ES5, Blazor Server)
         run: xvfb-run -a dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
         env:
-          SMOKE_TEST_PROFILE: es2020
+          SMOKE_TEST_PROFILE: es5
           SMOKE_TEST_HOSTING_MODEL: Server
