@@ -2,9 +2,10 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { readTargetsConfig } from './config-lib.mjs';
+import { readTargetsConfig } from '../../build/lib/config.mjs';
+import { withProxyFetchOptions } from '../../build/lib/network.mjs';
 
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const chromiumSnapshotsBaseUrl = 'https://commondatastorage.googleapis.com/chromium-browser-snapshots';
 const chromiumHistoryJsonBaseUrl =
   'https://raw.githubusercontent.com/vikyd/chromium-history-version-position/master/json/ver-pos-os-link';
@@ -34,7 +35,6 @@ export function getHostingModels() {
   return ['Server', 'WebAssembly'];
 }
 
-/** Determine the Chromium snapshot platform identifiers for the current OS/architecture. */
 export function getChromiumHistoryPlatform() {
   switch (process.platform) {
     case 'linux':
@@ -110,7 +110,6 @@ export async function resolveCompatibilityBrowsers() {
   return byProfile;
 }
 
-/** Find the newest Chromium snapshot that matches the requested major version. */
 function resolveSnapshotRelease(versionLinks, chromeMajor) {
   const prefix = `${chromeMajor}.`;
   const version = Object.keys(versionLinks)
@@ -134,7 +133,6 @@ function resolveSnapshotRelease(versionLinks, chromeMajor) {
   };
 }
 
-/** Compare dotted version strings numerically, treating missing segments as zero. */
 function compareVersions(left, right) {
   const leftParts = left.split('.').map(Number);
   const rightParts = right.split('.').map(Number);
@@ -157,13 +155,13 @@ async function fetchJson(url) {
 
   let response;
   try {
-    response = await fetch(url, {
+    response = await fetch(url, withProxyFetchOptions(url, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'legacy-blazor-js-build',
         Accept: 'application/json',
       },
-    });
+    }));
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw new Error(`Chromium version metadata request timed out after ${FETCH_TIMEOUT_MS}ms for ${url}.`);

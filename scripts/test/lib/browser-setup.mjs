@@ -4,7 +4,7 @@ import { access, chmod, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pipeline } from 'node:stream/promises';
-import { getRootDir } from './compat-lib.mjs';
+import { getRootDir } from './compat.mjs';
 
 const DOWNLOAD_TIMEOUT_MS = 600_000;
 const MAX_DOWNLOAD_ATTEMPTS = 3;

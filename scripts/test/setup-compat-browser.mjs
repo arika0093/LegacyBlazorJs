@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { appendFile } from 'node:fs/promises';
 import process from 'node:process';
-import { setupCompatibilityBrowser } from './browser-setup-lib.mjs';
-import { resolveCompatibilityBrowsers } from './compat-lib.mjs';
+import { setupCompatibilityBrowser } from './lib/browser-setup.mjs';
+import { resolveCompatibilityBrowsers } from './lib/compat.mjs';
 
 const profile = process.argv[2];
 if (!profile) {
-  throw new Error('Usage: node scripts/export-browser-env.mjs <profile>');
+  throw new Error('Usage: node scripts/test/setup-compat-browser.mjs <profile>');
 }
 
 const browser = (await resolveCompatibilityBrowsers()).get(profile);
