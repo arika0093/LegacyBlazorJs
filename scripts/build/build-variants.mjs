@@ -72,91 +72,18 @@ async function usesNpmWorkspaces(sourceDir) {
 }
 
 async function writeRollupLegacyPluginsModule(bundlerConfigPath) {
-  const legacyRequire = createRequire(path.join(rootDir, 'package.json'));
-  const babelPluginPath = legacyRequire.resolve('@rollup/plugin-babel');
-  const presetEnvPath = legacyRequire.resolve('@babel/preset-env');
-  const whatwgFetchPath = legacyRequire.resolve('whatwg-fetch/fetch.js');
-  const helperPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'lib', 'legacy-output.mjs');
+  const pluginsIndexPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'lib', 'rollup-plugins', 'index.mjs');
   const bridgePath = path.join(path.dirname(bundlerConfigPath), 'for-legacy-plugins.mjs');
-  const whatwgFetchVirtualId = 'legacy-blazor-whatwg-fetch';
-  const resolvedWhatwgFetchVirtualId = '\0legacy-blazor-whatwg-fetch';
-  const bridgeSource = `import { readFile } from 'node:fs/promises';
-import { babel } from ${JSON.stringify(pathToFileURL(babelPluginPath).href)};
-import presetEnv from ${JSON.stringify(pathToFileURL(presetEnvPath).href)};
-import {
-  injectWhatwgFetchPolyfillImport,
-  transformLegacyDynamicImport,
-} from ${JSON.stringify(pathToFileURL(helperPath).href)};
-
-const WHATWG_FETCH_SOURCE_URL = ${JSON.stringify(pathToFileURL(whatwgFetchPath).href)};
-const WHATWG_FETCH_VIRTUAL_ID = ${JSON.stringify(whatwgFetchVirtualId)};
-const RESOLVED_WHATWG_FETCH_VIRTUAL_ID = ${JSON.stringify(resolvedWhatwgFetchVirtualId)};
-
-function legacyWhatwgFetchPlugin() {
-  let polyfillSource = null;
-
-  return {
-    name: 'legacy-whatwg-fetch',
-    async buildStart() {
-      polyfillSource = await readFile(new URL(WHATWG_FETCH_SOURCE_URL), 'utf8');
-    },
-    resolveId(source) {
-      if (source === WHATWG_FETCH_VIRTUAL_ID) {
-        return RESOLVED_WHATWG_FETCH_VIRTUAL_ID;
-      }
-
-      return null;
-    },
-    load(id) {
-      if (id === RESOLVED_WHATWG_FETCH_VIRTUAL_ID) {
-        return polyfillSource;
-      }
-
-      return null;
-    },
-    transform(code, id) {
-      if (id === RESOLVED_WHATWG_FETCH_VIRTUAL_ID) {
-        return null;
-      }
-
-      const transformed = injectWhatwgFetchPolyfillImport(code, WHATWG_FETCH_VIRTUAL_ID, id);
-      return transformed === code ? null : { code: transformed, map: null };
-    }
-  };
-}
-
-function legacyDynamicImportPlugin() {
-  return {
-    name: 'legacy-dynamic-import',
-    renderChunk(code, chunk) {
-      const transformed = transformLegacyDynamicImport(code, chunk.fileName);
-      return transformed === code ? null : { code: transformed, map: null };
-    }
-  };
-}
+  
+  // Simple bridge that just re-exports from the rollup-plugins directory
+  const bridgeSource = `import { legacyBlazorPlugins as legacyBlazorPluginsImpl } from ${JSON.stringify(pathToFileURL(pluginsIndexPath).href)};
 
 export function legacyBlazorPlugins() {
   const targets = JSON.parse(process.env.LEGACY_BLAZOR_BABEL_TARGETS ?? '{}');
-  return [
-    legacyWhatwgFetchPlugin(),
-    legacyDynamicImportPlugin(),
-    babel({
-      babelHelpers: 'bundled',
-      extensions: ['.js', '.mjs', '.ts'],
-      exclude: /node_modules[\\\\/](?:@babel|core-js)[\\\\/]/,
-      presets: [[
-        presetEnv, {
-          targets,
-          modules: false,
-          bugfixes: true,
-          useBuiltIns: 'usage',
-          corejs: '3'
-        }
-      ]]
-    })
-  ];
+  return legacyBlazorPluginsImpl(targets);
 }
 `;
+  
   await writeFile(bridgePath, bridgeSource);
   return bridgePath;
 }
@@ -180,6 +107,7 @@ function withRollupLegacyPlugins(configSource) {
 }
 
 async function postProcessLegacyOutputs(distDir, profile, shouldDownlevel) {
+  // this method is legacy support ( < 8 ), will be removed in future.
   const files = ['blazor.web.js', 'blazor.webassembly.js', 'blazor.server.js', 'blazor.webview.js'];
   const legacyRequire = createRequire(path.join(rootDir, 'package.json'));
   const babel = shouldDownlevel ? legacyRequire('@babel/core') : null;

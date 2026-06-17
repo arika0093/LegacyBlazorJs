@@ -111,7 +111,7 @@ export async function buildUpstream({
   tag,
   nodeBin = process.execPath,
   buildProfiles = process.env.BUILD_TARGET_PROFILES,
-  skipPrebuild = false,
+  skipPrebuild = process.env.SKIP_PREBUILD === 'true',
   repository = process.env.UPSTREAM_REPOSITORY ?? 'dotnet/aspnetcore',
   includePrerelease = process.env.INCLUDE_PRERELEASE === 'true',
   githubToken = process.env.GITHUB_TOKEN,
@@ -135,7 +135,7 @@ export async function buildUpstream({
     if (skipPrebuild) {
       console.log('---------------------------------------');
       console.log(' Build required packages(JSInteop, SignalR, and relation packages)');
-      console.log(' ... Skipped (SKIP_PREBUILD = 1)');
+      console.log(' ... Skipped (SKIP_PREBUILD = true)');
     } else if (await usesNpmWorkspaces(upstreamDir)) {
       await prebuildWorkspacePackages(upstreamDir, env);
     } else {
