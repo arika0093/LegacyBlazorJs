@@ -4,7 +4,7 @@ import path from 'node:path';
 import {
   getCompatibilityResultsPath,
   getRootDir,
-} from './compat-lib.mjs';
+} from './lib/compat.mjs';
 
 const rootDir = getRootDir();
 const readmePath = path.join(rootDir, 'README.md');
@@ -15,7 +15,6 @@ function renderStatus(result) {
   return result?.passed ? 'PASS' : 'FAIL';
 }
 
-/** Group compatibility results by package version so the table can show one section per upstream tag. */
 function groupByPackage(results) {
   const grouped = new Map();
   for (const result of results) {
@@ -29,7 +28,6 @@ function groupByPackage(results) {
   return grouped;
 }
 
-/** Locate the result row for a given profile and hosting model. */
 function findResult(results, profile, hostingModel) {
   return results.find(result => result.profile === profile && result.hostingModel === hostingModel);
 }

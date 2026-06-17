@@ -1,9 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 
-/** Read a JSON configuration file relative to the scripts directory. */
 async function readJsonConfig(relativePath) {
-  const fileUrl = new URL(`../${relativePath}`, import.meta.url);
+  const fileUrl = new URL(`../../../${relativePath}`, import.meta.url);
   return JSON.parse(await readFile(fileUrl, 'utf8'));
 }
 

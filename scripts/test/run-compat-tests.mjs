@@ -9,13 +9,12 @@ import {
   getHostingModels,
   readBuildSummary,
   resolveCompatibilityBrowsers,
-} from './compat-lib.mjs';
+} from './lib/compat.mjs';
 
 const PROCESS_TIMEOUT_MS = 600_000;
 
-/** Spawn a child process, tee its output, and enforce a wall-clock timeout. */
 function run(command, args, env) {
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     const child = spawn(command, args, {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -24,7 +23,7 @@ function run(command, args, env) {
     let output = '';
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
-      reject(new Error(`Process '${command}' timed out after ${PROCESS_TIMEOUT_MS}ms.`));
+      resolve({ exitCode: 1, output: `${output}\nProcess '${command}' timed out after ${PROCESS_TIMEOUT_MS}ms.` });
     }, PROCESS_TIMEOUT_MS);
 
     child.stdout.on('data', chunk => {
@@ -49,7 +48,6 @@ function run(command, args, env) {
   });
 }
 
-/** Keep failure logs readable by trimming them to the last 8000 characters. */
 function trimLog(text) {
   const normalized = text.trim();
   if (normalized.length <= 8000) {

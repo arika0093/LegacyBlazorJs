@@ -3,13 +3,12 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { getSupportedMajors, getTargetProfiles } from './config-lib.mjs';
+import { getSupportedMajors, getTargetProfiles } from './lib/config.mjs';
 
 const mode = process.argv[2] ?? 'profiles';
 const json = process.argv.includes('--json');
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** List LegacyBlazorJs package versions present in the artifacts directory. */
 async function listPackageVersions() {
   const packageDirectory = path.join(rootDir, 'artifacts', 'packages');
   const files = await readdir(packageDirectory);

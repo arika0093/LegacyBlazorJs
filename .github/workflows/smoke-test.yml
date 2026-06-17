@@ -29,7 +29,7 @@ jobs:
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .work/aspnetcore-*
-          key: smoke-build-${{ runner.os }}-upstream-${{ hashFiles('scripts/build-all.mjs', 'scripts/build-variants.mjs', 'scripts/fetch-and-build-upstream.sh', 'scripts/config-lib.mjs', 'config/targets.json') }}
+          key: smoke-build-${{ runner.os }}-upstream-${{ hashFiles('scripts/build/build-all.mjs', 'scripts/build/build-variants.mjs', 'scripts/build/build-upstream.mjs', 'scripts/build/lib/*.mjs', 'scripts/build/patches/*.mjs', 'config/targets.json') }}
           restore-keys: |
             smoke-build-${{ runner.os }}-upstream-
       # > npm dependencies
@@ -79,7 +79,7 @@ jobs:
       - run: dotnet build tests/PlaywrightTest/PlaywrightTest.csproj
       - run: playwright -p tests/PlaywrightTest/PlaywrightTest.csproj install-deps chromium
       - name: Select old Chromium for smoke test
-        run: node scripts/export-browser-env.mjs es2015
+        run: node scripts/test/export-browser-env.mjs es2015
       # execute a single smoke test for the ES2015 variant on Blazor Server
       - name: Run smoke test (ES2015, Blazor Server)
         run: xvfb-run -a dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
