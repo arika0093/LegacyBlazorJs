@@ -88,7 +88,56 @@ export function legacyBlazorPlugins() {
   return bridgePath;
 }
 
-function withRollupLegacyPlugins(configSource) {
+function findRollupTerserCall(configSource) {
+  const match = /(^[ \t]*)terser\(\{/m.exec(configSource);
+  if (!match) {
+    throw new Error('Could not locate the upstream Rollup Terser plugin.');
+  }
+
+  const start = match.index + match[1].length;
+  let index = start + 'terser('.length;
+  let parenDepth = 1;
+
+  while (index < configSource.length && parenDepth > 0) {
+    const char = configSource[index];
+    if (char === '(') {
+      parenDepth += 1;
+    } else if (char === ')') {
+      parenDepth -= 1;
+    }
+    index += 1;
+  }
+
+  if (parenDepth !== 0) {
+    throw new Error('Could not find the end of the upstream Rollup Terser plugin.');
+  }
+
+  while (index < configSource.length && /[ \t]/.test(configSource[index])) {
+    index += 1;
+  }
+  if (configSource[index] === ',') {
+    index += 1;
+  }
+
+  return {
+    start,
+    end: index,
+    indentation: match[1],
+    source: configSource.slice(start, index),
+  };
+}
+
+export function withOptionalRollupTerser(configSource) {
+  const terserCall = findRollupTerserCall(configSource);
+  const commentedSource = [
+    `${terserCall.indentation}// LegacyBlazorJs: terser disabled via LEGACY_BLAZOR_DISABLE_TERSER.`,
+    ...terserCall.source.split('\n').map(line => `${terserCall.indentation}// ${line}`),
+  ].join('\n');
+
+  return `${configSource.slice(0, terserCall.start)}${commentedSource}${configSource.slice(terserCall.end)}`;
+}
+
+export function withRollupLegacyPlugins(configSource) {
   const importLine = "import { legacyBlazorPlugins } from './for-legacy-plugins.mjs';";
   const withImport = configSource.includes(importLine)
     ? configSource
@@ -205,9 +254,12 @@ export async function buildVariants({
       }
 
       const useRollupLegacyPlugins = isRollupBuild && profile.ecma < 2018;
-      const bundlerConfig = useRollupLegacyPlugins
+      let bundlerConfig = useRollupLegacyPlugins
         ? withRollupLegacyPlugins(ecmaPatchedBundlerConfig)
         : ecmaPatchedBundlerConfig;
+      if (isRollupBuild && process.env.LEGACY_BLAZOR_DISABLE_TERSER === 'true') {
+        bundlerConfig = withOptionalRollupTerser(bundlerConfig);
+      }
       if (useRollupLegacyPlugins) {
         process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
       } else {

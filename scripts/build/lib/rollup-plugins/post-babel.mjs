@@ -18,15 +18,15 @@ export function legacyPostBabelPlugin(targets) {
     name: 'legacy-post-babel',
     renderChunk(code, chunk) {
       // Apply Babel transformation to the entire chunk (including Rollup helpers)
-      // Note: useBuiltIns is intentionally omitted here since polyfills were already
-      // injected by the earlier babel plugin
+      // Note: Polyfills are already injected by legacyCoreJsPolyfillPlugin,
+      // so we don't need useBuiltIns here
       const result = babel.transformSync(code, {
         presets: [[
           '@babel/preset-env', {
             targets,
             modules: false,
             bugfixes: true,
-            // Don't inject polyfills here - already done in legacyBabelPlugin
+            // Don't inject polyfills here - already bundled by legacyCoreJsPolyfillPlugin
             useBuiltIns: false,
           }
         ]],

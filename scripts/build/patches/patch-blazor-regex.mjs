@@ -8,16 +8,26 @@ export async function patchBlazorRegex(filePath) {
   const originalLine = 'const blazorCommentRegularExpression = new RegExp(/^\\s*Blazor:[^{]*(?<descriptor>.*)$/);';
   const replacement = `// LegacyBlazorJs patch: keep this as a RegExp literal instead of new RegExp(...).
 // See scripts/build/patches/patch-blazor-regex.mjs for the full explanation.
-const blazorCommentRegularExpression = /^\\s*Blazor:[^{]*(?<descriptor>.*)$/;`;
+const blazorCommentRegularExpression = /^\\s*Blazor:[^{]*(.*)$/;`;
 
   if (content.includes(originalLine)) {
     content = content.replace(originalLine, replacement);
+    content = content.replace(
+      "const json = definition && definition.groups && definition.groups['descriptor'];",
+      'const json = definition && definition[1];');
     await writeFile(filePath, content);
     console.log('Patched blazorCommentRegularExpression to use a RegExp literal.');
     return;
   }
 
   if (content.includes('const blazorCommentRegularExpression = /^\\s*Blazor:')) {
+    content = content.replace(
+      'const blazorCommentRegularExpression = /^\\s*Blazor:[^{]*(?<descriptor>.*)$/;',
+      'const blazorCommentRegularExpression = /^\\s*Blazor:[^{]*(.*)$/;');
+    content = content.replace(
+      "const json = definition && definition.groups && definition.groups['descriptor'];",
+      'const json = definition && definition[1];');
+    await writeFile(filePath, content);
     console.log('blazorCommentRegularExpression already uses a RegExp literal; skipping.');
     return;
   }

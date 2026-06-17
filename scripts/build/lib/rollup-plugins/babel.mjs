@@ -13,8 +13,9 @@ export function legacyBabelPlugin(targets) {
         targets,
         modules: false,
         bugfixes: true,
-        useBuiltIns: 'usage',
-        corejs: '3'
+        // Polyfills are prepended as one bundle by legacyCoreJsPolyfillPlugin.
+        // Keeping usage-based injection here duplicates core-js inside app code.
+        useBuiltIns: false
       }
     ]]
   });
