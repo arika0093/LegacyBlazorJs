@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir, rm, copyFile, access, unlink } from 'node:f
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import process from 'node:process';
 import { parseAspNetTag } from './version-lib.mjs';
 import { readSelectedTargets } from './config-lib.mjs';
@@ -62,10 +62,11 @@ function resolveBabelTargets(profile) {
   return profile.intendedBrowsers;
 }
 
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Write the Rollup Babel bridge module next to the upstream Rollup config. */
 async function writeRollupBabelBridge(bundlerConfigPath) {
-  const legacyRequire = createRequire(path.join(process.cwd(), 'package.json'));
+  const legacyRequire = createRequire(path.join(rootDir, 'package.json'));
   const babelPluginPath = legacyRequire.resolve('@rollup/plugin-babel');
   const presetEnvPath = legacyRequire.resolve('@babel/preset-env');
   const bridgePath = path.join(path.dirname(bundlerConfigPath), 'legacy-blazor-babel-plugin.mjs');
@@ -77,7 +78,7 @@ export function legacyBlazorBabelPlugin() {
   return babel({
     babelHelpers: 'bundled',
     extensions: ['.js', '.mjs', '.ts'],
-    exclude: /node_modules/,
+    exclude: /node_modules[\\/](?:@babel|core-js)[\\/]/,
     presets: [[
       presetEnv, {
         targets,
@@ -120,7 +121,7 @@ async function postProcessForProfile(distDir, profile) {
     return;
   }
 
-  const legacyRequire = createRequire(path.join(process.cwd(), 'package.json'));
+  const legacyRequire = createRequire(path.join(rootDir, 'package.json'));
   const babel = legacyRequire('@babel/core');
   const targets = resolveBabelTargets(profile);
 
@@ -160,7 +161,8 @@ const tsconfigPath = bundlerConfigPath.endsWith('webpack.config.js')
   ? path.join(sourceDir, 'tsconfig.json')
   : path.join(sourceDir, '../Shared.JS/tsconfig.json');
 const isRollupBuild = bundlerConfigPath.endsWith('rollup.config.mjs');
-const rollupBabelBridgePath = isRollupBuild ? await writeRollupBabelBridge(bundlerConfigPath) : null;
+const needsRollupBabel = isRollupBuild && Object.values(targets).some(profile => profile.ecma < 2018);
+const rollupBabelBridgePath = needsRollupBabel ? await writeRollupBabelBridge(bundlerConfigPath) : null;
 const originalTsconfig = await readFile(tsconfigPath, 'utf8');
 const originalBundlerConfig = await readFile(bundlerConfigPath, 'utf8');
 await rm(output, { recursive: true, force: true });
@@ -192,10 +194,15 @@ try {
     if (ecmaPatchedBundlerConfig === originalBundlerConfig && !originalBundlerConfig.includes(`ecma: ${profile.ecma}`)) {
       throw new Error('Could not locate the upstream bundler/Terser ECMA target.');
     }
-    const bundlerConfig = isRollupBuild && profile.ecma < 2018
+    const useRollupBabel = isRollupBuild && profile.ecma < 2018;
+    const bundlerConfig = useRollupBabel
       ? withRollupBabelPlugin(ecmaPatchedBundlerConfig)
       : ecmaPatchedBundlerConfig;
-    process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
+    if (useRollupBabel) {
+      process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
+    } else {
+      delete process.env.LEGACY_BLAZOR_BABEL_TARGETS;
+    }
     await writeFile(bundlerConfigPath, bundlerConfig);
 
     if (npmWorkspace) {
