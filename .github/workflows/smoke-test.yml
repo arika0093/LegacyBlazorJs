@@ -40,6 +40,8 @@ jobs:
       - name: Build upstream source and NuGet package
         run: npm run build -- 10
         env:
+          # disable Terser for legacy Blazor JS builds to check source code
+          LEGACY_BLAZOR_DISABLE_TERSER: true
           BUILD_TARGET_PROFILES: es5
           GITHUB_TOKEN: "${{ github.token }}"
 
