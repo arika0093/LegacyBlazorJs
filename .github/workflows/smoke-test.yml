@@ -51,6 +51,7 @@ jobs:
   smoke-test:
     needs: build-package
     strategy:
+      fail-fast: false
       matrix:
         profile: [es2015]
         hosting: [Server]
