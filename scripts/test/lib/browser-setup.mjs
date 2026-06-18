@@ -25,9 +25,9 @@ export async function setupCompatibilityBrowser(browser) {
   }
 
   await mkdir(browserDirectory, { recursive: true });
-  const archivePath = path.join(browserDirectory, path.basename(new URL(browser.downloadUrl).pathname));
-  if (!await exists(archivePath)) {
-    await downloadBrowserArchiveWithRetry(browser.downloadUrl, archivePath);
+  let archivePath = await findExistingArchivePath(browser, browserDirectory);
+  if (!archivePath) {
+    archivePath = await downloadBrowserArchiveWithRetry(browser, browserDirectory);
   }
 
   await extractArchive(archivePath, browserDirectory);
@@ -70,20 +70,50 @@ function quotePowerShellString(value) {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-async function downloadBrowserArchiveWithRetry(downloadUrl, archivePath) {
-  for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt += 1) {
-    try {
-      await downloadBrowserArchive(downloadUrl, archivePath);
-      return;
-    } catch (error) {
-      await rm(archivePath, { force: true });
-      if (attempt === MAX_DOWNLOAD_ATTEMPTS) {
-        throw error;
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+async function findExistingArchivePath(browser, browserDirectory) {
+  for (const downloadUrl of getDownloadUrls(browser)) {
+    const archivePath = path.join(browserDirectory, path.basename(new URL(downloadUrl).pathname));
+    if (await exists(archivePath)) {
+      return archivePath;
     }
   }
+
+  return null;
+}
+
+async function downloadBrowserArchiveWithRetry(browser, browserDirectory) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt += 1) {
+    for (const downloadUrl of getDownloadUrls(browser)) {
+      const archivePath = path.join(browserDirectory, path.basename(new URL(downloadUrl).pathname));
+      try {
+        await downloadBrowserArchive(downloadUrl, archivePath);
+        return archivePath;
+      } catch (error) {
+        lastError = error;
+        await rm(archivePath, { force: true });
+        if (!isMissingArchiveError(error)) {
+          break;
+        }
+      }
+    }
+
+    if (attempt === MAX_DOWNLOAD_ATTEMPTS) {
+      throw lastError;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+  }
+
+  throw lastError;
+}
+
+function getDownloadUrls(browser) {
+  return browser.downloadUrls ?? [browser.downloadUrl];
+}
+
+function isMissingArchiveError(error) {
+  return error?.statusCode === 404;
 }
 
 async function downloadBrowserArchive(downloadUrl, archivePath) {
@@ -92,7 +122,9 @@ async function downloadBrowserArchive(downloadUrl, archivePath) {
   try {
     const response = await fetch(downloadUrl, { signal: controller.signal });
     if (!response.ok) {
-      throw new Error(`Chromium download failed for ${downloadUrl}: ${response.status} ${response.statusText}`);
+      const error = new Error(`Chromium download failed for ${downloadUrl}: ${response.status} ${response.statusText}`);
+      error.statusCode = response.status;
+      throw error;
     }
 
     await pipeline(response.body, createWriteStream(archivePath));

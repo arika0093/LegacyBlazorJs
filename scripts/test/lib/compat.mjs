@@ -45,29 +45,29 @@ export function getChromiumHistoryPlatform() {
         cacheKey: 'linux-x64',
         executableRelativePath: path.join('chrome-linux', 'chrome'),
         historyOs: 'Linux_x64',
-        archiveFileName: 'chrome-linux.zip',
+        archiveFileNames: ['chrome-linux.zip'],
       };
     case 'win32':
       // Always use x86 (older Chromium snapshots are not distributed for x64)
       return {
-          cacheKey: 'win-x86',
-          executableRelativePath: path.join('chrome-win', 'chrome.exe'),
-          historyOs: 'Win',
-          archiveFileName: 'chrome-win.zip',
-        };
+        cacheKey: 'win-x86',
+        executableRelativePath: path.join('chrome-win', 'chrome.exe'),
+        historyOs: 'Win',
+        archiveFileNames: ['chrome-win.zip', 'chrome-win32.zip'],
+      };
     case 'darwin':
       return process.arch === 'arm64'
         ? {
           cacheKey: 'mac-arm64',
           executableRelativePath: path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
           historyOs: 'Mac_Arm',
-          archiveFileName: 'chrome-mac.zip',
+          archiveFileNames: ['chrome-mac.zip'],
         }
         : {
           cacheKey: 'mac-x64',
           executableRelativePath: path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
           historyOs: 'Mac',
-          archiveFileName: 'chrome-mac.zip',
+          archiveFileNames: ['chrome-mac.zip'],
         };
     default:
       throw new Error(`Unsupported platform '${process.platform}'.`);
@@ -89,7 +89,9 @@ export async function resolveCompatibilityBrowsers() {
     byProfile.set(profile.name, {
       milestone: profile.chromeMajor,
       version: release.version,
-      downloadUrl: `${chromiumSnapshotsBaseUrl}/${release.snapshotPrefix}${platform.archiveFileName}`,
+      downloadUrl: `${chromiumSnapshotsBaseUrl}/${release.snapshotPrefix}${platform.archiveFileNames[0]}`,
+      downloadUrls: platform.archiveFileNames
+        .map(archiveFileName => `${chromiumSnapshotsBaseUrl}/${release.snapshotPrefix}${archiveFileName}`),
       executableRelativePath: platform.executableRelativePath,
       cacheKey: platform.cacheKey,
       source: release.source,
