@@ -55,7 +55,6 @@ jobs:
       matrix:
         include:
           # Blazor Server should work with all supported JS versions
-          - { profile: es5,    hosting: Server }
           - { profile: es2015, hosting: Server }
           - { profile: es2017, hosting: Server }
           # Blazor WASM only support Chromium > 57, so only test es2017(Chromium 58) for WebAssembly hosting model

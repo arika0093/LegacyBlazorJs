@@ -9,7 +9,7 @@ The official ASP.NET Core [Blazor browser support](https://learn.microsoft.com/e
 However, there are cases where supporting older browsers is necessary, especially for enterprise use.
 Unfortunately, .NET 9 and later target [ES2022](https://github.com/dotnet/aspnetcore/blob/v9.0.0/src/Components/Shared.JS/tsconfig.json#L3), and there have been [reports](https://github.com/dotnet/aspnetcore/issues/58212) of it not working on somewhat older browsers.
 
-This project aims to make Blazor available on older browsers by rebuilding the Blazor JavaScript runtime, blazor.web.js, to support multiple versions from ES5 to ES2022.
+This project aims to make Blazor available on older browsers by rebuilding the Blazor JavaScript runtime, blazor.web.js, to support multiple versions from ES2015 to ES2022.
 
 ## How to use
 ### Blazor Server
@@ -43,7 +43,6 @@ The process is almost the same for Blazor WebAssembly. After installation, repla
 Note that Blazor WebAssembly will not work on browsers that do not support WebAssembly itself (obviously).
 Specifically, it will not work on the following browsers.
 
-- **Internet Explorer (all versions)**
 - Chrome < 57
 - Edge < 16
 - Firefox < 52
@@ -65,18 +64,40 @@ The versions listed below are available.
 
 | Version | Intended browser target |
 |---------|-------------------------|
-| `ie11`   | Internet Explorer 11 [best effort] |
-| `es5`    | Chrome 23+ (Edge 12+, Firefox 21+, Safari 6+) |
-| `es2015` | Chrome 49+ (Edge 15+, Firefox 54+, Safari 10+) |
-| `es2017` | Chrome 58+ (Edge 16+, Firefox 54+, Safari 11+) |
-| `es2020` | Chrome 80+ (Edge 80+, Firefox 74+, Safari 13.1+) |
-| `es2022` | Chrome 94+ (Edge 94+, Firefox 93+, Safari 15.4+) |
+| `es2015` | Chrome 49+ |
+| `es2017` | Chrome 58+ |
+| `es2018` | Chrome 64+ |
+| `es2020` | Chrome 80+ |
+| `es2022` | Chrome 94+ |
 
 The browsers in parentheses are reference values.
 The authoritative profile definitions are in [config/targets.json](config/targets.json).
 
-> [!NOTE]
-> If you need additional targets, please feel free to submit a PR.
+### Why not include ES5/IE11?
+
+**Short answer**:  
+APIs are missing, testing is difficult, and trial-and-error is challenging.
+
+**Long answer**:  
+ES5 syntax is [supported](https://caniuse.com/es5) even in quite old browsers. It works on Chrome 23+ and IE 10+ (since 2012!).  
+ES3 syntax is [supported](https://caniuse.com/es3) in even older browsers. It works on all browsers (since 1999!).  
+However, the situation is not so straightforward.
+
+* Old browsers lack many APIs and will not work without polyfills.
+  * JavaScript features
+  * Browser APIs such as [fetch](https://caniuse.com/fetch), [getRootNode](https://caniuse.com/mdn-api_node_getrootnode), [MutationObserver](https://caniuse.com/mutationobserver), etc.
+  * JavaScript side can be mostly supplemented with the excellent [core-js](https://github.com/zloirock/core-js) project, but the browser API side is insufficient.
+* Beyond JavaScript-side issues, since .NET dynamically invokes JS, the range of APIs that need to be supported is extremely wide.
+  * The bidirectional nature of JS/dotnet communication makes debugging difficult.
+* Naturally, tools like playwright and puppeteer cannot be used, so automated testing is impossible.
+  * This means that upstream modifications cannot be detected immediately, making early problem detection and verification of solutions extremely difficult.
+
+However, there is hope.
+
+* Automated testing can be executed on ES5 (Chrome 23), although error messages are insufficient.
+* WebSocket connections can be established on both ES5 and IE11.
+* The problem is narrowed down after that. In other words, if a good approach can be found, it may be possible to support ES5/IE11 as well.
+
 
 ## Development Guide
 ### How it works
@@ -89,10 +110,9 @@ To be specific, the process is as follows:
 4. Build the dependencies in advance. As of .NET 10, the following are included in the dependencies.
     * [JSInterop](https://github.com/dotnet/aspnetcore/tree/main/src/JSInterop/Microsoft.JSInterop.JS/src)
     * [SignalR](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/clients/ts/signalr)
-    * [SignalR-protocol-msgpack](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/clients/ts/signalr-protocol-msgpack)
     * dotnet.js is built in the [runtime](https://github.com/dotnet/runtime/tree/main/src/mono/wasm), but since it is loaded by dynamic import, it does not need to be built in advance.
 5. It is compiled by `@rollup/plugin-typescript`.
-    * At this time, by inserting a transformation plugin via Babel, it is converted for older browsers such as ES5 and ES2015.
+    * At this time, by inserting a transformation plugin via Babel, it is converted for older browsers such as ES2015.
 6. The generated JS files (`blazor.(type).(version).js`) are packaged together into `LegacyBlazorJs`.
 7. Smoke tests are performed (using an old Chromium), and then the package is released.
     * It is released with the same version as the upstream.
@@ -121,7 +141,7 @@ see [rollup-plugins](./scripts/build/lib/rollup-plugins/index.mjs) for details.
   * Even if you run in this state, it will cause an error, but since this part is not executed except for WASM (`dotnet.js`), it is not a problem.
 * Use Babel to transform syntax for older browsers.
 * Transform the output of rollup again with Babel (because rollup helpers do not work in older browsers).
-* Finally, insert Polyfill of [core-js](https://github.com/zloirock/core-js).
+* Insert Polyfill of [core-js](https://github.com/zloirock/core-js).
 
 These settings are inserted before terser is applied in [upstream rollup settings](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Shared.JS/rollup.config.mjs).
 

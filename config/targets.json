@@ -1,20 +1,4 @@
 {
-  "ie11": {
-    "description": "Internet Explorer 11+ (best effort)",
-    "ecma": 5,
-    "typescriptTarget": "es5",
-    "intendedBrowsers": {
-      "ie": "11"
-    }
-  },
-  "es5": {
-    "description": "comprehensive ES5 support",
-    "ecma": 5,
-    "typescriptTarget": "es5",
-    "intendedBrowsers": {
-      "chrome": "23"
-    }
-  },
   "es2015": {
     "description": "comprehensive ES2015 support",
     "ecma": 2015,
