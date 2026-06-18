@@ -82,6 +82,7 @@ export class BrowserHarness {
   #failedResponses = [];
   #closed = false;
   #usesDirectPageCommands = false;
+  #usesTunneledSessionCommands = false;
   #unsupportedMethods = new Set();
   #observedBrowserNotices = new Set();
   #logger;
@@ -346,28 +347,11 @@ export class BrowserHarness {
       throw new Error(`Cannot send '${method}' because the DevTools connection is closed.`);
     }
 
-    const id = ++this.#messageId;
-    const payload = sessionId
-      ? { id, method, params, sessionId }
-      : { id, method, params };
-
-    const completion = createDeferred();
-    this.#pending.set(id, completion);
-
-    try {
-      this.#socket.send(JSON.stringify(payload));
-    } catch (error) {
-      this.#pending.delete(id);
-      throw error;
+    if (sessionId && method !== 'Target.sendMessageToTarget') {
+      return await this.#sendSessionCommand(method, params, sessionId);
     }
 
-    return completion.promise.catch(error => {
-      if (isMethodNotFoundError(error, method)) {
-        this.#unsupportedMethods.add(method);
-      }
-
-      throw error;
-    });
+    return await this.#sendProtocolPayload(createProtocolPayload(++this.#messageId, method, params, sessionId));
   }
 
   async #sendOptionalCommand(method, params = {}, sessionId) {
@@ -385,6 +369,59 @@ export class BrowserHarness {
 
       throw error;
     }
+  }
+
+  async #sendSessionCommand(method, params, sessionId) {
+    if (this.#usesTunneledSessionCommands) {
+      return await this.#sendTunneledSessionCommand(method, params, sessionId);
+    }
+
+    try {
+      return await this.#sendProtocolPayload(createProtocolPayload(++this.#messageId, method, params, sessionId));
+    } catch (error) {
+      if (!isMethodNotFoundError(error, method)) {
+        throw error;
+      }
+
+      this.#usesTunneledSessionCommands = true;
+      this.#logger.info('Routing session-scoped DevTools commands through Target.sendMessageToTarget.');
+      return await this.#sendTunneledSessionCommand(method, params, sessionId);
+    }
+  }
+
+  async #sendTunneledSessionCommand(method, params, sessionId) {
+    const innerId = ++this.#messageId;
+    const innerCompletion = createDeferred();
+    this.#pending.set(innerId, innerCompletion);
+
+    try {
+      await this.#sendProtocolPayload(createProtocolPayload(
+        ++this.#messageId,
+        'Target.sendMessageToTarget',
+        {
+          sessionId,
+          message: JSON.stringify({ id: innerId, method, params }),
+        }));
+    } catch (error) {
+      this.#pending.delete(innerId);
+      throw error;
+    }
+
+    return await innerCompletion.promise;
+  }
+
+  async #sendProtocolPayload(payload) {
+    const completion = createDeferred();
+    this.#pending.set(payload.id, completion);
+
+    try {
+      this.#socket.send(JSON.stringify(payload));
+    } catch (error) {
+      this.#pending.delete(payload.id);
+      throw error;
+    }
+
+    return await completion.promise;
   }
 
   async #captureDiagnostics() {
@@ -462,6 +499,14 @@ export class BrowserHarness {
       }
 
       completion.resolve(message.result ?? null);
+      return;
+    }
+
+    if (message.method === 'Target.receivedMessageFromTarget') {
+      const nestedMessage = message.params?.message;
+      if (typeof nestedMessage === 'string' && nestedMessage.length > 0) {
+        this.#handleMessage(JSON.parse(nestedMessage));
+      }
       return;
     }
 
@@ -574,6 +619,12 @@ function captureStartupLine(line, startupLog) {
   if (line) {
     startupLog.push(line);
   }
+}
+
+function createProtocolPayload(id, method, params = {}, sessionId) {
+  return sessionId
+    ? { id, method, params, sessionId }
+    : { id, method, params };
 }
 
 function isInvalidMouseEventParameterError(error) {
