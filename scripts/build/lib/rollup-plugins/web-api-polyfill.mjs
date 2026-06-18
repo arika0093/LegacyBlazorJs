@@ -59,7 +59,7 @@ export const legacyMutationObserverPolyfillSource = `
       node: node,
       attributes: null,
       characterData: null,
-      childNodes: null,
+      childNodes: null
     };
 
     if (options.attributes && node.nodeType === 1) {
@@ -92,7 +92,7 @@ export const legacyMutationObserverPolyfillSource = `
       nextSibling: null,
       attributeName: null,
       attributeNamespace: null,
-      oldValue: null,
+      oldValue: null
     };
   }
 
@@ -115,7 +115,9 @@ export const legacyMutationObserverPolyfillSource = `
       if (oldAttributes[name] !== newAttributes[name]) {
         var changedRecord = createRecord('attributes', target);
         changedRecord.attributeName = name;
-        changedRecord.oldValue = options.attributeOldValue ? oldAttributes[name] ?? null : null;
+        changedRecord.oldValue = options.attributeOldValue
+          ? (Object.prototype.hasOwnProperty.call(oldAttributes, name) ? oldAttributes[name] : null)
+          : null;
         records.push(changedRecord);
       }
     }
@@ -186,7 +188,7 @@ export const legacyMutationObserverPolyfillSource = `
 
     return {
       currentChildren: currentChildren,
-      previousChildren: previousSnapshots,
+      previousChildren: previousSnapshots
     };
   }
 
@@ -239,7 +241,7 @@ export const legacyMutationObserverPolyfillSource = `
       childList: !!normalized.childList,
       subtree: !!normalized.subtree,
       characterData: !!(normalized.characterData || normalized.characterDataOldValue),
-      characterDataOldValue: !!normalized.characterDataOldValue,
+      characterDataOldValue: !!normalized.characterDataOldValue
     };
   }
 
@@ -265,7 +267,7 @@ export const legacyMutationObserverPolyfillSource = `
     this._watchedTargets.push({
       target: target,
       options: normalizedOptions,
-      snapshot: snapshotNode(target, normalizedOptions),
+      snapshot: snapshotNode(target, normalizedOptions)
     });
 
     if (this._timerId === null) {
@@ -313,7 +315,7 @@ export const legacyMutationObserverPolyfillSource = `
   };
 
   global.MutationObserver = MutationObserver;
-})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+})(typeof window !== 'undefined' ? window : this);
 `.trim();
 
 export const legacyDomApiShimsSource = `
