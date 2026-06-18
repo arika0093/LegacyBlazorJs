@@ -943,7 +943,14 @@ async function locateCommand(command) {
   }
 }
 
-function buildBrowserArguments(profileDirectory, remoteDebuggingPort, versionMajor) {
+export function buildBrowserArguments(
+  profileDirectory,
+  remoteDebuggingPort,
+  versionMajor,
+  options = {}) {
+  const platform = options.platform ?? process.platform;
+  const display = options.display ?? process.env.DISPLAY;
+  const supportsHeadless = versionMajor === null || versionMajor >= 59;
   const argumentsList = [
     '--disable-gpu',
     '--disable-dev-shm-usage',
@@ -952,15 +959,17 @@ function buildBrowserArguments(profileDirectory, remoteDebuggingPort, versionMaj
     'about:blank',
   ];
 
-  if (!process.env.DISPLAY) {
-    if (versionMajor !== null && versionMajor < 59) {
+  if (!display) {
+    if (platform === 'linux' && !supportsHeadless) {
       throw new Error('Legacy Chromium requires a display server. Run the smoke test under xvfb-run or set DISPLAY.');
     }
 
-    argumentsList.unshift('--headless');
+    if (supportsHeadless) {
+      argumentsList.unshift('--headless');
+    }
   }
 
-  if (process.platform === 'linux') {
+  if (platform === 'linux') {
     argumentsList.push('--no-sandbox');
   }
 
