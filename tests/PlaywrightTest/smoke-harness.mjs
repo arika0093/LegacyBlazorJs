@@ -164,7 +164,7 @@ class SmokeAppHarness {
 
   async dispose() {
     await this.#disposeServer();
-    await rm(this.#rootDirectory, { recursive: true, force: true });
+    await removeDirectory(this.#rootDirectory);
   }
 
   async #initialize() {
@@ -270,7 +270,7 @@ class BrowserHarness {
         await processHandle.dispose();
       }
 
-      await rm(profileDirectory, { recursive: true, force: true });
+      await removeDirectory(profileDirectory);
       throw error;
     }
   }
@@ -376,7 +376,7 @@ class BrowserHarness {
     }
 
     await this.#process.dispose();
-    await rm(this.#profileDirectory, { recursive: true, force: true });
+    await removeDirectory(this.#profileDirectory);
   }
 
   async #waitForCondition(expression, timeoutMs, description) {
@@ -1290,6 +1290,19 @@ async function fileExists(filePath) {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function removeDirectory(directoryPath) {
+  try {
+    await rm(directoryPath, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 250,
+    });
+  } catch (error) {
+    // ignore
   }
 }
 
