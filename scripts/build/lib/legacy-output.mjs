@@ -115,8 +115,16 @@ export function sourceUsesFetch(source, filename = 'chunk.js') {
 }
 
 export function injectWhatwgFetchPolyfillImport(source, moduleId = WHATWG_FETCH_VIRTUAL_MODULE_ID, filename = 'chunk.js') {
+  if (!sourceUsesFetch(source, filename)) {
+    return source;
+  }
+
+  return injectModuleImport(source, moduleId);
+}
+
+export function injectModuleImport(source, moduleId) {
   const importLine = `import ${JSON.stringify(moduleId)};`;
-  if (source.includes(importLine) || !sourceUsesFetch(source, filename)) {
+  if (source.includes(importLine)) {
     return source;
   }
 
