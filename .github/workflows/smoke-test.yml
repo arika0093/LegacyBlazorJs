@@ -4,6 +4,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  BUILD_TARGET_PROFILES: es2015
+
 permissions:
   contents: read
 
@@ -21,17 +24,10 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20
-          cache: npm
       # > dotnet (10)
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
           dotnet-version: 10.0.x
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: .work/aspnetcore-*
-          key: smoke-build-${{ runner.os }}-upstream-${{ hashFiles('scripts/build/build-all.mjs', 'scripts/build/build-variants.mjs', 'scripts/build/build-upstream.mjs', 'scripts/build/lib/*.mjs', 'scripts/build/patches/*.mjs', 'config/targets.json') }}
-          restore-keys: |
-            smoke-build-${{ runner.os }}-upstream-
       # > npm dependencies
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
@@ -40,7 +36,9 @@ jobs:
       - name: Build upstream source and NuGet package
         run: npm run build -- 10
         env:
-          BUILD_TARGET_PROFILES: es5
+          # disable Terser for legacy Blazor JS builds to check source code
+          LEGACY_BLAZOR_DISABLE_TERSER: true
+          BUILD_TARGET_PROFILES: "${{ env.BUILD_TARGET_PROFILES }}"
           GITHUB_TOKEN: "${{ github.token }}"
 
       # upload packages
@@ -49,10 +47,16 @@ jobs:
           name: LegacyBlazorJs-packages
           path: artifacts/packages/*.nupkg
 
-  # Run a single smoke test against the ES5 variant using Blazor Server
+  # Run smoke tests against the es2015 variant using Blazor Server and WebAssembly
   smoke-test:
     needs: build-package
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { profile: es2015, hosting: Server }
+    # Legacy Chromium often has shared library dependency issues on Linux, so run on Windows environment.
+    runs-on: windows-latest
     steps:
       # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -74,15 +78,12 @@ jobs:
           path: artifacts/packages
       # > npm dependencies
       - run: npm ci --ignore-scripts
-      # > playwright dependencies; the test harness downloads the older ES2020-era Chromium below
-      - run: dotnet tool install --global Microsoft.Playwright.CLI
-      - run: dotnet build tests/PlaywrightTest/PlaywrightTest.csproj
-      - run: playwright -p tests/PlaywrightTest/PlaywrightTest.csproj install-deps chromium
+      # > browser setup downloads the target profile's Chromium directly
       - name: Select old Chromium for smoke test
-        run: node scripts/test/export-browser-env.mjs es2015
-      # execute a single smoke test for the ES2015 variant on Blazor Server
-      - name: Run smoke test (ES2015, Blazor Server)
-        run: xvfb-run -a dotnet test tests/PlaywrightTest/PlaywrightTest.csproj
+        run: node scripts/test/export-browser-env.mjs ${{ matrix.profile }}
+      # execute a smoke test for the specified variant
+      - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
+        run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:
-          SMOKE_TEST_PROFILE: es2015
-          SMOKE_TEST_HOSTING_MODEL: Server
+          SMOKE_TEST_PROFILE: ${{ matrix.profile }}
+          SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}

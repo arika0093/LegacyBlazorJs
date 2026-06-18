@@ -2,13 +2,13 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { readTargetsConfig } from '../../build/lib/config.mjs';
-import { withProxyFetchOptions } from '../../build/lib/network.mjs';
+import {
+  readChromiumSnapshotConfig,
+  readTargetsConfig,
+} from '../../build/lib/config.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const chromiumSnapshotsBaseUrl = 'https://commondatastorage.googleapis.com/chromium-browser-snapshots';
-const chromiumHistoryJsonBaseUrl =
-  'https://raw.githubusercontent.com/vikyd/chromium-history-version-position/master/json/ver-pos-os-link';
 
 export function getRootDir() {
   return rootDir;
@@ -21,7 +21,7 @@ export function getCompatibilityResultsPath() {
 export async function getCompatibilityProfiles() {
   const targets = await readTargetsConfig();
   return Object.entries(targets)
-    .filter(([, profile]) => Number(profile.ecma) >= 2020)
+    .filter(([, profile]) => hasChromeTarget(profile))
     .map(([name, profile]) => ({
       name,
       ecma: Number(profile.ecma),
@@ -43,56 +43,59 @@ export function getChromiumHistoryPlatform() {
       }
       return {
         cacheKey: 'linux-x64',
-        executableRelativePath: path.join('chrome-linux', 'chrome'),
         historyOs: 'Linux_x64',
-        archiveFileName: 'chrome-linux.zip',
+        archiveVariants: [{
+          archiveFileName: 'chrome-linux.zip',
+          executableRelativePath: path.join('chrome-linux', 'chrome'),
+        }],
       };
     case 'win32':
-      return process.arch === 'x64'
-        ? {
-          cacheKey: 'win-x64',
-          executableRelativePath: path.join('chrome-win', 'chrome.exe'),
-          historyOs: 'Win_x64',
-          archiveFileName: 'chrome-win.zip',
-        }
-        : {
-          cacheKey: 'win-x86',
-          executableRelativePath: path.join('chrome-win', 'chrome.exe'),
-          historyOs: 'Win',
-          archiveFileName: 'chrome-win.zip',
-        };
+      // Always use x86 (older Chromium snapshots are not distributed for x64)
+      return {
+        cacheKey: 'win-x86',
+        historyOs: 'Win',
+        archiveVariants: [
+          {
+            archiveFileName: 'chrome-win.zip',
+            executableRelativePath: path.join('chrome-win', 'chrome.exe'),
+          },
+          {
+            archiveFileName: 'chrome-win32.zip',
+            executableRelativePath: path.join('chrome-win32', 'chrome.exe'),
+          },
+        ],
+      };
     case 'darwin':
       return process.arch === 'arm64'
         ? {
           cacheKey: 'mac-arm64',
-          executableRelativePath: path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
           historyOs: 'Mac_Arm',
-          archiveFileName: 'chrome-mac.zip',
+          archiveVariants: [{
+            archiveFileName: 'chrome-mac.zip',
+            executableRelativePath: path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+          }],
         }
         : {
           cacheKey: 'mac-x64',
-          executableRelativePath: path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
           historyOs: 'Mac',
-          archiveFileName: 'chrome-mac.zip',
+          archiveVariants: [{
+            archiveFileName: 'chrome-mac.zip',
+            executableRelativePath: path.join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+          }],
         };
     default:
       throw new Error(`Unsupported platform '${process.platform}'.`);
   }
 }
 
-export async function fetchChromiumVersionLinks() {
-  const platform = getChromiumHistoryPlatform();
-  return fetchJson(`${chromiumHistoryJsonBaseUrl}/version-position-link-${platform.historyOs}.json`);
-}
-
 export async function resolveCompatibilityBrowsers() {
   const platform = getChromiumHistoryPlatform();
   const profiles = await getCompatibilityProfiles();
-  const versionLinks = await fetchChromiumVersionLinks();
+  const overrides = await readChromiumSnapshotConfig();
   const byProfile = new Map();
 
   for (const profile of profiles) {
-    const release = resolveSnapshotRelease(versionLinks, profile.chromeMajor);
+    const release = resolveSnapshotRelease(profile.chromeMajor, platform, overrides);
     if (!release) {
       throw new Error(`No Chromium snapshot was found for major ${profile.chromeMajor} (${profile.name}).`);
     }
@@ -100,83 +103,38 @@ export async function resolveCompatibilityBrowsers() {
     byProfile.set(profile.name, {
       milestone: profile.chromeMajor,
       version: release.version,
-      downloadUrl: `${chromiumSnapshotsBaseUrl}/${release.snapshotPrefix}${platform.archiveFileName}`,
-      executableRelativePath: platform.executableRelativePath,
+      downloadUrl: `${chromiumSnapshotsBaseUrl}/${release.snapshotPrefix}${platform.archiveVariants[0].archiveFileName}`,
+      downloadUrls: platform.archiveVariants
+        .map(variant => `${chromiumSnapshotsBaseUrl}/${release.snapshotPrefix}${variant.archiveFileName}`),
+      executableRelativePath: platform.archiveVariants[0].executableRelativePath,
+      executableRelativePaths: platform.archiveVariants.map(variant => variant.executableRelativePath),
+      downloadVariants: platform.archiveVariants.map(variant => ({
+        downloadUrl: `${chromiumSnapshotsBaseUrl}/${release.snapshotPrefix}${variant.archiveFileName}`,
+        executableRelativePath: variant.executableRelativePath,
+      })),
       cacheKey: platform.cacheKey,
-      source: 'vikyd/chromium-history-version-position',
+      source: release.source,
     });
   }
 
   return byProfile;
 }
 
-function resolveSnapshotRelease(versionLinks, chromeMajor) {
-  const prefix = `${chromeMajor}.`;
-  const version = Object.keys(versionLinks)
-    .filter(candidate => candidate.startsWith(prefix))
-    .sort(compareVersions)
-    .at(-1);
+function resolveSnapshotRelease(chromeMajor, platform, overrides) {
+  return resolveLocalSnapshotRelease(chromeMajor, platform, overrides);
+}
 
-  if (!version) {
+function resolveLocalSnapshotRelease(chromeMajor, platform, overrides) {
+  const override = overrides?.majors?.[String(chromeMajor)];
+  if (!override) {
     return null;
   }
 
-  const indexUrl = versionLinks[version];
-  const match = /prefix=([^&]+\/)/.exec(indexUrl);
-  if (!match) {
-    throw new Error(`Could not parse the Chromium snapshot prefix from '${indexUrl}'.`);
-  }
-
   return {
-    version,
-    snapshotPrefix: match[1],
+    version: override.version,
+    snapshotPrefix: `${platform.historyOs}/${override.position}/`,
+    source: 'config/chromium-snapshot-overrides.json',
   };
-}
-
-function compareVersions(left, right) {
-  const leftParts = left.split('.').map(Number);
-  const rightParts = right.split('.').map(Number);
-  const length = Math.max(leftParts.length, rightParts.length);
-  for (let index = 0; index < length; index += 1) {
-    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
-    if (difference !== 0) {
-      return difference;
-    }
-  }
-
-  return 0;
-}
-
-const FETCH_TIMEOUT_MS = 30_000;
-
-async function fetchJson(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  let response;
-  try {
-    response = await fetch(url, withProxyFetchOptions(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'legacy-blazor-js-build',
-        Accept: 'application/json',
-      },
-    }));
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new Error(`Chromium version metadata request timed out after ${FETCH_TIMEOUT_MS}ms for ${url}.`);
-    }
-
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!response.ok) {
-    throw new Error(`Chromium version metadata request failed for ${url}: ${response.status} ${response.statusText}`);
-  }
-
-  return response.json();
 }
 
 export async function readBuildSummary() {
@@ -192,13 +150,25 @@ export async function readBuildSummary() {
   }
 }
 
+function hasChromeTarget(profile) {
+  if (profile.intendedBrowsers?.chrome) {
+    return true;
+  }
+
+  const text = Array.isArray(profile.intendedBrowsers)
+    ? profile.intendedBrowsers.join('\n')
+    : profile.description;
+  return /Chrome\s*(?:>=|\+)\s*\d+/i.test(text);
+}
+
+/** Extract the minimum Chrome major version declared for a target profile. */
 function parseChromeMajor(profile) {
   if (profile.intendedBrowsers?.chrome) {
     return Number(profile.intendedBrowsers.chrome);
   }
 
   const text = Array.isArray(profile.intendedBrowsers)
-    ? profile.intendedBrowsers.find(entry => /^Chrome\s*>=\s*\d+/.test(entry))
+    ? profile.intendedBrowsers.find(entry => /^Chrome\s*(?:>=|\+)\s*\d+/i.test(entry))
     : profile.description;
   const match = /Chrome\s*(?:>=|\+)\s*(\d+)/i.exec(text);
   if (!match) {

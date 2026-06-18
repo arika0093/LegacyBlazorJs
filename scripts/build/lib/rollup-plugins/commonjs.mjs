@@ -2,12 +2,10 @@ import commonjs from '@rollup/plugin-commonjs';
 
 export const LEGACY_COMMONJS_INCLUDE_PATTERNS = [
   /[/\\]node_modules[/\\]/,
+  // Include workspace-linked packages that are built as CommonJS and resolved outside node_modules
+  // e.g. /src/JSInterop/dist/...
   /[/\\]src[/\\](?!Components[/\\]Web\.JS[/\\]dist[/\\]).+[/\\]dist[/\\]/,
 ];
-
-export function shouldTransformLegacyCommonjsModule(id) {
-  return LEGACY_COMMONJS_INCLUDE_PATTERNS.some(pattern => pattern.test(id));
-}
 
 /**
  * Convert CommonJS modules to ES modules, including workspace-linked upstream package builds.

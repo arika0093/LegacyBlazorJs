@@ -11,7 +11,7 @@ export function legacyWhatwgFetchPlugin() {
   const whatwgFetchPath = require.resolve('whatwg-fetch/fetch.js');
   const VIRTUAL_ID = 'legacy-blazor-whatwg-fetch';
   const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-whatwg-fetch';
-  
+
   let polyfillSource = null;
 
   return {

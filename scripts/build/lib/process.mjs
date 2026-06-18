@@ -60,7 +60,7 @@ export function run(command, args, options = {}) {
 
     let timer;
     let aliveTimer;
-    
+
     // Periodic "still alive" check for long-running processes
     if (!timeoutMs || timeoutMs > 30000) {
       aliveTimer = setInterval(() => {
@@ -69,7 +69,7 @@ export function run(command, args, options = {}) {
         }
       }, 10000); // Check every 10 seconds
     }
-    
+
     if (timeoutMs) {
       timer = setTimeout(() => {
         clearInterval(aliveTimer);
@@ -132,7 +132,7 @@ export async function prepareNodeShim(nodeBin) {
 
   const shimDirectory = await mkdtemp(path.join(tmpdir(), 'legacy-blazor-node-'));
   const shimPath = path.join(shimDirectory, 'node');
-  
+
   // Use the resolved node path directly in the shebang to avoid infinite loop
   const shimSource = `#!${resolvedNode}
 import { spawnSync } from 'node:child_process';

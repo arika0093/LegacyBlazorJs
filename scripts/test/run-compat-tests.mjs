@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
+import { setupCompatibilityBrowser } from './lib/browser-setup.mjs';
 import {
   getCompatibilityProfiles,
   getCompatibilityResultsPath,
@@ -57,6 +58,21 @@ function trimLog(text) {
   return normalized.slice(-8000);
 }
 
+function resolveSmokeCommand(browser, env) {
+  const browserMajor = Number(String(browser.version).split('.')[0]);
+  if (process.platform === 'linux' && !env.DISPLAY && browserMajor < 59) {
+    return {
+      command: 'xvfb-run',
+      args: ['-a', process.execPath, '--test', 'tests/PlaywrightTest/smoke.test.mjs'],
+    };
+  }
+
+  return {
+    command: process.execPath,
+    args: ['--test', 'tests/PlaywrightTest/smoke.test.mjs'],
+  };
+}
+
 async function main() {
   const [profiles, hostingModels, buildSummary, browsersByProfile] = await Promise.all([
     getCompatibilityProfiles(),
@@ -71,6 +87,7 @@ async function main() {
   for (const build of buildSummary.builds) {
     for (const profile of profiles) {
       const browser = browsersByProfile.get(profile.name);
+      const executablePath = await setupCompatibilityBrowser(browser);
       for (const hostingModel of hostingModels) {
         const startedAt = new Date().toISOString();
         const started = Date.now();
@@ -80,16 +97,15 @@ async function main() {
           SMOKE_TEST_PROFILE: profile.name,
           SMOKE_TEST_HOSTING_MODEL: hostingModel,
           SMOKE_TEST_CHROMIUM_VERSION: browser.version,
-          SMOKE_TEST_CHROMIUM_DOWNLOAD_URL: browser.downloadUrl,
-          SMOKE_TEST_CHROMIUM_EXECUTABLE_RELATIVE_PATH: browser.executableRelativePath,
-          SMOKE_TEST_CHROMIUM_CACHE_KEY: browser.cacheKey,
+          SMOKE_TEST_CHROMIUM_EXECUTABLE_PATH: executablePath,
         };
 
         console.log(
           `Running ${build.version} ${profile.name} ${hostingModel} on Chromium ${browser.version} (${browser.source})`);
+        const smokeCommand = resolveSmokeCommand(browser, env);
         const outcome = await run(
-          'dotnet',
-          ['test', 'tests/PlaywrightTest/PlaywrightTest.csproj', '--logger', 'console;verbosity=minimal'],
+          smokeCommand.command,
+          smokeCommand.args,
           env);
         const durationSeconds = Number(((Date.now() - started) / 1000).toFixed(1));
         const passed = outcome.exitCode === 0;
