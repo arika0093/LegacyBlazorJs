@@ -5,6 +5,7 @@ import { legacyWebApiPolyfillPlugin } from './web-api-polyfill.mjs';
 import { legacyDynamicImportPlugin } from './dynamic-import.mjs';
 import { legacyBabelPlugin } from './babel.mjs';
 import { legacyIE11FixesPlugin } from './ie11-fixes.mjs';
+import { legacyES5FixesPlugin } from './es5-fixes.mjs';
 import { legacyPostBabelPlugin } from './post-babel.mjs';
 
 /**
@@ -28,5 +29,7 @@ export function legacyBlazorPlugins(targets) {
     legacyDynamicImportPlugin(),
     // Apply IE11-specific fixes
     legacyIE11FixesPlugin(targets),
+    // Apply ES5-specific fixes
+    legacyES5FixesPlugin(targets),
   ];
 }
