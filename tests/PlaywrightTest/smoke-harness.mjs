@@ -22,6 +22,37 @@ const workDirectory = path.join(repositoryRoot, '.work');
 const blazorServerAppTemplateDirectory = path.join(repositoryRoot, 'tests', 'BlazorServerApp');
 const blazorWasmAppTemplateDirectory = path.join(repositoryRoot, 'tests', 'BlazorWasmApp');
 
+function createSmokeLogger(profile, hostingModel) {
+  const entries = [];
+  const prefix = `[smoke:${hostingModel}:${profile}]`;
+
+  return {
+    info(message) {
+      const line = `${prefix} ${new Date().toISOString()} INFO ${message}`;
+      entries.push(line);
+      console.log(line);
+    },
+    error(message) {
+      const line = `${prefix} ${new Date().toISOString()} ERROR ${message}`;
+      entries.push(line);
+      console.error(line);
+    },
+    formatHistory() {
+      return entries.length === 0
+        ? `${prefix} No smoke test logs were captured.`
+        : `Smoke test log:\n${entries.join('\n')}`;
+    },
+  };
+}
+
+function describeError(error) {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+
+  return String(error);
+}
+
 export async function getProfiles() {
   const configuredProfile = process.env.SMOKE_TEST_PROFILE?.trim();
   if (configuredProfile) {
@@ -50,38 +81,54 @@ export function getHostingModel() {
 }
 
 export async function runSmokeTest(profile, hostingModel = getHostingModel()) {
-  const packageVersion = await resolvePackageVersion();
-  const appHarness = await SmokeAppHarness.create(repositoryRoot, profile, packageVersion, hostingModel);
+  const logger = createSmokeLogger(profile, hostingModel);
+  logger.info('Resolving package version.');
 
   try {
-    await appHarness.start();
+    const packageVersion = await resolvePackageVersion();
+    logger.info(`Using package version ${packageVersion}.`);
+    const appHarness = await SmokeAppHarness.create(repositoryRoot, profile, packageVersion, hostingModel, logger);
 
-    const browserHarness = await BrowserHarness.create();
     try {
-      await browserHarness.assertCounterInteractive(appHarness.baseUri, profile, hostingModel);
+      await appHarness.start();
+      logger.info('Application server is ready.');
+
+      const browserHarness = await BrowserHarness.create(logger);
+      try {
+        await browserHarness.assertCounterInteractive(appHarness.baseUri, profile, hostingModel);
+        logger.info('Counter interaction completed successfully.');
+      } finally {
+        logger.info('Disposing browser harness.');
+        await browserHarness.dispose();
+      }
     } finally {
-      await browserHarness.dispose();
+      logger.info('Disposing application harness.');
+      await appHarness.dispose();
     }
-  } finally {
-    await appHarness.dispose();
+  } catch (error) {
+    logger.error(`Smoke test failed: ${describeError(error)}`);
+    throw new Error(`${logger.formatHistory()}\n\n${describeError(error)}`, { cause: error });
   }
 }
 
 class SmokeAppHarness {
-  static async create(root, profile, packageVersion, hostingModel) {
+  static async create(root, profile, packageVersion, hostingModel, logger) {
     const rootDirectory = path.join(
       root,
       '.work',
       `smoke-${hostingModel.toLowerCase()}-${profile}-${createId()}`);
+    logger.info(`Creating smoke app workspace at '${rootDirectory}'.`);
     await mkdir(rootDirectory, { recursive: true });
 
     const templateDirectory = getTemplateDirectory(hostingModel);
+    logger.info(`Copying ${hostingModel} template from '${templateDirectory}'.`);
     await cp(templateDirectory, rootDirectory, { recursive: true });
 
     const projectPath = getProjectPath(rootDirectory, hostingModel);
     const baseUri = `http://127.0.0.1:${await getAvailablePort()}`;
     const targetFramework = resolveTargetFrameworkMoniker(packageVersion);
     const scriptProfile = await resolveScriptProfile(profile);
+    logger.info(`Resolved script profile '${scriptProfile}' for requested profile '${profile}'.`);
 
     const harness = new SmokeAppHarness(
       rootDirectory,
@@ -91,7 +138,8 @@ class SmokeAppHarness {
       packageVersion,
       targetFramework,
       hostingModel,
-      baseUri);
+      baseUri,
+      logger);
     await harness.#initialize();
     return harness;
   }
@@ -104,9 +152,10 @@ class SmokeAppHarness {
   #targetFramework;
   #hostingModel;
   #baseUri;
+  #logger;
   #serverProcess = null;
 
-  constructor(rootDirectory, projectPath, profile, scriptProfile, packageVersion, targetFramework, hostingModel, baseUri) {
+  constructor(rootDirectory, projectPath, profile, scriptProfile, packageVersion, targetFramework, hostingModel, baseUri, logger) {
     this.#rootDirectory = rootDirectory;
     this.#projectPath = projectPath;
     this.#profile = profile;
@@ -115,6 +164,7 @@ class SmokeAppHarness {
     this.#targetFramework = targetFramework;
     this.#hostingModel = hostingModel;
     this.#baseUri = baseUri;
+    this.#logger = logger;
   }
 
   get baseUri() {
@@ -122,6 +172,7 @@ class SmokeAppHarness {
   }
 
   async start() {
+    this.#logger.info(`Starting Blazor ${this.#hostingModel} app at ${this.#baseUri}.`);
     this.#serverProcess = CapturedProcess.start('dotnet', [
       'run',
       '--project', this.#projectPath,
@@ -139,6 +190,7 @@ class SmokeAppHarness {
     const readyUntil = Date.now() + SERVER_READY_TIMEOUT_MS;
     while (Date.now() < readyUntil) {
       if (this.#serverProcess.hasExited) {
+        this.#logger.error('Blazor app exited before reporting ready state.');
         throw new Error(
           `Blazor ${this.#hostingModel} app exited before it became ready.\n${await this.#serverProcess.getCombinedOutput()}`);
       }
@@ -146,6 +198,7 @@ class SmokeAppHarness {
       try {
         const response = await requestText(new URL('/counter', this.#baseUri).toString());
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          this.#logger.info(`Blazor ${this.#hostingModel} app responded successfully on ${this.#baseUri}.`);
           return;
         }
       } catch (error) {
@@ -158,20 +211,24 @@ class SmokeAppHarness {
     }
 
     await this.#disposeServer();
+    this.#logger.error(`Blazor ${this.#hostingModel} app did not become ready before timeout.`);
     throw new Error(
       `Blazor ${this.#hostingModel} app did not become ready at ${this.#baseUri} within ${SERVER_READY_TIMEOUT_MS / 1000} seconds.`);
   }
 
   async dispose() {
+    this.#logger.info(`Removing smoke app workspace '${this.#rootDirectory}'.`);
     await this.#disposeServer();
     await removeDirectory(this.#rootDirectory);
   }
 
   async #initialize() {
+    this.#logger.info(`Preparing project '${this.#projectPath}'.`);
     await this.#replaceProjectPlaceholders();
     await this.#normalizeLegacyBlazorReference();
     await writeNuGetConfig(this.#rootDirectory);
 
+    this.#logger.info(`Restoring .NET dependencies for '${this.#projectPath}'.`);
     await runChecked('dotnet', ['restore', this.#projectPath], { cwd: this.#rootDirectory });
 
     const scriptHostPath = getScriptHostPath(this.#rootDirectory, this.#hostingModel);
@@ -179,6 +236,7 @@ class SmokeAppHarness {
       ? `blazor.web.${this.#scriptProfile}.js`
       : `blazor.webassembly.${this.#scriptProfile}.js`;
     const replacement = `<script src="_content/LegacyBlazorJs/${scriptName}"></script>`;
+    this.#logger.info(`Injecting generated script '${scriptName}' into '${scriptHostPath}'.`);
     await replaceSingleToken(scriptHostPath, '__LEGACY_BLAZOR_SCRIPT__', replacement);
   }
 
@@ -218,6 +276,7 @@ class SmokeAppHarness {
     }
 
     if (!this.#serverProcess.hasExited) {
+      this.#logger.info('Stopping Blazor app process.');
       this.#serverProcess.kill();
     }
 
@@ -227,16 +286,19 @@ class SmokeAppHarness {
 }
 
 class BrowserHarness {
-  static async create() {
+  static async create(logger) {
     const launchConfiguration = await resolveBrowserLaunchConfiguration();
+    logger.info(`Launching Chromium from '${launchConfiguration.executablePath}'.`);
     return BrowserHarness.#createLegacyHarness(
       launchConfiguration.executablePath,
       launchConfiguration.versionMajor,
-      launchConfiguration.platform);
+      launchConfiguration.platform,
+      logger);
   }
 
-  static async #createLegacyHarness(executablePath, versionMajor, platform) {
+  static async #createLegacyHarness(executablePath, versionMajor, platform, logger) {
     const profileDirectory = path.join(workDirectory, 'browser-profiles', createId());
+    logger.info(`Creating browser profile at '${profileDirectory}'.`);
     await mkdir(profileDirectory, { recursive: true });
 
     let processHandle;
@@ -252,12 +314,15 @@ class BrowserHarness {
           onStderrLine: line => captureStartupLine(line, startupLog),
         });
 
+      logger.info(`Waiting for DevTools endpoint on port ${remoteDebuggingPort}.`);
       const endpoint = await waitForDevToolsEndpoint(processHandle, remoteDebuggingPort, startupLog);
+      logger.info(`Connecting to DevTools endpoint '${endpoint}'.`);
       socket = await openWebSocket(endpoint);
-      const harness = new BrowserHarness(processHandle, profileDirectory, socket, startupLog);
+      const harness = new BrowserHarness(processHandle, profileDirectory, socket, startupLog, logger);
       await harness.#attach();
       return harness;
     } catch (error) {
+      logger.error(`Browser harness setup failed: ${describeError(error)}`);
       if (socket && socket.readyState !== WebSocket.CLOSED) {
         await closeWebSocket(socket);
       }
@@ -288,12 +353,14 @@ class BrowserHarness {
   #closed = false;
   #usesDirectPageCommands = false;
   #unsupportedMethods = new Set();
+  #logger;
 
-  constructor(processHandle, profileDirectory, socket, startupLog) {
+  constructor(processHandle, profileDirectory, socket, startupLog, logger) {
     this.#process = processHandle;
     this.#profileDirectory = profileDirectory;
     this.#socket = socket;
     this.#startupLog = startupLog;
+    this.#logger = logger;
 
     socket.addEventListener('message', event => {
       void this.#handleSocketMessage(event.data);
@@ -308,13 +375,16 @@ class BrowserHarness {
   }
 
   async #attach() {
+    this.#logger.info('Attaching to Chromium DevTools target.');
     const attachment = await attachToDevToolsTarget((method, params) => this.#sendCommand(method, params));
     this.#targetId = attachment.targetId;
     this.#sessionId = attachment.sessionId;
     this.#usesDirectPageCommands = attachment.usesDirectPageCommands;
+    this.#logger.info('Attached to Chromium DevTools target.');
   }
 
   async assertCounterInteractive(baseUri, profile, hostingModel) {
+    this.#logger.info(`Opening counter page at ${new URL('/counter', baseUri).toString()}.`);
     const sessionId = this.#commandSessionId;
     if (this.#targetId) {
       await this.#sendOptionalCommand('Target.activateTarget', { targetId: this.#targetId });
@@ -328,12 +398,15 @@ class BrowserHarness {
     await this.#sendOptionalCommand('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId);
 
     await this.#navigate(new URL('/counter', baseUri).toString());
+    this.#logger.info('Waiting for counter UI to render.');
     await this.#waitForCondition(
       'document.readyState === "complete" && document.querySelector("button") !== null && document.querySelector(\'[role="status"]\') !== null',
       INTERACTION_TIMEOUT_MS,
       'counter UI to render');
 
+    this.#logger.info('Counter UI rendered. Attempting interaction.');
     const deadline = Date.now() + INTERACTION_TIMEOUT_MS;
+    let attempts = 0;
     while (Date.now() < deadline) {
       if (this.#errors.length > 0 || this.#failedResponses.length > 0) {
         break;
@@ -346,27 +419,34 @@ class BrowserHarness {
         })()
       `);
       if (parseCounterValue(countText) > 0) {
+        this.#logger.info(`Counter became interactive after ${attempts} click attempt(s).`);
         return;
       }
 
+      attempts += 1;
+      this.#logger.info(`Dispatching counter click attempt ${attempts}.`);
       await this.#ensurePageReadyForInput();
       await this.#clickButton();
       await delay(500);
     }
 
     if (this.#errors.length > 0) {
+      this.#logger.error('Browser reported errors while waiting for interactivity.');
       throw new Error(`${hostingModel} ${profile} emitted browser errors:\n${this.#errors.join('\n')}`);
     }
 
     if (this.#failedResponses.length > 0) {
+      this.#logger.error('HTTP failures were observed while waiting for interactivity.');
       throw new Error(`${hostingModel} ${profile} returned failing HTTP responses:\n${this.#failedResponses.join('\n')}`);
     }
 
+    this.#logger.error('Counter did not become interactive before timeout.');
     throw new Error(
       `${hostingModel} ${profile} did not become interactive within the allotted time.\n${await this.#captureDiagnostics()}`);
   }
 
   async dispose() {
+    this.#logger.info(`Disposing browser profile '${this.#profileDirectory}'.`);
     if (this.#socket.readyState === WebSocket.OPEN || this.#socket.readyState === WebSocket.CLOSING) {
       await closeWebSocket(this.#socket);
     }
@@ -636,6 +716,7 @@ class BrowserHarness {
     switch (message.method) {
       case 'Runtime.exceptionThrown':
         this.#errors.push(JSON.stringify(message.params?.exceptionDetails ?? message.params ?? message));
+        this.#logger.error('Captured browser runtime exception.');
         break;
       case 'Log.entryAdded': {
         const entry = message.params?.entry;
@@ -643,6 +724,7 @@ class BrowserHarness {
         if (String(entry?.level ?? '').toLowerCase() === 'error' &&
           text !== 'Failed to load resource: the server responded with a status of 404 (Not Found)') {
           this.#errors.push(text);
+          this.#logger.error(`Captured browser console error: ${text}`);
         }
         break;
       }
@@ -652,6 +734,7 @@ class BrowserHarness {
         const url = String(response?.url ?? '');
         if (status >= 400 && !url.endsWith('/favicon.ico')) {
           this.#failedResponses.push(`${status} ${url}`);
+          this.#logger.error(`Captured failing network response: ${status} ${url}`);
         }
         break;
       }
@@ -1294,16 +1377,12 @@ async function fileExists(filePath) {
 }
 
 async function removeDirectory(directoryPath) {
-  try {
-    await rm(directoryPath, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 250,
-    });
-  } catch (error) {
-    // ignore
-  }
+  await rm(directoryPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 20,
+    retryDelay: 250,
+  });
 }
 
 function parseBrowserMajor(versionText) {
