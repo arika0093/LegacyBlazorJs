@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 env:
-  BUILD_TARGET_PROFILES: es5,es2015,es2017
+  BUILD_TARGET_PROFILES: es2015,es2017
 
 permissions:
   contents: read
