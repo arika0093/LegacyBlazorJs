@@ -75,25 +75,27 @@ The profile definitions are in [config/targets.json](config/targets.json).
 ### Why not include ES5/IE11?
 
 **Short answer**:  
-APIs are missing, testing is difficult, and trial-and-error is challenging.
+APIs are missing, testing is difficult, so trial-and-error is challenging.
 
 **Long answer**:  
 ES5 syntax is [supported](https://caniuse.com/es5) even in quite old browsers. It works on Chrome 23+ and IE 10+ (since 2012!).  
-ES3 syntax is [supported](https://caniuse.com/es3) in even older browsers. It works on all browsers (since 1999!).  
 However, the situation is not so straightforward.
 
-* Old browsers lack many APIs and will not work without polyfills.
-  * JavaScript features
-  * Browser APIs such as [fetch](https://caniuse.com/fetch), [getRootNode](https://caniuse.com/mdn-api_node_getrootnode), [MutationObserver](https://caniuse.com/mutationobserver), etc.
-  * JavaScript side can be mostly supplemented with the excellent [core-js](https://github.com/zloirock/core-js) project, but the browser API side is insufficient.
+* Old browsers do not recognize the latest syntax (e.g., replacing arrow functions).
+  * It can be done relatively easily using [Babel](https://babeljs.io/docs/).
+* Old browsers lack many Javascript APIs (e.g. `Set`, `Map`, `Promise`, etc.).
+  * It can be supplemented with [core-js](https://github.com/zloirock/core-js). but it requires replacing the build process, which is somewhat complicated.
+* Old browsers lack many browser APIs (e.g., [fetch](https://caniuse.com/fetch), [getRootNode](https://caniuse.com/mdn-api_node_getrootnode), etc.).
+  * The polyfill is insufficient. In particular, it is difficult to select when supporting IE11.
 * Beyond JavaScript-side issues, since .NET dynamically invokes JS, the range of APIs that need to be supported is extremely wide.
-  * The bidirectional nature of JS/dotnet communication makes debugging difficult.
-* Naturally, tools like playwright and puppeteer cannot be used, so automated testing is impossible.
+* The bidirectional nature of JS/.NET communication makes debugging difficult.
+* Tools like `playwright` and `puppeteer` cannot be used, so automated testing is difficult.
   * This means that upstream modifications cannot be detected immediately, making early problem detection and verification of solutions extremely difficult.
 
 However, there is hope.
 
-* Automated testing can be executed on ES5 (Chrome 23), although error messages are insufficient.
+* Automated testing can be executed on Chrome 23 (ES5)!
+  * but although error messages are insufficient.
 * WebSocket connections can be established on both ES5 and IE11.
 * The problem is narrowed down after that. In other words, if a good approach can be found, it may be possible to support ES5/IE11 as well.
 
