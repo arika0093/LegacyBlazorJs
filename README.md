@@ -39,21 +39,20 @@ The following files are included under `_content/LegacyBlazorJs/`:
 - blazor.web.{version}.js
 - blazor.server.{version}.js
 - ~~blazor.webassembly.{version}.js~~ Although it is included, the dependent `dotnet.js` does not work.
-- blazor.webview.{version}.js
+- ~~blazor.webview.{version}.js~~ Although it is included, the dependent `dotnet.js` does not work.
 
 The versions listed below are available.
 
-| Version   | Intended browser target                        |
-|-----------|------------------------------------------------|
-| ~~`es5`~~ | ~~Chrome 23+~~                                 |
-| `es2015`  | Chrome 49+                                     |
-| `es2017`  | Chrome 58+                                     |
-| `es2018`  | Chrome 64+                                     |
-| `es2020`  | Chrome 80+                                     |
-| `es2022`  | Chrome 94+                                     |
+| Version   | Browser target   | Notes                 |
+|-----------|------------------|-----------------------|
+| ~~`es5`~~ | ~~Chrome 23+~~   |                       |
+| `es2015`  | Chrome 49+       |                       |
+| `es2017`  | Chrome 58+       |                       |
+| `es2018`  | Chrome 64+       |                       |
+| `es2020`  | Chrome 80+       | Default for .NET 8    |
+| `es2022`  | Chrome 94+       | Default for .NET 9    |
 
 The profile definitions are in [config/targets.json](config/targets.json).
-
 
 ### Why not include ES5/IE11?
 
@@ -78,7 +77,6 @@ However, the situation is not so straightforward.
 However, there is hope.
 
 * Automated testing can be executed on Chrome 23 (ES5)!
-  * but although error messages are insufficient.
 * WebSocket connections can be established on both ES5 and IE11.
 * The problem is narrowed down after that. In other words, if a good approach can be found, it may be possible to support ES5/IE11 as well.
 
