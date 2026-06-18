@@ -7,7 +7,6 @@
     "resolve-version": "node scripts/build/resolve-version.mjs",
     "build:variants": "node scripts/build/build-variants.mjs",
     "build": "node scripts/build/build-all.mjs",
-    "test": "node --test tests/node/**/*.test.mjs",
     "test:smoke": "dotnet test tests/PlaywrightTest/PlaywrightTest.csproj",
     "test:compat": "node scripts/test/run-compat-tests.mjs",
     "readme:compat": "node scripts/test/update-readme-compat.mjs",
