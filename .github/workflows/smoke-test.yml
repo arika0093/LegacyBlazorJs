@@ -4,6 +4,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  BUILD_TARGET_PROFILES: es2015
+
 permissions:
   contents: read
 
@@ -35,6 +38,7 @@ jobs:
         env:
           # disable Terser for legacy Blazor JS builds to check source code
           LEGACY_BLAZOR_DISABLE_TERSER: true
+          BUILD_TARGET_PROFILES: "${{ env.BUILD_TARGET_PROFILES }}"
           GITHUB_TOKEN: "${{ github.token }}"
 
       # upload packages
@@ -48,7 +52,7 @@ jobs:
     needs: build-package
     strategy:
       matrix:
-        profile: [es2015, es2020, es2022]
+        profile: [es2015]
         hosting: [Server]
     # Legacy Chromium often has shared library dependency issues on Linux, so run on Windows environment.
     runs-on: windows-latest

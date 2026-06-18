@@ -48,14 +48,8 @@ export function getChromiumHistoryPlatform() {
         archiveFileName: 'chrome-linux.zip',
       };
     case 'win32':
-      return process.arch === 'x64'
-        ? {
-          cacheKey: 'win-x64',
-          executableRelativePath: path.join('chrome-win', 'chrome.exe'),
-          historyOs: 'Win_x64',
-          archiveFileName: 'chrome-win.zip',
-        }
-        : {
+      // Always use x86 (older Chromium snapshots are not distributed for x64)
+      return {
           cacheKey: 'win-x86',
           executableRelativePath: path.join('chrome-win', 'chrome.exe'),
           historyOs: 'Win',
