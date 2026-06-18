@@ -1,4 +1,5 @@
 import { legacyCommonjsPlugin } from './commonjs.mjs';
+import { legacyDotnetJsImportPlugin } from './dotnetjs-import.mjs';
 import { legacyWhatwgFetchPlugin } from './whatwg-fetch.mjs';
 import { legacyCoreJsPolyfillPlugin } from './corejs-polyfill.mjs';
 import { legacyWebApiPolyfillPlugin } from './web-api-polyfill.mjs';
@@ -14,6 +15,7 @@ import { legacyPostBabelPlugin } from './post-babel.mjs';
 export function legacyBlazorPlugins(targets) {
   return [
     legacyCommonjsPlugin(),
+    legacyDotnetJsImportPlugin(),
     // Prepend non-ECMAScript Web API polyfills before any entry code runs
     legacyWhatwgFetchPlugin(),
     legacyWebApiPolyfillPlugin(),
