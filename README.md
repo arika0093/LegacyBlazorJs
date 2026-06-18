@@ -31,24 +31,6 @@ Then, replace the official script in your Blazor Web App's `Components/App.razor
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
 
-### Blazor WebAssembly
-
-The process is almost the same for Blazor WebAssembly. After installation, replace the script in `wwwroot/index.html`:
-
-```diff
-- <script src="_framework/blazor.webassembly.js"></script>
-+ <script src="_content/LegacyBlazorJs/blazor.webassembly.uwasm.js"></script>
-```
-
-To run WebAssembly, the following features are required:
-
-* [WebAssembly](https://caniuse.com/wasm)
-* [Dynamic import](https://caniuse.com/es6-module-dynamic-import)
-* [BigInt](https://caniuse.com/bigint)
-
-These features cannot be polyfilled, so they must be supported natively by the browser.  
-The `uwasm` build is provided for browsers that meet these minimum requirements (Chrome 67+, Edge 79+, Safari 14+, Firefox 68+).
-
 ## Included files
 ### Overview
 
@@ -56,7 +38,7 @@ The following files are included under `_content/LegacyBlazorJs/`:
 
 - blazor.web.{version}.js
 - blazor.server.{version}.js
-- blazor.webassembly.{version}.js
+- ~~blazor.webassembly.{version}.js~~ Although it is included, the dependent `dotnet.js` does not work.
 - blazor.webview.{version}.js
 
 The versions listed below are available.
@@ -67,11 +49,11 @@ The versions listed below are available.
 | `es2015`  | Chrome 49+                                     |
 | `es2017`  | Chrome 58+                                     |
 | `es2018`  | Chrome 64+                                     |
-| `uwasm`   | Chrome 67+, Edge 79+, Safari 14+, Firefox 68+  |
 | `es2020`  | Chrome 80+                                     |
 | `es2022`  | Chrome 94+                                     |
 
 The profile definitions are in [config/targets.json](config/targets.json).
+
 
 ### Why not include ES5/IE11?
 

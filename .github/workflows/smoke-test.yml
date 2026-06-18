@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 env:
-  BUILD_TARGET_PROFILES: es2015,uwasm
+  BUILD_TARGET_PROFILES: es2015
 
 permissions:
   contents: read
@@ -55,7 +55,6 @@ jobs:
       matrix:
         include:
           - { profile: es2015, hosting: Server }
-          - { profile: uwasm,  hosting: WebAssembly }
     # Legacy Chromium often has shared library dependency issues on Linux, so run on Windows environment.
     runs-on: windows-latest
     steps:
