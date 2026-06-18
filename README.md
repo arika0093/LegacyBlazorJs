@@ -70,8 +70,7 @@ The versions listed below are available.
 | `es2020` | Chrome 80+ |
 | `es2022` | Chrome 94+ |
 
-The browsers in parentheses are reference values.
-The authoritative profile definitions are in [config/targets.json](config/targets.json).
+The profile definitions are in [config/targets.json](config/targets.json).
 
 ### Why not include ES5/IE11?
 
