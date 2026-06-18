@@ -287,6 +287,7 @@ class BrowserHarness {
   #failedResponses = [];
   #closed = false;
   #usesDirectPageCommands = false;
+  #unsupportedMethods = new Set();
 
   constructor(processHandle, profileDirectory, socket, startupLog) {
     this.#process = processHandle;
@@ -316,17 +317,17 @@ class BrowserHarness {
   async assertCounterInteractive(baseUri, profile, hostingModel) {
     const sessionId = this.#commandSessionId;
     if (this.#targetId) {
-      await this.#sendCommand('Target.activateTarget', { targetId: this.#targetId });
+      await this.#sendOptionalCommand('Target.activateTarget', { targetId: this.#targetId });
     }
 
-    await this.#sendCommand('Page.enable', undefined, sessionId);
-    await this.#sendCommand('Runtime.enable', undefined, sessionId);
-    await this.#sendCommand('Log.enable', undefined, sessionId);
-    await this.#sendCommand('Network.enable', undefined, sessionId);
-    await this.#trySendCommand('Page.bringToFront', undefined, sessionId);
-    await this.#trySendCommand('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId);
+    await this.#sendOptionalCommand('Page.enable', undefined, sessionId);
+    await this.#sendOptionalCommand('Runtime.enable', undefined, sessionId);
+    await this.#sendOptionalCommand('Log.enable', undefined, sessionId);
+    await this.#sendOptionalCommand('Network.enable', undefined, sessionId);
+    await this.#sendOptionalCommand('Page.bringToFront', undefined, sessionId);
+    await this.#sendOptionalCommand('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId);
 
-    await this.#sendCommand('Page.navigate', { url: new URL('/counter', baseUri).toString() }, sessionId);
+    await this.#navigate(new URL('/counter', baseUri).toString());
     await this.#waitForCondition(
       'document.readyState === "complete" && document.querySelector("button") !== null && document.querySelector(\'[role="status"]\') !== null',
       INTERACTION_TIMEOUT_MS,
@@ -392,7 +393,7 @@ class BrowserHarness {
   }
 
   async #ensurePageReadyForInput() {
-    await this.#trySendCommand('Page.bringToFront', undefined, this.#commandSessionId);
+    await this.#sendOptionalCommand('Page.bringToFront', undefined, this.#commandSessionId);
     await this.#evaluate(`
       (() => {
         const button = document.querySelector('button');
@@ -433,15 +434,15 @@ class BrowserHarness {
     }
 
     const { x, y } = buttonCenter;
-    await this.#sendCommand(
+    await this.#sendOptionalCommand(
       'Input.dispatchMouseEvent',
       { type: 'mouseMoved', x, y, button: 'none', buttons: 0, clickCount: 0 },
       this.#commandSessionId);
-    await this.#sendCommand(
+    await this.#sendOptionalCommand(
       'Input.dispatchMouseEvent',
       { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 },
       this.#commandSessionId);
-    await this.#sendCommand(
+    await this.#sendOptionalCommand(
       'Input.dispatchMouseEvent',
       { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 },
       this.#commandSessionId);
@@ -483,6 +484,20 @@ class BrowserHarness {
       : null;
   }
 
+  async #navigate(url) {
+    const navigation = await this.#sendOptionalCommand('Page.navigate', { url }, this.#commandSessionId);
+    if (navigation !== UNSUPPORTED_METHOD_RESULT) {
+      return navigation;
+    }
+
+    return await this.#evaluate(`
+      (() => {
+        location.href = ${JSON.stringify(url)};
+        return true;
+      })()
+    `);
+  }
+
   async #sendCommand(method, params = {}, sessionId) {
     if (this.#closed) {
       throw new Error(`Cannot send '${method}' because the DevTools connection is closed.`);
@@ -503,14 +518,29 @@ class BrowserHarness {
       throw error;
     }
 
-    return completion.promise;
+    return completion.promise.catch(error => {
+      if (isMethodNotFoundError(error, method)) {
+        this.#unsupportedMethods.add(method);
+      }
+
+      throw error;
+    });
   }
 
-  async #trySendCommand(method, params = {}, sessionId) {
+  async #sendOptionalCommand(method, params = {}, sessionId) {
+    if (this.#unsupportedMethods.has(method)) {
+      return UNSUPPORTED_METHOD_RESULT;
+    }
+
     try {
       return await this.#sendCommand(method, params, sessionId);
-    } catch {
-      return null;
+    } catch (error) {
+      if (isMethodNotFoundError(error, method)) {
+        this.#unsupportedMethods.add(method);
+        return UNSUPPORTED_METHOD_RESULT;
+      }
+
+      throw error;
     }
   }
 
@@ -1253,6 +1283,8 @@ function parseBrowserMajor(versionText) {
   return match ? Number(match[1]) : null;
 }
 
+const UNSUPPORTED_METHOD_RESULT = Symbol('unsupported-devtools-method');
+
 export async function attachToDevToolsTarget(sendCommand) {
   try {
     const target = await sendCommand('Target.createTarget', { url: 'about:blank' });
@@ -1289,6 +1321,7 @@ export function isMethodNotFoundError(error, method) {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return message.includes(`'${method}' wasn't found`) ||
     message.includes(`"${method}" wasn't found`) ||
+    message.includes(`No such method ${method}`) ||
     (/method not found/i.test(message) && message.includes(method));
 }
 
