@@ -90,7 +90,6 @@ async function prebuildWorkspacePackages(upstreamDir, env) {
   await patchTslibOverride(path.join(upstreamDir, 'package.json'));
   await patchBlazorRegex(path.join(upstreamDir, 'src/Components/Web.JS/src/Services/ComponentDescriptorDiscovery.ts'));
   await patchSignalRAbortController(path.join(upstreamDir, 'src/SignalR/clients/ts/signalr/src/FetchHttpClient.ts'));
-  await patchSignalRConnectUrl(path.join(upstreamDir, 'src/SignalR/clients/ts/signalr/src/HttpConnection.ts'));
   await retry(3, 15_000, () => run('npm', ['install', '--ignore-scripts'], { cwd: upstreamDir, env }));
   await run('npm', ['run', 'build', '--workspace=src/JSInterop/Microsoft.JSInterop.JS/src'], { cwd: upstreamDir, env });
   await run('npm', ['run', 'build', '--workspace=src/SignalR/clients/ts/signalr'], { cwd: upstreamDir, env });
@@ -102,7 +101,6 @@ async function prebuildYarnPackages(upstreamDir, env) {
   console.log(' Build required packages(JSInteop, SignalR, and relation packages)');
   await run('corepack', ['prepare', 'yarn@1.22.22', '--activate'], { cwd: rootDir, env });
   await patchSignalRAbortController(path.join(upstreamDir, 'src/SignalR/clients/ts/signalr/src/FetchHttpClient.ts'));
-  await patchSignalRConnectUrl(path.join(upstreamDir, 'src/SignalR/clients/ts/signalr/src/HttpConnection.ts'));
   await runYarnBuild(path.join(upstreamDir, 'src/JSInterop/Microsoft.JSInterop.JS/src'), env);
   await retry(3, 15_000, () => run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], {
     cwd: path.join(upstreamDir, 'src/SignalR/clients/ts/common'),

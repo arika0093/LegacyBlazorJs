@@ -229,10 +229,13 @@ class SmokeAppHarness {
 class BrowserHarness {
   static async create() {
     const launchConfiguration = await resolveBrowserLaunchConfiguration();
-    return BrowserHarness.#createLegacyHarness(launchConfiguration.executablePath, launchConfiguration.versionMajor);
+    return BrowserHarness.#createLegacyHarness(
+      launchConfiguration.executablePath,
+      launchConfiguration.versionMajor,
+      launchConfiguration.platform);
   }
 
-  static async #createLegacyHarness(executablePath, versionMajor) {
+  static async #createLegacyHarness(executablePath, versionMajor, platform) {
     const profileDirectory = path.join(workDirectory, 'browser-profiles', createId());
     await mkdir(profileDirectory, { recursive: true });
 
@@ -243,7 +246,7 @@ class BrowserHarness {
       const startupLog = [];
       processHandle = CapturedProcess.start(
         executablePath,
-        buildBrowserArguments(profileDirectory, remoteDebuggingPort, versionMajor), {
+        buildBrowserArguments(profileDirectory, remoteDebuggingPort, versionMajor, { platform }), {
           cwd: repositoryRoot,
           onStdoutLine: line => captureStartupLine(line, startupLog),
           onStderrLine: line => captureStartupLine(line, startupLog),
@@ -885,6 +888,7 @@ async function resolveBrowserLaunchConfiguration() {
     await ensureExecutablePermissions(configuredPath);
     return {
       executablePath: configuredPath,
+      platform: inferBrowserPlatform(configuredPath),
       versionMajor: parseBrowserMajor(process.env.SMOKE_TEST_CHROMIUM_VERSION),
     };
   }
@@ -892,7 +896,11 @@ async function resolveBrowserLaunchConfiguration() {
   for (const candidate of await findInstalledBrowsers()) {
     if (await fileExists(candidate)) {
       await ensureExecutablePermissions(candidate);
-      return { executablePath: candidate, versionMajor: null };
+      return {
+        executablePath: candidate,
+        platform: inferBrowserPlatform(candidate),
+        versionMajor: null,
+      };
     }
   }
 
@@ -941,6 +949,14 @@ async function locateCommand(command) {
   } catch {
     return null;
   }
+}
+
+function inferBrowserPlatform(executablePath) {
+  if (executablePath.toLowerCase().endsWith('.exe')) {
+    return 'win32';
+  }
+
+  return process.platform;
 }
 
 export function buildBrowserArguments(
