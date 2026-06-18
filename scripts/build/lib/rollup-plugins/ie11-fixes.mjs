@@ -6,11 +6,16 @@
  * 2. Framework-specific patterns that Babel doesn't recognize
  * 3. Issues that appear after Babel transformation
  */
-export function legacyIE11FixesPlugin() {
+export function legacyIE11FixesPlugin(targets) {
   return {
     name: 'legacy-ie11-fixes',
     renderChunk(code, chunk) {
       let transformed = code;
+
+      // if IE11 is not a target, skip all transformations
+      if (!targets || targets.ie !== '11') {
+        return null;
+      }
 
       // Fix 1: _mergeNamespaces type checking
       // Without this, primitives like 'true' cause "Object.keys: argument is not an object" error
