@@ -129,6 +129,10 @@ function findRollupTerserCall(configSource) {
 }
 
 export function withOptionalRollupTerser(configSource) {
+  if (configSource.includes('LegacyBlazorJs: terser disabled via LEGACY_BLAZOR_DISABLE_TERSER.')) {
+    return configSource;
+  }
+
   const terserCall = findRollupTerserCall(configSource);
   const commentedSource = [
     `${terserCall.indentation}// LegacyBlazorJs: terser disabled via LEGACY_BLAZOR_DISABLE_TERSER.`,
