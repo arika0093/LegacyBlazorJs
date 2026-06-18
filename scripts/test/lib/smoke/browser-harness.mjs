@@ -313,11 +313,10 @@ export class BrowserHarness {
   }
 
   async #evaluate(expression) {
-    const response = await this.#sendCommand('Runtime.evaluate', {
-      expression,
-      awaitPromise: true,
-      returnByValue: true,
-    }, this.#commandSessionId);
+    const response = await this.#sendCommand(
+      'Runtime.evaluate',
+      createRuntimeEvaluateParams(expression),
+      this.#commandSessionId);
 
     if (response?.exceptionDetails) {
       throw new Error(`Legacy Chromium evaluation failed: ${JSON.stringify(response.exceptionDetails)}`);
@@ -633,4 +632,11 @@ function formatRemoteObjectValue(value) {
   }
 
   return JSON.stringify(value);
+}
+
+export function createRuntimeEvaluateParams(expression) {
+  return {
+    expression,
+    returnByValue: true,
+  };
 }
