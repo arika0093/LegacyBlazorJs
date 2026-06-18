@@ -21,6 +21,7 @@
     "@babel/preset-env": "^7.29.7",
     "@rollup/plugin-babel": "^7.1.0",
     "@rollup/plugin-commonjs": "^29.0.3",
+    "@webcomponents/custom-elements": "^1.6.0",
     "core-js": "^3.49.0",
     "undici": "^7.16.0",
     "whatwg-fetch": "^3.6.20"

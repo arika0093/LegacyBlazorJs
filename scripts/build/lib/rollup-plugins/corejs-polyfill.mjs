@@ -4,39 +4,6 @@ import { createRequire } from 'node:module';
 
 const VIRTUAL_ID = 'legacy-blazor-corejs-polyfill';
 const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-corejs-polyfill';
-export const legacyBrowserShimsSource = `
-(function () {
-  var nodePrototype = typeof Node !== 'undefined' && Node.prototype;
-  if (nodePrototype && !nodePrototype.getRootNode) {
-    nodePrototype.getRootNode = function getRootNode() {
-      var current = this;
-      while (current && current.parentNode) {
-        current = current.parentNode;
-      }
-      if (current && current.nodeType === 11 && current.host) {
-        return current.host;
-      }
-      return current || this;
-    };
-  }
-
-  var eventPrototype = typeof Event !== 'undefined' && Event.prototype;
-  if (eventPrototype && !eventPrototype.composedPath) {
-    eventPrototype.composedPath = function composedPath() {
-      var path = [];
-      var current = this.target;
-      while (current) {
-        path.push(current);
-        current = current.parentNode || current.host || null;
-      }
-      if (typeof window !== 'undefined') {
-        path.push(window);
-      }
-      return path;
-    };
-  }
-})();
-`.trim();
 
 export const polyfillModules = [
   // Keep this list aligned with the union of @babel/preset-env IE11 usage analysis
@@ -254,7 +221,7 @@ export function legacyCoreJsPolyfillPlugin()
       }
 
       return {
-        code: `${polyfillSource}\n${legacyBrowserShimsSource}\n${code}`,
+        code: `${polyfillSource}\n${code}`,
         map: null,
       };
     },
