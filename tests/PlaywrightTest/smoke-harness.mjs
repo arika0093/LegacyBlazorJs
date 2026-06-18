@@ -339,7 +339,12 @@ class BrowserHarness {
         break;
       }
 
-      const countText = await this.#evaluateString('document.querySelector(\'[role="status"]\')?.textContent ?? ""');
+      const countText = await this.#evaluateString(`
+        (function () {
+          var status = document.querySelector('[role="status"]');
+          return status ? status.textContent : '';
+        })()
+      `);
       if (parseCounterValue(countText) > 0) {
         return;
       }
