@@ -5,10 +5,6 @@ export const LEGACY_COMMONJS_INCLUDE_PATTERNS = [
   /[/\\]src[/\\](?!Components[/\\]Web\.JS[/\\]dist[/\\]).+[/\\]dist[/\\]/,
 ];
 
-export function shouldTransformLegacyCommonjsModule(id) {
-  return LEGACY_COMMONJS_INCLUDE_PATTERNS.some(pattern => pattern.test(id));
-}
-
 /**
  * Convert CommonJS modules to ES modules, including workspace-linked upstream package builds.
  * npm workspaces resolve these packages outside node_modules, so a node_modules-only

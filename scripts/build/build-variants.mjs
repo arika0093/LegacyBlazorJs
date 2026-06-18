@@ -8,6 +8,7 @@ import { run } from './lib/process.mjs';
 import { readSelectedTargets } from './lib/config.mjs';
 import { transformLegacyDynamicImport } from './lib/legacy-output.mjs';
 import { parseAspNetTag } from './lib/version.mjs';
+import { patchBlazorRegex } from './patches/patch-blazor-regex.mjs';
 
 function arg(name, fallback, argv = process.argv.slice(2)) {
   const index = argv.indexOf(`--${name}`);
@@ -210,6 +211,10 @@ export async function buildVariants({
     delete process.env.BUILD_TARGET_PROFILES;
   }
 
+  // apply patch for blazorCommentRegularExpression to use a RegExp literal
+  // instead of new RegExp(...) to avoid issues with IE11 and legacy browsers.
+  await patchBlazorRegex(path.join(sourceDir, 'src/Services/ComponentDescriptorDiscovery.ts'));
+
   const targets = await readSelectedTargets();
   const npmWorkspace = await usesNpmWorkspaces(sourceDir);
   const bundlerConfigPath = await firstExisting([
@@ -220,7 +225,7 @@ export async function buildVariants({
     ? path.join(sourceDir, 'tsconfig.json')
     : path.join(sourceDir, '../Shared.JS/tsconfig.json');
   const isRollupBuild = bundlerConfigPath.endsWith('rollup.config.mjs');
-  const needsRollupLegacyPlugins = isRollupBuild && Object.values(targets).some(profile => profile.ecma < 2018);
+  const needsRollupLegacyPlugins = isRollupBuild;
   const rollupLegacyPluginsPath = needsRollupLegacyPlugins
     ? await writeRollupLegacyPluginsModule(bundlerConfigPath)
     : null;
@@ -235,25 +240,33 @@ export async function buildVariants({
     for (const [name, profile] of Object.entries(targets)) {
       console.log(`****** Build "${name}" (target: ${profile.typescriptTarget}) ******`);
 
+      // const tsconfig = JSON.parse(originalTsconfig);
+      // tsconfig.compilerOptions.target = profile.typescriptTarget;
+      // if (profile.typescriptTarget === 'es5') {
+      //   tsconfig.compilerOptions.downlevelIteration = true;
+      // }
+      // if (npmWorkspace) {
+      //   tsconfig.compilerOptions.importHelpers = false;
+      //   if (profile.ecma < 2018) {
+      //     tsconfig.compilerOptions.target = 'es2018';
+      //   }
+      // }
+      // await writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
+
       const ecmaPatchedBundlerConfig = originalBundlerConfig.replace(/ecma:\s*\d+/g, `ecma: ${profile.ecma}`);
       if (ecmaPatchedBundlerConfig === originalBundlerConfig && !originalBundlerConfig.includes(`ecma: ${profile.ecma}`)) {
         throw new Error('Could not locate the upstream bundler/Terser ECMA target.');
       }
 
-      const useRollupLegacyPlugins = isRollupBuild && profile.ecma < 2018;
-      let bundlerConfig = useRollupLegacyPlugins
-        ? withRollupLegacyPlugins(ecmaPatchedBundlerConfig)
-        : ecmaPatchedBundlerConfig;
-      if (isRollupBuild && process.env.LEGACY_BLAZOR_DISABLE_TERSER === 'true') {
-        bundlerConfig = withOptionalRollupTerser(bundlerConfig);
-      }
-      if (useRollupLegacyPlugins) {
+      if (isRollupBuild) {
+        let bundlerConfig = withRollupLegacyPlugins(ecmaPatchedBundlerConfig)
+        if (process.env.LEGACY_BLAZOR_DISABLE_TERSER === 'true') {
+          bundlerConfig = withOptionalRollupTerser(bundlerConfig);
+        }
         process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
-      } else {
-        delete process.env.LEGACY_BLAZOR_BABEL_TARGETS;
+        await writeFile(bundlerConfigPath, bundlerConfig);
       }
-      await writeFile(bundlerConfigPath, bundlerConfig);
-
+      
       if (npmWorkspace) {
         await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], { cwd: npmWorkspace.root });
       } else {
@@ -261,8 +274,11 @@ export async function buildVariants({
         await run('yarn', ['run', 'build:production'], { cwd: sourceDir });
       }
 
-      await postProcessLegacyOutputs(path.join(sourceDir, 'dist', 'Release'), profile, !isRollupBuild && profile.ecma < 2018);
+      if (!isRollupBuild) {
+        await postProcessLegacyOutputs(path.join(sourceDir, 'dist', 'Release'), profile, true);
+      }
 
+      // generate variant-specific file names and copy to output
       const webFilename = `blazor.web.${name}.js`;
       const webAssemblyFilename = `blazor.webassembly.${name}.js`;
       const serverFilename = `blazor.server.${name}.js`;

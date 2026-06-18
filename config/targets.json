@@ -31,6 +31,14 @@
       "chrome": "58"
     }
   },
+  "es2018": {
+    "description": "comprehensive ES2018 support",
+    "ecma": 2018,
+    "typescriptTarget": "es2018",
+    "intendedBrowsers": {
+      "chrome": "64"
+    }
+  },
   "es2020": {
     "description": "comprehensive ES2020 support",
     "ecma": 2020,
