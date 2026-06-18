@@ -17,26 +17,29 @@ export async function setupCompatibilityBrowser(browser) {
     'chromium',
     browser.version,
     browser.cacheKey);
-  const executablePath = path.join(browserDirectory, browser.executableRelativePath);
-
-  if (await exists(executablePath)) {
+  const executablePath = await findExistingExecutablePath(browser, browserDirectory);
+  if (executablePath) {
     await ensureExecutablePermissions(executablePath);
     return executablePath;
   }
 
   await mkdir(browserDirectory, { recursive: true });
-  let archivePath = await findExistingArchivePath(browser, browserDirectory);
-  if (!archivePath) {
-    archivePath = await downloadBrowserArchiveWithRetry(browser, browserDirectory);
+  let archiveVariant = await findExistingArchiveVariant(browser, browserDirectory);
+  if (!archiveVariant) {
+    archiveVariant = await downloadBrowserArchiveWithRetry(browser, browserDirectory);
   }
 
-  await extractArchive(archivePath, browserDirectory);
-  if (!await exists(executablePath)) {
-    throw new Error(`Downloaded Chromium archive did not contain the expected executable '${browser.executableRelativePath}'.`);
+  await extractArchive(archiveVariant.archivePath, browserDirectory);
+  const extractedExecutablePath = await findExistingExecutablePath(
+    browser,
+    browserDirectory,
+    [archiveVariant.executableRelativePath]);
+  if (!extractedExecutablePath) {
+    throw new Error(`Downloaded Chromium archive did not contain any expected executable: ${getExecutableRelativePaths(browser).join(', ')}`);
   }
 
-  await ensureExecutablePermissions(executablePath);
-  return executablePath;
+  await ensureExecutablePermissions(extractedExecutablePath);
+  return extractedExecutablePath;
 }
 
 async function extractArchive(archivePath, destinationDirectory) {
@@ -70,11 +73,25 @@ function quotePowerShellString(value) {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-async function findExistingArchivePath(browser, browserDirectory) {
-  for (const downloadUrl of getDownloadUrls(browser)) {
-    const archivePath = path.join(browserDirectory, path.basename(new URL(downloadUrl).pathname));
+async function findExistingExecutablePath(browser, browserDirectory, preferredRelativePaths = []) {
+  for (const executableRelativePath of getExecutableRelativePaths(browser, preferredRelativePaths)) {
+    const executablePath = path.join(browserDirectory, executableRelativePath);
+    if (await exists(executablePath)) {
+      return executablePath;
+    }
+  }
+
+  return null;
+}
+
+async function findExistingArchiveVariant(browser, browserDirectory) {
+  for (const variant of getDownloadVariants(browser)) {
+    const archivePath = path.join(browserDirectory, path.basename(new URL(variant.downloadUrl).pathname));
     if (await exists(archivePath)) {
-      return archivePath;
+      return {
+        ...variant,
+        archivePath,
+      };
     }
   }
 
@@ -84,11 +101,14 @@ async function findExistingArchivePath(browser, browserDirectory) {
 async function downloadBrowserArchiveWithRetry(browser, browserDirectory) {
   let lastError = null;
   for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt += 1) {
-    for (const downloadUrl of getDownloadUrls(browser)) {
-      const archivePath = path.join(browserDirectory, path.basename(new URL(downloadUrl).pathname));
+    for (const variant of getDownloadVariants(browser)) {
+      const archivePath = path.join(browserDirectory, path.basename(new URL(variant.downloadUrl).pathname));
       try {
-        await downloadBrowserArchive(downloadUrl, archivePath);
-        return archivePath;
+        await downloadBrowserArchive(variant.downloadUrl, archivePath);
+        return {
+          ...variant,
+          archivePath,
+        };
       } catch (error) {
         lastError = error;
         await rm(archivePath, { force: true });
@@ -108,8 +128,23 @@ async function downloadBrowserArchiveWithRetry(browser, browserDirectory) {
   throw lastError;
 }
 
-function getDownloadUrls(browser) {
-  return browser.downloadUrls ?? [browser.downloadUrl];
+function getDownloadVariants(browser) {
+  if (browser.downloadVariants?.length) {
+    return browser.downloadVariants;
+  }
+
+  return [{
+    downloadUrl: browser.downloadUrl,
+    executableRelativePath: browser.executableRelativePath,
+  }];
+}
+
+function getExecutableRelativePaths(browser, preferredRelativePaths = []) {
+  const executableRelativePaths = [
+    ...preferredRelativePaths,
+    ...(browser.executableRelativePaths ?? getDownloadVariants(browser).map(variant => variant.executableRelativePath)),
+  ];
+  return [...new Set(executableRelativePaths)];
 }
 
 function isMissingArchiveError(error) {
