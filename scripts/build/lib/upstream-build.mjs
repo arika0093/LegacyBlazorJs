@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { buildVariants } from '../build-variants.mjs';
 import { patchBlazorRegex } from '../patches/patch-blazor-regex.mjs';
 import { patchSignalRAbortController } from '../patches/patch-signalr-abort-controller.mjs';
-import { patchSignalRConnectUrl } from '../patches/patch-signalr-connect-url.mjs';
 import { patchTslibOverride } from '../patches/patch-tslib-override.mjs';
 import { prepareNodeShim, retry, run } from './process.mjs';
 import { fetchLatestTagForMajor, parseAspNetTag } from './version.mjs';
