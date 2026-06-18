@@ -37,6 +37,11 @@ function createSmokeLogger(profile, hostingModel) {
       entries.push(line);
       console.error(line);
     },
+    warn(message) {
+      const line = `${prefix} ${new Date().toISOString()} WARN ${message}`;
+      entries.push(line);
+      console.warn(line);
+    },
     formatHistory() {
       return entries.length === 0
         ? `${prefix} No smoke test logs were captured.`
@@ -45,12 +50,12 @@ function createSmokeLogger(profile, hostingModel) {
   };
 }
 
-function describeError(error) {
+function describeErrorSummary(error) {
   if (error instanceof Error) {
-    return error.stack ?? error.message;
+    return error.message.split('\n', 1)[0];
   }
 
-  return String(error);
+  return String(error).split('\n', 1)[0];
 }
 
 export async function getProfiles() {
@@ -106,8 +111,10 @@ export async function runSmokeTest(profile, hostingModel = getHostingModel()) {
       await appHarness.dispose();
     }
   } catch (error) {
-    logger.error(`Smoke test failed: ${describeError(error)}`);
-    throw new Error(`${logger.formatHistory()}\n\n${describeError(error)}`, { cause: error });
+    logger.error(`Smoke test failed: ${describeErrorSummary(error)}`);
+    throw error instanceof Error
+      ? error
+      : new Error(describeErrorSummary(error));
   }
 }
 
@@ -322,7 +329,7 @@ class BrowserHarness {
       await harness.#attach();
       return harness;
     } catch (error) {
-      logger.error(`Browser harness setup failed: ${describeError(error)}`);
+      logger.error(`Browser harness setup failed: ${describeErrorSummary(error)}`);
       if (socket && socket.readyState !== WebSocket.CLOSED) {
         await closeWebSocket(socket);
       }
@@ -349,10 +356,12 @@ class BrowserHarness {
   #pending = new Map();
   #messageId = 0;
   #errors = [];
+  #warnings = [];
   #failedResponses = [];
   #closed = false;
   #usesDirectPageCommands = false;
   #unsupportedMethods = new Set();
+  #observedBrowserNotices = new Set();
   #logger;
 
   constructor(processHandle, profileDirectory, socket, startupLog, logger) {
@@ -392,6 +401,7 @@ class BrowserHarness {
 
     await this.#sendOptionalCommand('Page.enable', undefined, sessionId);
     await this.#sendOptionalCommand('Runtime.enable', undefined, sessionId);
+    await this.#sendOptionalCommand('Console.enable', undefined, sessionId);
     await this.#sendOptionalCommand('Log.enable', undefined, sessionId);
     await this.#sendOptionalCommand('Network.enable', undefined, sessionId);
     await this.#sendOptionalCommand('Page.bringToFront', undefined, sessionId);
@@ -548,7 +558,14 @@ class BrowserHarness {
           return false;
         }
 
-        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        const eventOptions = { bubbles: true, cancelable: true, view: window };
+        button.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+        button.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+        if (typeof button.click === 'function') {
+          button.click();
+        } else {
+          button.dispatchEvent(new MouseEvent('click', eventOptions));
+        }
         return true;
       })()
     `);
@@ -678,6 +695,10 @@ class BrowserHarness {
       lines.push('Collected browser errors:', ...this.#errors);
     }
 
+    if (this.#warnings.length > 0) {
+      lines.push('Collected browser warnings:', ...this.#warnings);
+    }
+
     if (this.#failedResponses.length > 0) {
       lines.push('Collected failed responses:', ...this.#failedResponses);
     }
@@ -715,16 +736,39 @@ class BrowserHarness {
 
     switch (message.method) {
       case 'Runtime.exceptionThrown':
-        this.#errors.push(JSON.stringify(message.params?.exceptionDetails ?? message.params ?? message));
-        this.#logger.error('Captured browser runtime exception.');
+        this.#recordBrowserError(
+          `runtime-exception:${JSON.stringify(message.params?.exceptionDetails ?? message.params ?? message)}`,
+          `Runtime exception: ${JSON.stringify(message.params?.exceptionDetails ?? message.params ?? message)}`);
         break;
+      case 'Runtime.consoleAPICalled': {
+        const type = String(message.params?.type ?? '').toLowerCase();
+        const text = formatConsoleMessage(message.params?.args, message.params?.stackTrace);
+        if (type === 'warning') {
+          this.#recordBrowserWarning(`runtime-warning:${text}`, text);
+        } else if (type === 'error' || type === 'assert') {
+          this.#recordBrowserError(`runtime-error:${text}`, text);
+        }
+        break;
+      }
+      case 'Console.messageAdded': {
+        const text = formatConsoleEntryText(message.params?.message);
+        const level = normalizeConsoleLevel(message.params?.message?.level);
+        if (level === 'warning') {
+          this.#recordBrowserWarning(`console-warning:${text}`, text);
+        } else if (level === 'error') {
+          this.#recordBrowserError(`console-error:${text}`, text);
+        }
+        break;
+      }
       case 'Log.entryAdded': {
         const entry = message.params?.entry;
-        const text = entry?.text ?? JSON.stringify(entry ?? message.params ?? message);
-        if (String(entry?.level ?? '').toLowerCase() === 'error' &&
+        const text = formatConsoleEntryText(entry ?? message.params ?? message);
+        const level = normalizeConsoleLevel(entry?.level);
+        if (level === 'error' &&
           text !== 'Failed to load resource: the server responded with a status of 404 (Not Found)') {
-          this.#errors.push(text);
-          this.#logger.error(`Captured browser console error: ${text}`);
+          this.#recordBrowserError(`log-error:${text}`, text);
+        } else if (level === 'warning') {
+          this.#recordBrowserWarning(`log-warning:${text}`, text);
         }
         break;
       }
@@ -733,12 +777,53 @@ class BrowserHarness {
         const status = Number(response?.status);
         const url = String(response?.url ?? '');
         if (status >= 400 && !url.endsWith('/favicon.ico')) {
-          this.#failedResponses.push(`${status} ${url}`);
-          this.#logger.error(`Captured failing network response: ${status} ${url}`);
+          this.#recordFailedResponse(`response:${status}:${url}`, `${status} ${url}`);
         }
         break;
       }
+      case 'Network.loadingFailed': {
+        if (message.params?.canceled) {
+          break;
+        }
+
+        const errorText = String(message.params?.errorText ?? '').trim();
+        const requestId = String(message.params?.requestId ?? '').trim();
+        const description = errorText.length > 0 ? errorText : 'Unknown network failure';
+        const failure = requestId.length > 0 ? `${description} (${requestId})` : description;
+        this.#recordFailedResponse(`loading-failed:${failure}`, failure);
+        break;
+      }
     }
+  }
+
+  #recordBrowserError(key, text) {
+    if (this.#observedBrowserNotices.has(key)) {
+      return;
+    }
+
+    this.#observedBrowserNotices.add(key);
+    this.#errors.push(text);
+    this.#logger.error(`Captured browser console error: ${text}`);
+  }
+
+  #recordBrowserWarning(key, text) {
+    if (this.#observedBrowserNotices.has(key)) {
+      return;
+    }
+
+    this.#observedBrowserNotices.add(key);
+    this.#warnings.push(text);
+    this.#logger.warn(`Captured browser console warning: ${text}`);
+  }
+
+  #recordFailedResponse(key, text) {
+    if (this.#observedBrowserNotices.has(key)) {
+      return;
+    }
+
+    this.#observedBrowserNotices.add(key);
+    this.#failedResponses.push(text);
+    this.#logger.error(`Captured failing network response: ${text}`);
   }
 
   #failPending(error) {
@@ -930,7 +1015,8 @@ async function listArchiveEntries(archivePath) {
 
 async function writeNuGetConfig(directory) {
   const nugetConfigPath = path.join(directory, 'NuGet.config');
-  const contents = `<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key="local" value="${packageSourceDirectory.replaceAll('\\', '/')}" />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />\n  </packageSources>\n</configuration>\n`;
+  const globalPackagesFolder = path.join(directory, '.nuget', 'packages').replaceAll('\\', '/');
+  const contents = `<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <config>\n    <add key="globalPackagesFolder" value="${globalPackagesFolder}" />\n  </config>\n  <packageSources>\n    <clear />\n    <add key="local" value="${packageSourceDirectory.replaceAll('\\', '/')}" />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />\n  </packageSources>\n</configuration>\n`;
   await writeFile(nugetConfigPath, contents);
 }
 
@@ -1203,6 +1289,59 @@ function buildStartupLog(startupLog) {
   return startupLog.length === 0
     ? 'No browser startup output was captured.'
     : `Browser startup output:\n${startupLog.join('\n')}`;
+}
+
+function normalizeConsoleLevel(level) {
+  const normalized = String(level ?? '').toLowerCase();
+  return normalized === 'warn' ? 'warning' : normalized;
+}
+
+function formatConsoleEntryText(entry) {
+  const text = entry?.text;
+  if (typeof text === 'string' && text.length > 0) {
+    return text;
+  }
+
+  return JSON.stringify(entry);
+}
+
+function formatConsoleMessage(args, stackTrace) {
+  const parts = Array.isArray(args)
+    ? args.map(formatRemoteObjectValue).filter(part => part.length > 0)
+    : [];
+  if (parts.length > 0) {
+    return parts.join(' ');
+  }
+
+  const topFrame = stackTrace?.callFrames?.[0];
+  if (topFrame?.functionName) {
+    return topFrame.functionName;
+  }
+
+  return 'Console API call with no printable arguments.';
+}
+
+function formatRemoteObjectValue(value) {
+  if (!value || typeof value !== 'object') {
+    return '';
+  }
+
+  if (Object.hasOwn(value, 'value')) {
+    const serialized = value.value;
+    return typeof serialized === 'string'
+      ? serialized
+      : JSON.stringify(serialized);
+  }
+
+  if (typeof value.unserializableValue === 'string' && value.unserializableValue.length > 0) {
+    return value.unserializableValue;
+  }
+
+  if (typeof value.description === 'string' && value.description.length > 0) {
+    return value.description;
+  }
+
+  return JSON.stringify(value);
 }
 
 async function openWebSocket(endpoint) {
