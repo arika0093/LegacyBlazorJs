@@ -57,7 +57,8 @@ jobs:
           # Blazor Server should work with all supported JS versions
           - { profile: es5,    hosting: Server }
           - { profile: es2015, hosting: Server }
-          # Blazor WASM only support Chromium > 57, so only test es2017(Chromium 64+) for WebAssembly hosting model
+          - { profile: es2017, hosting: Server }
+          # Blazor WASM only support Chromium > 57, so only test es2017(Chromium 58) for WebAssembly hosting model
           - { profile: es2017, hosting: WebAssembly }
     # Legacy Chromium often has shared library dependency issues on Linux, so run on Windows environment.
     runs-on: windows-latest
