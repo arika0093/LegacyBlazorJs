@@ -438,19 +438,29 @@ class BrowserHarness {
       return;
     }
 
-    const { x, y } = buttonCenter;
-    await this.#sendOptionalCommand(
-      'Input.dispatchMouseEvent',
-      { type: 'mouseMoved', x, y, button: 'none', buttons: 0, clickCount: 0 },
-      this.#commandSessionId);
-    await this.#sendOptionalCommand(
-      'Input.dispatchMouseEvent',
-      { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 },
-      this.#commandSessionId);
-    await this.#sendOptionalCommand(
-      'Input.dispatchMouseEvent',
-      { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 },
-      this.#commandSessionId);
+    const x = toFiniteInteger(buttonCenter.x);
+    const y = toFiniteInteger(buttonCenter.y);
+    if (x !== null && y !== null) {
+      try {
+        await this.#sendOptionalCommand(
+          'Input.dispatchMouseEvent',
+          { type: 'mouseMoved', x, y, button: 'none', buttons: 0, clickCount: 0 },
+          this.#commandSessionId);
+        await this.#sendOptionalCommand(
+          'Input.dispatchMouseEvent',
+          { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 },
+          this.#commandSessionId);
+        await this.#sendOptionalCommand(
+          'Input.dispatchMouseEvent',
+          { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 },
+          this.#commandSessionId);
+      } catch (error) {
+        if (!isInvalidMouseEventParameterError(error)) {
+          throw error;
+        }
+      }
+    }
+
     await this.#evaluate(`
       (() => {
         const button = document.querySelector('button');
@@ -1328,6 +1338,17 @@ export function isMethodNotFoundError(error, method) {
     message.includes(`"${method}" wasn't found`) ||
     message.includes(`No such method ${method}`) ||
     (/method not found/i.test(message) && message.includes(method));
+}
+
+function isInvalidMouseEventParameterError(error) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /missing or invalid ['"](?:x|y)['"] parameter/i.test(message);
+}
+
+function toFiniteInteger(value) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.round(value)
+    : null;
 }
 
 function parseCounterValue(text) {
