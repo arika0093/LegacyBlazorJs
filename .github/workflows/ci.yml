@@ -74,11 +74,12 @@ jobs:
   test-compat:
     needs: [build]
     if: inputs.run_compat
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        dotnet: [8, 9, 10]
+        dotnet: [10]
+        profile: [es2015, es2020, es2022]
     steps:
       # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -99,11 +100,15 @@ jobs:
           path: artifacts/packages
       # > npm dependencies
       - run: npm ci --ignore-scripts
-      # execute compatibility test matrix for this .NET version
-      - name: Run ES20x compatibility matrix (.NET ${{ matrix.dotnet }})
-        run: npm run test:compat
+      # > browser setup downloads the target profile's Chromium directly
+      - name: Select old Chromium for smoke test
+        run: node scripts/test/export-browser-env.mjs ${{ matrix.profile }}
+      # execute a smoke test for the specified variant
+      - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
+        run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:
-          DOTNET_MAJOR: ${{ matrix.dotnet }}
+          SMOKE_TEST_PROFILE: ${{ matrix.profile }}
+          SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}
 
   # If a new version is found, create a release and publish to NuGet/GitHub
   release-github:
@@ -148,7 +153,7 @@ jobs:
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
-      
+
       - name: NuGet login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
         id: login

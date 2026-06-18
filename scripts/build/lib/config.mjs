@@ -14,8 +14,8 @@ export async function readTargetsConfig() {
   return readJsonConfig('config/targets.json');
 }
 
-export async function readChromiumSnapshotOverridesConfig() {
-  return readJsonConfig('config/chromium-snapshot-overrides.json');
+export async function readChromiumSnapshotConfig() {
+  return readJsonConfig('config/chromium-snapshot.json');
 }
 
 export async function readSelectedTargets() {

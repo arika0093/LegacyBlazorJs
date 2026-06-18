@@ -3,7 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import {
-  readChromiumSnapshotOverridesConfig,
+  readChromiumSnapshotConfig,
   readTargetsConfig,
 } from '../../build/lib/config.mjs';
 
@@ -83,7 +83,7 @@ export function getChromiumHistoryPlatform() {
 export async function resolveCompatibilityBrowsers() {
   const platform = getChromiumHistoryPlatform();
   const profiles = await getCompatibilityProfiles();
-  const overrides = await readChromiumSnapshotOverridesConfig();
+  const overrides = await readChromiumSnapshotConfig();
   const byProfile = new Map();
 
   for (const profile of profiles) {

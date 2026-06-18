@@ -4,9 +4,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  BUILD_TARGET_PROFILES: es2015
-
 permissions:
   contents: read
 
@@ -38,7 +35,6 @@ jobs:
         env:
           # disable Terser for legacy Blazor JS builds to check source code
           LEGACY_BLAZOR_DISABLE_TERSER: true
-          BUILD_TARGET_PROFILES: "${{ env.BUILD_TARGET_PROFILES }}"
           GITHUB_TOKEN: "${{ github.token }}"
 
       # upload packages
@@ -50,7 +46,12 @@ jobs:
   # Run a single smoke test against the es2015 variant using Blazor Server
   smoke-test:
     needs: build-package
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        profile: [es2015, es2020, es2022]
+        hosting: [Server]
+    # Legacy Chromium often has shared library dependency issues on Linux, so run on Windows environment.
+    runs-on: windows-latest
     steps:
       # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -74,10 +75,10 @@ jobs:
       - run: npm ci --ignore-scripts
       # > browser setup downloads the target profile's Chromium directly
       - name: Select old Chromium for smoke test
-        run: node scripts/test/export-browser-env.mjs ${{ env.BUILD_TARGET_PROFILES }}
-      # execute a single smoke test for the specified variant on Blazor Server
-      - name: Run smoke test (${{ env.BUILD_TARGET_PROFILES }}, Blazor Server)
-        run: xvfb-run -a node --test tests/PlaywrightTest/smoke.test.mjs
+        run: node scripts/test/export-browser-env.mjs ${{ matrix.profile }}
+      # execute a smoke test for the specified variant
+      - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
+        run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:
-          SMOKE_TEST_PROFILE: ${{ env.BUILD_TARGET_PROFILES }}
-          SMOKE_TEST_HOSTING_MODEL: Server
+          SMOKE_TEST_PROFILE: ${{ matrix.profile }}
+          SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}
