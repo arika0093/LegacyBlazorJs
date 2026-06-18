@@ -1,6 +1,7 @@
 import path from 'node:path';
 import process from 'node:process';
 import { createRequire } from 'node:module';
+import { LEGACY_COMMONJS_INCLUDE_PATTERNS } from './commonjs.mjs';
 
 const VIRTUAL_ID = 'legacy-blazor-corejs-polyfill';
 const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-corejs-polyfill';
@@ -64,7 +65,7 @@ export function legacyCoreJsPolyfillPlugin()
           },
           nodeResolve(),
           commonjs({
-            include: /node_modules/,
+            include: LEGACY_COMMONJS_INCLUDE_PATTERNS,
           }),
         ],
         treeshake: false,

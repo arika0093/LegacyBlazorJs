@@ -24,22 +24,7 @@ export function legacyIE11FixesPlugin(targets) {
         "e && typeof e === 'object' && typeof e !== 'string' && !Array.isArray(e) && Object.keys(e)"
       );
 
-      // Fix 2: shouldAutoStart for IE11
-      // IE11's document.currentScript is null in IIFE contexts.
-      // Solution: Fall back to getElementsByTagName('script')
-      transformed = transformed.replace(
-        /function shouldAutoStart\(\)\s*\{[^}]+\}/,
-        `function shouldAutoStart() {
-    var script = document && document.currentScript;
-    if (!script) {
-      var scripts = document.getElementsByTagName('script');
-      script = scripts[scripts.length - 1];
-    }
-    return !script || script.getAttribute('autostart') !== 'false';
-  }`
-      );
-
-      // Fix 3: userAgent.match() safety check
+      // Fix 2: userAgent.match() safety check
       // Without this, userAgent being non-string causes "object does not support match" error
       transformed = transformed.replace(
         /if\s*\(\s*!version\s*&&\s*userAgent(\$\d+)\s*\)\s*\{/g,
