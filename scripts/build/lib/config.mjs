@@ -14,6 +14,10 @@ export async function readTargetsConfig() {
   return readJsonConfig('config/targets.json');
 }
 
+export async function readChromiumSnapshotOverridesConfig() {
+  return readJsonConfig('config/chromium-snapshot-overrides.json');
+}
+
 export async function readSelectedTargets() {
   const targets = await readTargetsConfig();
   const configuredProfiles = process.env.BUILD_TARGET_PROFILES

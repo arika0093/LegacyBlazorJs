@@ -58,6 +58,21 @@ function trimLog(text) {
   return normalized.slice(-8000);
 }
 
+function resolveSmokeCommand(browser, env) {
+  const browserMajor = Number(String(browser.version).split('.')[0]);
+  if (process.platform === 'linux' && !env.DISPLAY && browserMajor < 59) {
+    return {
+      command: 'xvfb-run',
+      args: ['-a', process.execPath, '--test', 'tests/PlaywrightTest/smoke.test.mjs'],
+    };
+  }
+
+  return {
+    command: process.execPath,
+    args: ['--test', 'tests/PlaywrightTest/smoke.test.mjs'],
+  };
+}
+
 async function main() {
   const [profiles, hostingModels, buildSummary, browsersByProfile] = await Promise.all([
     getCompatibilityProfiles(),
@@ -87,9 +102,10 @@ async function main() {
 
         console.log(
           `Running ${build.version} ${profile.name} ${hostingModel} on Chromium ${browser.version} (${browser.source})`);
+        const smokeCommand = resolveSmokeCommand(browser, env);
         const outcome = await run(
-          'dotnet',
-          ['test', 'tests/PlaywrightTest/PlaywrightTest.csproj', '--logger', 'console;verbosity=minimal'],
+          smokeCommand.command,
+          smokeCommand.args,
           env);
         const durationSeconds = Number(((Date.now() - started) / 1000).toFixed(1));
         const passed = outcome.exitCode === 0;
