@@ -80,10 +80,10 @@ jobs:
       matrix:
         dotnet: [10]
         profile: [es2015, es2017, es2018, es2020]
-        hosting: [Server, WebAssembly]
-        exclude:
-          # Blazor WASM only support Chromium > 63 (WASM and dynamic import)
-          - { profile: es2015, hosting: WebAssembly }
+        hosting: [Server]
+        include:
+          - { profile: uwasm,  hosting: WebAssembly }
+          - { profile: es2020, hosting: WebAssembly }
     steps:
       # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3

@@ -23,6 +23,17 @@
       "chrome": "64"
     }
   },
+  "uwasm": {
+    "description": "WebAssembly support (WASM, BigInt, dynamic import)",
+    "ecma": 2018,
+    "typescriptTarget": "es2018",
+    "intendedBrowsers": {
+      "chrome": "67",
+      "edge": "79",
+      "safari": "14",
+      "firefox": "68"
+    }
+  },
   "es2020": {
     "description": "comprehensive ES2020 support",
     "ecma": 2020,
