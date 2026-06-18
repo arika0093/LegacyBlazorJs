@@ -86,9 +86,11 @@ However, there is hope.
 
 To be specific, the process is as follows:
 
-1. First, check the tags of the upstream [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore) to find the latest versions.
+1. First, resolve the upstream [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore) targets.
+    * By default, the build targets the latest LTS line and the latest preview line.
+    * The defaults are controlled in [config/majors.json](config/majors.json) and can be overridden with environment variables such as `BUILD_CHANNELS`, `LTS_DOTNET_MAJOR`, `PREVIEW_DOTNET_MAJOR`, `ASPNETCORE_TAG`, and `UPSTREAM_REF`.
 2. Clone the upstream.
-3. For .NET 8 and earlier, use yarn; for .NET 9 and later, use npm workspaces.
+3. Build the upstream JavaScript packages with npm workspaces.
 4. Build the dependencies in advance. As of .NET 10, the following are included in the dependencies.
     * [JSInterop](https://github.com/dotnet/aspnetcore/tree/main/src/JSInterop/Microsoft.JSInterop.JS/src)
     * [SignalR](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/clients/ts/signalr)

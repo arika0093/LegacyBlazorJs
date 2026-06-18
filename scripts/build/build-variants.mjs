@@ -1,38 +1,14 @@
 #!/usr/bin/env node
 import { copyFile, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { run } from './lib/process.mjs';
 import { readSelectedTargets } from './lib/config.mjs';
-import { transformLegacyDynamicImport } from './lib/legacy-output.mjs';
-import { parseAspNetTag } from './lib/version.mjs';
 import { patchBlazorRegex } from './patches/patch-blazor-regex.mjs';
-
-function arg(name, fallback, argv = process.argv.slice(2)) {
-  const index = argv.indexOf(`--${name}`);
-  return index >= 0 ? argv[index + 1] : fallback;
-}
 
 function resolveBabelTargets(profile) {
   return profile.intendedBrowsers;
-}
-
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-
-async function readFirstExisting(paths) {
-  for (const candidate of paths) {
-    try {
-      return await readFile(candidate, 'utf8');
-    } catch (error) {
-      if (error?.code !== 'ENOENT') {
-        throw error;
-      }
-    }
-  }
-
-  throw new Error(`None of the expected upstream files exist:\n${paths.join('\n')}`);
 }
 
 async function firstExisting(paths) {
@@ -50,7 +26,7 @@ async function firstExisting(paths) {
   throw new Error(`None of the expected upstream files exist:\n${paths.join('\n')}`);
 }
 
-async function usesNpmWorkspaces(sourceDir) {
+async function resolveNpmWorkspace(sourceDir) {
   let current = path.resolve(sourceDir);
   for (let depth = 0; depth < 5; depth += 1) {
     const parent = path.dirname(current);
@@ -69,14 +45,13 @@ async function usesNpmWorkspaces(sourceDir) {
     }
   }
 
-  return null;
+  throw new Error(`Could not locate an npm workspace root for '${sourceDir}'. Legacy yarn-based builds are no longer supported.`);
 }
 
 async function writeRollupLegacyPluginsModule(bundlerConfigPath) {
   const pluginsIndexPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'lib', 'rollup-plugins', 'index.mjs');
   const bridgePath = path.join(path.dirname(bundlerConfigPath), 'for-legacy-plugins.mjs');
 
-  // Simple bridge that just re-exports from the rollup-plugins directory
   const bridgeSource = `import { legacyBlazorPlugins as legacyBlazorPluginsImpl } from ${JSON.stringify(pathToFileURL(pluginsIndexPath).href)};
 
 export function legacyBlazorPlugins() {
@@ -152,7 +127,7 @@ export function withRollupLegacyPlugins(configSource) {
     return withImport;
   }
 
-  let patched = withImport.replace(/(\n\s*)terser\(\{/m, '$1...legacyBlazorPlugins(),$1terser({');
+  const patched = withImport.replace(/(\n\s*)terser\(\{/m, '$1...legacyBlazorPlugins(),$1terser({');
   if (patched === withImport) {
     throw new Error('Could not locate the upstream Rollup Terser plugin to insert legacy plugins before it.');
   }
@@ -160,44 +135,19 @@ export function withRollupLegacyPlugins(configSource) {
   return patched;
 }
 
-async function postProcessLegacyOutputs(distDir, profile, shouldDownlevel) {
-  // this method is legacy support ( < 8 ), will be removed in future.
-  const files = ['blazor.web.js', 'blazor.webassembly.js', 'blazor.server.js', 'blazor.webview.js'];
-  const legacyRequire = createRequire(path.join(rootDir, 'package.json'));
-  const babel = shouldDownlevel ? legacyRequire('@babel/core') : null;
-  const targets = shouldDownlevel ? resolveBabelTargets(profile) : null;
-
-  for (const file of files) {
-    const filePath = path.join(distDir, file);
-    let source = await readFile(filePath, 'utf8');
-
-    if (shouldDownlevel) {
-      const result = babel.transformSync(source, {
-        presets: [[
-          '@babel/preset-env', {
-            targets,
-          },
-        ]],
-        filename: file,
-        compact: true,
-      });
-      source = result.code;
-    }
-
-    source = transformLegacyDynamicImport(source, file);
-    await writeFile(filePath, source);
-  }
-}
-
 export async function buildVariants({
   sourceDir = path.resolve('src/Components/Web.JS'),
   output = path.resolve('src/LegacyBlazorJs/wwwroot'),
-  tag = process.env.ASPNETCORE_TAG,
+  upstreamRef = process.env.UPSTREAM_REF ?? process.env.ASPNETCORE_TAG,
+  upstreamTag = process.env.ASPNETCORE_TAG,
+  packageVersion = process.env.PACKAGE_VERSION,
   profiles = process.env.BUILD_TARGET_PROFILES,
 } = {}) {
-  const parsed = parseAspNetTag(tag ?? '');
-  if (!parsed) {
-    throw new Error('A valid --tag vX.Y.Z is required.');
+  if (!upstreamRef) {
+    throw new Error('Set UPSTREAM_REF or ASPNETCORE_TAG before building variants.');
+  }
+  if (!packageVersion) {
+    throw new Error('Set PACKAGE_VERSION before building variants.');
   }
 
   const previousProfiles = process.env.BUILD_TARGET_PROFILES;
@@ -207,24 +157,15 @@ export async function buildVariants({
     delete process.env.BUILD_TARGET_PROFILES;
   }
 
-  // apply patch for blazorCommentRegularExpression to use a RegExp literal
-  // instead of new RegExp(...) to avoid issues with IE11 and legacy browsers.
   await patchBlazorRegex(path.join(sourceDir, 'src/Services/ComponentDescriptorDiscovery.ts'));
 
   const targets = await readSelectedTargets();
-  const npmWorkspace = await usesNpmWorkspaces(sourceDir);
+  const npmWorkspace = await resolveNpmWorkspace(sourceDir);
   const bundlerConfigPath = await firstExisting([
-    path.join(sourceDir, 'src/webpack.config.js'),
     path.join(sourceDir, '../Shared.JS/rollup.config.mjs'),
   ]);
-  const tsconfigPath = bundlerConfigPath.endsWith('webpack.config.js')
-    ? path.join(sourceDir, 'tsconfig.json')
-    : path.join(sourceDir, '../Shared.JS/tsconfig.json');
-  const isRollupBuild = bundlerConfigPath.endsWith('rollup.config.mjs');
-  const needsRollupLegacyPlugins = isRollupBuild;
-  const rollupLegacyPluginsPath = needsRollupLegacyPlugins
-    ? await writeRollupLegacyPluginsModule(bundlerConfigPath)
-    : null;
+  const tsconfigPath = path.join(sourceDir, '../Shared.JS/tsconfig.json');
+  const rollupLegacyPluginsPath = await writeRollupLegacyPluginsModule(bundlerConfigPath);
   const originalTsconfig = await readFile(tsconfigPath, 'utf8');
   const originalBundlerConfig = await readFile(bundlerConfigPath, 'utf8');
 
@@ -236,45 +177,20 @@ export async function buildVariants({
     for (const [name, profile] of Object.entries(targets)) {
       console.log(`****** Build "${name}" (target: ${profile.typescriptTarget}) ******`);
 
-      // const tsconfig = JSON.parse(originalTsconfig);
-      // tsconfig.compilerOptions.target = profile.typescriptTarget;
-      // if (profile.typescriptTarget === 'es5') {
-      //   tsconfig.compilerOptions.downlevelIteration = true;
-      // }
-      // if (npmWorkspace) {
-      //   tsconfig.compilerOptions.importHelpers = false;
-      //   if (profile.ecma < 2018) {
-      //     tsconfig.compilerOptions.target = 'es2018';
-      //   }
-      // }
-      // await writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
-
       const ecmaPatchedBundlerConfig = originalBundlerConfig.replace(/ecma:\s*\d+/g, `ecma: ${profile.ecma}`);
       if (ecmaPatchedBundlerConfig === originalBundlerConfig && !originalBundlerConfig.includes(`ecma: ${profile.ecma}`)) {
-        throw new Error('Could not locate the upstream bundler/Terser ECMA target.');
+        throw new Error('Could not locate the upstream Rollup Terser ECMA target.');
       }
 
-      if (isRollupBuild) {
-        let bundlerConfig = withRollupLegacyPlugins(ecmaPatchedBundlerConfig)
-        if (process.env.LEGACY_BLAZOR_DISABLE_TERSER === 'true') {
-          bundlerConfig = withOptionalRollupTerser(bundlerConfig);
-        }
-        process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
-        await writeFile(bundlerConfigPath, bundlerConfig);
-      }
-      
-      if (npmWorkspace) {
-        await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], { cwd: npmWorkspace.root });
-      } else {
-        await run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], { cwd: sourceDir });
-        await run('yarn', ['run', 'build:production'], { cwd: sourceDir });
+      let bundlerConfig = withRollupLegacyPlugins(ecmaPatchedBundlerConfig);
+      if (process.env.LEGACY_BLAZOR_DISABLE_TERSER === 'true') {
+        bundlerConfig = withOptionalRollupTerser(bundlerConfig);
       }
 
-      if (!isRollupBuild) {
-        await postProcessLegacyOutputs(path.join(sourceDir, 'dist', 'Release'), profile, true);
-      }
+      process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
+      await writeFile(bundlerConfigPath, bundlerConfig);
+      await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], { cwd: npmWorkspace.root });
 
-      // generate variant-specific file names and copy to output
       const webFilename = `blazor.web.${name}.js`;
       const webAssemblyFilename = `blazor.webassembly.${name}.js`;
       const serverFilename = `blazor.server.${name}.js`;
@@ -296,9 +212,7 @@ export async function buildVariants({
   } finally {
     await writeFile(tsconfigPath, originalTsconfig);
     await writeFile(bundlerConfigPath, originalBundlerConfig);
-    if (rollupLegacyPluginsPath) {
-      await unlink(rollupLegacyPluginsPath).catch(() => {});
-    }
+    await unlink(rollupLegacyPluginsPath).catch(() => {});
     delete process.env.LEGACY_BLAZOR_BABEL_TARGETS;
     if (previousProfiles) {
       process.env.BUILD_TARGET_PROFILES = previousProfiles;
@@ -309,15 +223,10 @@ export async function buildVariants({
 
   await writeFile(
     path.join(output, 'build-manifest.json'),
-    `${JSON.stringify({ upstreamTag: parsed.tag, packageVersion: parsed.version, files }, null, 2)}\n`);
-  console.log(`Built ${Object.keys(files).length} upstream variants for ${parsed.tag} in ${output}`);
+    `${JSON.stringify({ upstreamRef, upstreamTag: upstreamTag ?? null, packageVersion, files }, null, 2)}\n`);
+  console.log(`Built ${Object.keys(files).length} upstream variants for ${upstreamRef} in ${output}`);
 }
 
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
-  await buildVariants({
-    sourceDir: path.resolve(arg('source-dir', 'src/Components/Web.JS')),
-    output: path.resolve(arg('output', 'src/LegacyBlazorJs/wwwroot')),
-    tag: arg('tag', process.env.ASPNETCORE_TAG),
-    profiles: arg('profiles', process.env.BUILD_TARGET_PROFILES),
-  });
+  await buildVariants();
 }

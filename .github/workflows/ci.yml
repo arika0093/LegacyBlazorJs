@@ -3,12 +3,8 @@ name: Build and publish latest ASP.NET Core tags to NuGet
 on:
   workflow_dispatch:
     inputs:
-      majors:
-        description: Space- or comma-separated .NET majors to build and test
-        type: string
-        default: '8 9 10'
       run_compat:
-        description: Run compatibility tests for the selected majors
+        description: Run compatibility tests for the latest LTS package
         type: boolean
         default: true
       publish_github:
@@ -25,44 +21,41 @@ on:
 permissions:
   contents: write
 
+env:
+  LTS_DOTNET_MAJOR: '10'
+  PREVIEW_DOTNET_MAJOR: '11'
+
 jobs:
-  # build the latest ASP.NET Core source, create browser variants and NuGet package, and upload artifacts for release
   build:
     runs-on: ubuntu-latest
     steps:
-      # setup environment
-      # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-      # > node (20)
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20
-      # > dotnet (all supported majors + test framework target)
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
-            10.0.x
-      # > npm dependencies
+          dotnet-version: 10.0.x
+      - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
+        if: github.event_name != 'schedule'
+        with:
+          dotnet-version: 11.0.x
+          dotnet-quality: preview
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
 
-      # fetch upstream source, build browser variants, and pack NuGet
       - name: Build upstream source, browser variants, and NuGet package
-        run: npm run build -- 8 9 10
+        run: npm run build
         env:
-          GITHUB_TOKEN: "${{ github.token }}"
+          BUILD_CHANNELS: ${{ github.event_name == 'schedule' && 'lts' || 'lts,preview' }}
+          GITHUB_TOKEN: ${{ github.token }}
 
-      # upload artifacts
-      # > build output (js files)
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: LegacyBlazorJs-build-output
           path: dist/**/*.js
-      # > packages (nupkg + build summary)
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: LegacyBlazorJs-packages
@@ -70,60 +63,54 @@ jobs:
             artifacts/packages/*.nupkg
             artifacts/packages/build-summary.json
 
-  # Run ES20x compatibility matrix tests with specific Chromium versions
   test-compat:
     needs: [build]
-    if: inputs.run_compat
+    if: github.event_name == 'workflow_dispatch' && inputs.run_compat
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        dotnet: [10]
         profile: [es2015, es2017, es2018, es2020]
         hosting: [Server]
     steps:
-      # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-      # > node (20)
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20
-      # > dotnet (test framework target + package target frameworks)
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
-          dotnet-version: ${{ matrix.dotnet }}.0.x
-      # download artifacts from build job
+          dotnet-version: ${{ env.LTS_DOTNET_MAJOR }}.0.x
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
-      # > npm dependencies
+      - name: Select latest LTS package
+        shell: bash
+        run: |
+          PACKAGE_VERSION=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const summary = JSON.parse(readFileSync('artifacts/packages/build-summary.json', 'utf8')); const build = summary.builds.find(entry => entry.channel === 'lts'); if (!build) { throw new Error('Latest LTS build not found in build summary.'); } process.stdout.write(build.version);")
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
       - run: npm ci --ignore-scripts
-      # > browser setup downloads the target profile's Chromium directly
       - name: Select old Chromium for smoke test
         run: node scripts/test/export-browser-env.mjs ${{ matrix.profile }}
-      # execute a smoke test for the specified variant
       - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
         run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:
+          PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
           SMOKE_TEST_PROFILE: ${{ matrix.profile }}
           SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}
 
-  # If a new version is found, create a release and publish to NuGet/GitHub
   release-github:
     needs: [build, test-compat]
-    if: inputs.publish_github
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_github && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
-      # download artifacts from build job
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
 
-      # create a GitHub release per package version (skip already-released versions)
       - name: Create GitHub releases
         run: |
           for nupkg in artifacts/packages/*.nupkg; do
@@ -142,14 +129,13 @@ jobs:
             fi
           done
         env:
-          GITHUB_TOKEN: "${{ github.token }}"
+          GITHUB_TOKEN: ${{ github.token }}
 
   release-nuget:
     needs: [build, test-compat]
-    if: inputs.publish_nuget
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_nuget && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
-      # download artifacts from build job
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: LegacyBlazorJs-packages
@@ -161,5 +147,5 @@ jobs:
         with:
           user: arika0093
 
-      - name: Publish NuGet Package
+      - name: Publish NuGet package
         run: dotnet nuget push ./artifacts/packages/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }}

@@ -1,4 +1,13 @@
 {
-  "supportedMajors": [8, 9, 10],
-  "includePrerelease": false
+  "defaultBuildChannels": ["lts", "preview"],
+  "channels": {
+    "lts": {
+      "major": 10,
+      "prereleaseMode": "stable"
+    },
+    "preview": {
+      "major": 11,
+      "prereleaseMode": "prerelease"
+    }
+  }
 }

@@ -1,49 +1,56 @@
-name: Smoke test generated scripts
+name: Weekly smoke test upstream main
 
 on:
-  push:
-    branches:
-      - main
-    files:
-      - 'config/**'
-      - 'scripts/**'
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/smoke-test.yml'
-  pull_request:
-  workflow_dispatch:
+  schedule:
+    - cron: '53 5 * * 1'
 
 env:
   BUILD_TARGET_PROFILES: es2015
-  LTS_DOTNET_MAJOR: '10'
+  PREVIEW_DOTNET_MAJOR: '11'
 
 permissions:
   contents: read
 
 jobs:
+  # Build upstream main with the current preview SDK surface and upload the generated package
   build-package:
     runs-on: ubuntu-latest
     steps:
+      # setup environment
+      # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
+      # > node (20)
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20
+      # > dotnet (preview)
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
-          dotnet-version: ${{ env.LTS_DOTNET_MAJOR }}.0.x
+          dotnet-version: ${{ env.PREVIEW_DOTNET_MAJOR }}.0.x
+          dotnet-quality: preview
+      # > npm dependencies
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
-
-      - name: Build latest LTS source and NuGet package
+      # Resolve a package version/TFM pair compatible with the preview SDK
+      - name: Resolve latest preview package version
+        id: preview-version
+        run: node scripts/build/resolve-version.mjs
+        env:
+          BUILD_CHANNEL: preview
+          GITHUB_TOKEN: ${{ github.token }}
+      # Build upstream main while packaging with the preview version/TFM
+      - name: Build upstream main source and NuGet package
         run: npm run build
         env:
-          BUILD_CHANNEL: lts
           BUILD_TARGET_PROFILES: ${{ env.BUILD_TARGET_PROFILES }}
           GITHUB_TOKEN: ${{ github.token }}
           LEGACY_BLAZOR_DISABLE_TERSER: true
-
+          PACKAGE_VERSION: ${{ steps.preview-version.outputs.version }}
+          LEGACY_BLAZOR_TARGET_FRAMEWORK: net${{ steps.preview-version.outputs.major }}.0
+          UPSTREAM_REF: main
+      # upload packages
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: LegacyBlazorJs-packages
@@ -51,6 +58,7 @@ jobs:
             artifacts/packages/*.nupkg
             artifacts/packages/build-summary.json
 
+  # Run smoke tests against the upstream-main package to detect layout/build regressions early
   smoke-test:
     needs: build-package
     strategy:
@@ -58,30 +66,40 @@ jobs:
       matrix:
         include:
           - { profile: es2015, hosting: Server }
+    # Legacy Chromium often has shared library dependency issues on Linux, so run on Windows environment.
     runs-on: windows-latest
     steps:
+      # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
+      # > node (20)
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20
           cache: npm
+      # > dotnet (preview)
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
-          dotnet-version: ${{ env.LTS_DOTNET_MAJOR }}.0.x
+          dotnet-version: ${{ env.PREVIEW_DOTNET_MAJOR }}.0.x
+          dotnet-quality: preview
+      # download artifacts from build job
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
+      # pick the upstream-main package built in this workflow
       - name: Select package version
         shell: bash
         run: |
-          PACKAGE_VERSION=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const summary = JSON.parse(readFileSync('artifacts/packages/build-summary.json', 'utf8')); const build = summary.builds.find(entry => entry.channel === 'lts'); if (!build) { throw new Error('Latest LTS build not found in build summary.'); } process.stdout.write(build.version);")
+          PACKAGE_VERSION=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const summary = JSON.parse(readFileSync('artifacts/packages/build-summary.json', 'utf8')); const build = summary.builds.at(-1); if (!build) { throw new Error('No build outputs were found.'); } process.stdout.write(build.version);")
           echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+      # > npm dependencies
       - run: npm ci --ignore-scripts
+      # > browser setup downloads the target profile's Chromium directly
       - name: Select old Chromium for smoke test
         run: node scripts/test/export-browser-env.mjs ${{ matrix.profile }}
+      # execute a smoke test for the specified variant
       - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
         run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:

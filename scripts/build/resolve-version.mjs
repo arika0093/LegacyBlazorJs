@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 import { appendFile } from 'node:fs/promises';
 import process from 'node:process';
-import { fetchLatestTagForMajor, parseAspNetTag } from './lib/version.mjs';
+import { getConfiguredBuildChannels } from './lib/config.mjs';
+import {
+  fetchLatestTagForMajor,
+  parseAspNetTag,
+  resolvePrereleaseMode,
+} from './lib/version.mjs';
 
 const repository = process.env.UPSTREAM_REPOSITORY ?? 'dotnet/aspnetcore';
-const requestedMajor = process.argv[2] ?? process.env.DOTNET_MAJOR;
+const requestedMajor = process.env.DOTNET_MAJOR;
 const explicitTag = process.env.ASPNETCORE_TAG;
 const includePrerelease = process.env.INCLUDE_PRERELEASE === 'true';
+const requestedChannel = process.env.BUILD_CHANNEL?.trim();
 
-if (!requestedMajor && !explicitTag) {
-  throw new Error('Pass a .NET major version or set ASPNETCORE_TAG.');
+if (!requestedChannel && !requestedMajor && !explicitTag) {
+  throw new Error('Set BUILD_CHANNEL, DOTNET_MAJOR, or ASPNETCORE_TAG.');
 }
 
 let selected;
@@ -18,11 +24,29 @@ if (explicitTag) {
   if (!selected) {
     throw new Error(`Invalid ASP.NET Core tag: ${explicitTag}`);
   }
+  if (requestedChannel) {
+    selected.channel = requestedChannel;
+  }
+} else if (requestedChannel) {
+  const [channel] = await getConfiguredBuildChannels();
+  if (!channel) {
+    throw new Error(`Unknown build channel '${requestedChannel}'.`);
+  }
+  selected = await fetchLatestTagForMajor({
+    repository,
+    major: channel.major,
+    prereleaseMode: channel.prereleaseMode,
+    githubToken: process.env.GITHUB_TOKEN,
+  });
+  if (!selected) {
+    throw new Error(`No matching tag found for build channel '${channel.name}'.`);
+  }
+  selected.channel = channel.name;
 } else {
   selected = await fetchLatestTagForMajor({
     repository,
     major: requestedMajor,
-    includePrerelease,
+    prereleaseMode: resolvePrereleaseMode(includePrerelease),
     githubToken: process.env.GITHUB_TOKEN,
   });
   if (!selected) {

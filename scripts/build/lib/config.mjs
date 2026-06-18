@@ -42,10 +42,48 @@ export async function readSelectedTargets() {
 }
 
 export async function getSupportedMajors() {
-  const { supportedMajors } = await readMajorsConfig();
-  return supportedMajors.map(Number);
+  const channels = await getConfiguredBuildChannels();
+  return channels.map(channel => channel.major);
 }
 
 export async function getTargetProfiles() {
   return Object.keys(await readTargetsConfig());
+}
+
+function splitCsvEnv(value) {
+  return value
+    ?.split(',')
+    .map(item => item.trim())
+    .filter(Boolean) ?? [];
+}
+
+function normalizeChannel(name) {
+  return name.trim().toLowerCase();
+}
+
+export async function getConfiguredBuildChannels() {
+  const { defaultBuildChannels = [], channels = {} } = await readMajorsConfig();
+  const requested = splitCsvEnv(process.env.BUILD_CHANNELS ?? process.env.BUILD_CHANNEL);
+  const selectedNames = requested.length > 0
+    ? requested.map(normalizeChannel)
+    : defaultBuildChannels.map(normalizeChannel);
+
+  return selectedNames.map(name => {
+    const configured = channels[name];
+    if (!configured) {
+      throw new Error(`Unknown build channel '${name}'. Expected one of: ${Object.keys(channels).join(', ')}`);
+    }
+
+    const majorOverride = process.env[`${name.toUpperCase()}_DOTNET_MAJOR`];
+    const major = Number(majorOverride ?? configured.major);
+    if (Number.isNaN(major)) {
+      throw new Error(`Invalid .NET major for build channel '${name}': ${majorOverride ?? configured.major}`);
+    }
+
+    return {
+      name,
+      major,
+      prereleaseMode: configured.prereleaseMode ?? 'stable',
+    };
+  });
 }

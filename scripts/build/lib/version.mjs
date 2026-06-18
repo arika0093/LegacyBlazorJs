@@ -38,13 +38,24 @@ export function compareVersions(a, b) {
   return a.prerelease.localeCompare(b.prerelease, undefined, { numeric: true });
 }
 
-/** Select the newest tag matching the requested .NET major, optionally including prereleases. */
-export function latestTagForMajor(tags, major, includePrerelease = false) {
+/** Select the newest tag matching the requested .NET major and prerelease policy. */
+export function latestTagForMajor(tags, major, prereleaseMode = 'stable') {
   const versions = tags
     .map(parseAspNetTag)
     .filter(Boolean)
     .filter(version => version.major === Number(major))
-    .filter(version => includePrerelease || version.prerelease === null)
+    .filter(version => {
+      switch (prereleaseMode) {
+        case 'stable':
+          return version.prerelease === null;
+        case 'prerelease':
+          return version.prerelease !== null;
+        case 'all':
+          return true;
+        default:
+          throw new Error(`Unsupported prerelease mode '${prereleaseMode}'.`);
+      }
+    })
     .sort(compareVersions);
   return versions.at(-1) ?? null;
 }
@@ -93,7 +104,11 @@ export async function fetchTagsFromGitHub(repository, githubToken) {
   return tags;
 }
 
-export async function fetchLatestTagForMajor({ repository, major, includePrerelease = false, githubToken }) {
+export function resolvePrereleaseMode(includePrerelease = false) {
+  return includePrerelease ? 'all' : 'stable';
+}
+
+export async function fetchLatestTagForMajor({ repository, major, prereleaseMode = 'stable', githubToken }) {
   const tags = await fetchTagsFromGitHub(repository, githubToken);
-  return latestTagForMajor(tags, major, includePrerelease);
+  return latestTagForMajor(tags, major, prereleaseMode);
 }

@@ -6,7 +6,11 @@ import { buildVariants } from '../build-variants.mjs';
 import { patchSignalRAbortController } from '../patches/patch-signalr-abort-controller.mjs';
 import { patchTslibOverride } from '../patches/patch-tslib-override.mjs';
 import { prepareNodeShim, retry, run } from './process.mjs';
-import { fetchLatestTagForMajor, parseAspNetTag } from './version.mjs';
+import {
+  fetchLatestTagForMajor,
+  parseAspNetTag,
+  resolvePrereleaseMode,
+} from './version.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -23,7 +27,7 @@ async function readPackageJson(packageJsonPath) {
   return JSON.parse(await readFile(packageJsonPath, 'utf8'));
 }
 
-async function usesNpmWorkspaces(upstreamDir) {
+async function resolveNpmWorkspace(upstreamDir) {
   if (await hasPath(path.join(upstreamDir, 'package-lock.json'))) {
     return true;
   }
@@ -37,54 +41,111 @@ async function usesNpmWorkspaces(upstreamDir) {
   return Array.isArray(packageJson.workspaces) && packageJson.workspaces.length > 0;
 }
 
-async function runYarnBuild(projectDir, env, buildScript = 'build') {
-  await retry(3, 15_000, () => run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], {
-    cwd: projectDir,
-    env,
-  }));
-  await run('yarn', ['run', buildScript], { cwd: projectDir, env });
+function resolveTargetFramework(packageVersion, explicitTargetFramework) {
+  if (explicitTargetFramework?.trim()) {
+    return explicitTargetFramework.trim();
+  }
+
+  const majorMatch = /^(\d+)\./.exec(packageVersion ?? '');
+  if (!majorMatch) {
+    throw new Error(`Could not determine the target framework from package version '${packageVersion}'.`);
+  }
+
+  return `net${majorMatch[1]}.0`;
 }
 
-async function resolveTag({ major, tag, repository, includePrerelease, githubToken }) {
+async function resolveBuildIdentity({
+  major,
+  tag,
+  ref,
+  repository,
+  includePrerelease,
+  prereleaseMode,
+  githubToken,
+  packageVersion,
+  targetFramework,
+}) {
   if (tag) {
-    return tag;
+    const parsed = parseAspNetTag(tag);
+    if (!parsed) {
+      throw new Error(`Invalid ASP.NET Core tag: ${tag}`);
+    }
+
+    return {
+      ...parsed,
+      checkoutRef: tag,
+      targetFramework: resolveTargetFramework(parsed.version, targetFramework),
+      upstreamRef: tag,
+    };
   }
+
+  if (ref) {
+    const resolvedPackageVersion = packageVersion?.trim();
+    if (!resolvedPackageVersion) {
+      throw new Error('Set PACKAGE_VERSION when building from UPSTREAM_REF.');
+    }
+
+    const parsed = parseAspNetTag(`v${resolvedPackageVersion}`);
+    const resolvedMajor = parsed?.major ?? Number(major);
+    if (!resolvedMajor || Number.isNaN(resolvedMajor)) {
+      throw new Error(`Could not determine the .NET major for upstream ref '${ref}'.`);
+    }
+
+    return {
+      checkoutRef: ref,
+      major: resolvedMajor,
+      patch: parsed?.patch ?? null,
+      prerelease: parsed?.prerelease ?? (resolvedPackageVersion.includes('-')
+        ? resolvedPackageVersion.split('-').slice(1).join('-')
+        : null),
+      tag: null,
+      targetFramework: resolveTargetFramework(resolvedPackageVersion, targetFramework),
+      upstreamRef: ref,
+      version: resolvedPackageVersion,
+    };
+  }
+
   if (!major) {
-    throw new Error('Pass --major <version> or --tag vX.Y.Z.');
+    throw new Error('Set DOTNET_MAJOR, ASPNETCORE_TAG, or UPSTREAM_REF.');
   }
 
   const selected = await fetchLatestTagForMajor({
     repository,
     major,
-    includePrerelease,
+    prereleaseMode: prereleaseMode ?? resolvePrereleaseMode(includePrerelease),
     githubToken,
   });
   if (!selected) {
     throw new Error(`No matching tag found for .NET ${major}.`);
   }
 
-  return selected.tag;
+  return {
+    ...selected,
+    checkoutRef: selected.tag,
+    targetFramework: resolveTargetFramework(selected.version, targetFramework),
+    upstreamRef: selected.tag,
+  };
 }
 
-async function checkoutUpstreamSource(upstreamDir, tag) {
+async function checkoutUpstreamSource(upstreamDir, ref, repository) {
   console.log('---------------------------------------');
-  console.log(` Clone Upstream source: ${tag.slice(1)}`);
+  console.log(` Clone upstream source: ${repository}@${ref}`);
 
   if (await hasPath(path.join(upstreamDir, '.git'))) {
-    await run('git', ['fetch', '--depth', '1', 'origin', tag], { cwd: upstreamDir });
+    await run('git', ['fetch', '--depth', '1', 'origin', ref], { cwd: upstreamDir });
     await run('git', ['checkout', '--detach', 'FETCH_HEAD'], { cwd: upstreamDir });
     return;
   }
 
   await rm(upstreamDir, { recursive: true, force: true });
-  await run('git', ['clone', '--depth', '1', '--branch', tag, '--', 'https://github.com/dotnet/aspnetcore.git', upstreamDir], {
+  await run('git', ['clone', '--depth', '1', '--branch', ref, '--', `https://github.com/${repository}.git`, upstreamDir], {
     cwd: rootDir,
   });
 }
 
 async function prebuildWorkspacePackages(upstreamDir, env) {
   console.log('---------------------------------------');
-  console.log(' Build required packages(JSInteop, SignalR, and relation packages)');
+  console.log(' Build required packages (JSInterop, SignalR, and related packages)');
   await patchTslibOverride(path.join(upstreamDir, 'package.json'));
   await patchSignalRAbortController(path.join(upstreamDir, 'src/SignalR/clients/ts/signalr/src/FetchHttpClient.ts'));
   await retry(3, 15_000, () => run('npm', ['install', '--ignore-scripts'], { cwd: upstreamDir, env }));
@@ -93,54 +154,55 @@ async function prebuildWorkspacePackages(upstreamDir, env) {
   await run('npm', ['run', 'build', '--workspace=src/SignalR/clients/ts/signalr-protocol-msgpack'], { cwd: upstreamDir, env });
 }
 
-async function prebuildYarnPackages(upstreamDir, env) {
-  console.log('---------------------------------------');
-  console.log(' Build required packages(JSInteop, SignalR, and relation packages)');
-  await run('corepack', ['prepare', 'yarn@1.22.22', '--activate'], { cwd: rootDir, env });
-  await patchSignalRAbortController(path.join(upstreamDir, 'src/SignalR/clients/ts/signalr/src/FetchHttpClient.ts'));
-  await runYarnBuild(path.join(upstreamDir, 'src/JSInterop/Microsoft.JSInterop.JS/src'), env);
-  await retry(3, 15_000, () => run('yarn', ['install', '--mutex', 'network', '--frozen-lockfile', '--ignore-engines'], {
-    cwd: path.join(upstreamDir, 'src/SignalR/clients/ts/common'),
-    env,
-  }));
-  await runYarnBuild(path.join(upstreamDir, 'src/SignalR/clients/ts/signalr'), env);
-  await runYarnBuild(path.join(upstreamDir, 'src/SignalR/clients/ts/signalr-protocol-msgpack'), env);
+function sanitizePathSegment(value) {
+  return value.replace(/[^0-9A-Za-z._-]+/g, '-');
 }
 
 export async function buildUpstream({
-  major,
-  tag,
+  major = process.env.DOTNET_MAJOR,
+  tag = process.env.ASPNETCORE_TAG,
+  ref = process.env.UPSTREAM_REF,
   nodeBin = process.execPath,
   buildProfiles = process.env.BUILD_TARGET_PROFILES,
   skipPrebuild = process.env.SKIP_PREBUILD === 'true',
   repository = process.env.UPSTREAM_REPOSITORY ?? 'dotnet/aspnetcore',
   includePrerelease = process.env.INCLUDE_PRERELEASE === 'true',
+  prereleaseMode,
   githubToken = process.env.GITHUB_TOKEN,
+  packageVersion = process.env.PACKAGE_VERSION,
+  targetFramework = process.env.LEGACY_BLAZOR_TARGET_FRAMEWORK,
 } = {}) {
-  const resolvedTag = await resolveTag({ major, tag, repository, includePrerelease, githubToken });
-  const parsed = parseAspNetTag(resolvedTag);
-  if (!parsed) {
-    throw new Error(`Invalid ASP.NET Core tag: ${resolvedTag}`);
-  }
+  const build = await resolveBuildIdentity({
+    major,
+    tag,
+    ref,
+    repository,
+    includePrerelease,
+    prereleaseMode,
+    githubToken,
+    packageVersion,
+    targetFramework,
+  });
 
-  const targetFramework = `net${parsed.major}.0`;
-  const distDir = path.join(rootDir, 'dist', resolvedTag);
+  const distDir = path.join(rootDir, 'dist', sanitizePathSegment(build.upstreamRef));
   const packageWwwroot = path.join(rootDir, 'src/LegacyBlazorJs/wwwroot');
-  const upstreamDir = path.join(rootDir, '.work', `aspnetcore-${resolvedTag}`);
+  const upstreamDir = path.join(rootDir, '.work', `aspnetcore-${sanitizePathSegment(build.upstreamRef)}`);
   const webJsDir = path.join(upstreamDir, 'src/Components/Web.JS');
   const { env, cleanup } = await prepareNodeShim(nodeBin);
 
   try {
-    await checkoutUpstreamSource(upstreamDir, resolvedTag);
+    await checkoutUpstreamSource(upstreamDir, build.checkoutRef, repository);
+
+    if (!await resolveNpmWorkspace(upstreamDir)) {
+      throw new Error(`The upstream source '${repository}@${build.checkoutRef}' is not an npm workspace build. Legacy yarn-based builds are no longer supported.`);
+    }
 
     if (skipPrebuild) {
       console.log('---------------------------------------');
-      console.log(' Build required packages(JSInteop, SignalR, and relation packages)');
+      console.log(' Build required packages (JSInterop, SignalR, and related packages)');
       console.log(' ... Skipped (SKIP_PREBUILD = true)');
-    } else if (await usesNpmWorkspaces(upstreamDir)) {
-      await prebuildWorkspacePackages(upstreamDir, env);
     } else {
-      await prebuildYarnPackages(upstreamDir, env);
+      await prebuildWorkspacePackages(upstreamDir, env);
     }
 
     console.log('---------------------------------------');
@@ -148,7 +210,9 @@ export async function buildUpstream({
     await buildVariants({
       sourceDir: webJsDir,
       output: distDir,
-      tag: resolvedTag,
+      upstreamRef: build.upstreamRef,
+      upstreamTag: build.tag,
+      packageVersion: build.version,
       profiles: buildProfiles,
     });
 
@@ -156,14 +220,14 @@ export async function buildUpstream({
     await cp(distDir, packageWwwroot, { recursive: true });
 
     console.log('---------------------------------------');
-    console.log(' Pack the Razor class library with the upstream version');
+    console.log(' Pack the Razor class library with the selected upstream version');
     await run('dotnet', [
       'pack',
       path.join(rootDir, 'src/LegacyBlazorJs/LegacyBlazorJs.csproj'),
       '-c',
       'Release',
-      `-p:PackageVersion=${parsed.version}`,
-      `-p:LegacyBlazorTargetFramework=${targetFramework}`,
+      `-p:PackageVersion=${build.version}`,
+      `-p:LegacyBlazorTargetFramework=${build.targetFramework}`,
       '-o',
       path.join(rootDir, 'artifacts/packages'),
     ], {
@@ -174,5 +238,5 @@ export async function buildUpstream({
     await cleanup();
   }
 
-  return parsed;
+  return build;
 }
