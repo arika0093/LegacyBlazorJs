@@ -37,18 +37,11 @@ The process is almost the same for Blazor WebAssembly. After installation, repla
 
 ```diff
 - <script src="_framework/blazor.webassembly.js"></script>
-+ <script src="_content/LegacyBlazorJs/blazor.webassembly.es2020.js"></script>
++ <script src="_content/LegacyBlazorJs/blazor.webassembly.es2018.js"></script>
 ```
 
-Note that Blazor WebAssembly will not work on browsers that do not support WebAssembly itself (obviously).
-Specifically, it will not work on the following browsers.
-
-- Chrome < 57
-- Edge < 16
-- Firefox < 52
-- Safari < 11
-
-see [CanIUse](https://caniuse.com/wasm) for more details.
+Since the WASM feature requires both the browser's WebAssembly support and dynamic import in dotnet.js, it will not work unless it's ES2018 or later (Chrome 64+).  
+see CanIUse [WASM](https://caniuse.com/wasm) and [dynamic import](https://caniuse.com/es6-module-dynamic-import) for more details.
 
 ## Included files
 ### Overview

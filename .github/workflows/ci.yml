@@ -79,10 +79,10 @@ jobs:
       fail-fast: false
       matrix:
         dotnet: [10]
-        profile: [es2015, es2017, es2020, es2022]
+        profile: [es2015, es2017, es2018, es2020]
         hosting: [Server, WebAssembly]
         exclude:
-          # Blazor WASM only support Chromium > 57, so only test es2017(Chromium 64+) for WebAssembly hosting model
+          # Blazor WASM only support Chromium > 63 (WASM and dynamic import)
           - { profile: es2015, hosting: WebAssembly }
     steps:
       # > source
