@@ -286,6 +286,7 @@ class BrowserHarness {
   #errors = [];
   #failedResponses = [];
   #closed = false;
+  #usesDirectPageCommands = false;
 
   constructor(processHandle, profileDirectory, socket, startupLog) {
     this.#process = processHandle;
@@ -306,32 +307,26 @@ class BrowserHarness {
   }
 
   async #attach() {
-    const target = await this.#sendCommand('Target.createTarget', { url: 'about:blank' });
-    const targetId = target?.targetId;
-    if (!targetId) {
-      throw new Error('CDP did not return a target id.');
-    }
-
-    const attached = await this.#sendCommand('Target.attachToTarget', { targetId, flatten: true });
-    const sessionId = attached?.sessionId;
-    if (!sessionId) {
-      throw new Error('CDP did not return a session id.');
-    }
-
-    this.#targetId = targetId;
-    this.#sessionId = sessionId;
+    const attachment = await attachToDevToolsTarget((method, params) => this.#sendCommand(method, params));
+    this.#targetId = attachment.targetId;
+    this.#sessionId = attachment.sessionId;
+    this.#usesDirectPageCommands = attachment.usesDirectPageCommands;
   }
 
   async assertCounterInteractive(baseUri, profile, hostingModel) {
-    await this.#sendCommand('Target.activateTarget', { targetId: this.#targetId });
-    await this.#sendCommand('Page.enable', undefined, this.#sessionId);
-    await this.#sendCommand('Runtime.enable', undefined, this.#sessionId);
-    await this.#sendCommand('Log.enable', undefined, this.#sessionId);
-    await this.#sendCommand('Network.enable', undefined, this.#sessionId);
-    await this.#trySendCommand('Page.bringToFront', undefined, this.#sessionId);
-    await this.#trySendCommand('Emulation.setFocusEmulationEnabled', { enabled: true }, this.#sessionId);
+    const sessionId = this.#commandSessionId;
+    if (this.#targetId) {
+      await this.#sendCommand('Target.activateTarget', { targetId: this.#targetId });
+    }
 
-    await this.#sendCommand('Page.navigate', { url: new URL('/counter', baseUri).toString() }, this.#sessionId);
+    await this.#sendCommand('Page.enable', undefined, sessionId);
+    await this.#sendCommand('Runtime.enable', undefined, sessionId);
+    await this.#sendCommand('Log.enable', undefined, sessionId);
+    await this.#sendCommand('Network.enable', undefined, sessionId);
+    await this.#trySendCommand('Page.bringToFront', undefined, sessionId);
+    await this.#trySendCommand('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId);
+
+    await this.#sendCommand('Page.navigate', { url: new URL('/counter', baseUri).toString() }, sessionId);
     await this.#waitForCondition(
       'document.readyState === "complete" && document.querySelector("button") !== null && document.querySelector(\'[role="status"]\') !== null',
       INTERACTION_TIMEOUT_MS,
@@ -397,7 +392,7 @@ class BrowserHarness {
   }
 
   async #ensurePageReadyForInput() {
-    await this.#trySendCommand('Page.bringToFront', undefined, this.#sessionId);
+    await this.#trySendCommand('Page.bringToFront', undefined, this.#commandSessionId);
     await this.#evaluate(`
       (() => {
         const button = document.querySelector('button');
@@ -441,15 +436,15 @@ class BrowserHarness {
     await this.#sendCommand(
       'Input.dispatchMouseEvent',
       { type: 'mouseMoved', x, y, button: 'none', buttons: 0, clickCount: 0 },
-      this.#sessionId);
+      this.#commandSessionId);
     await this.#sendCommand(
       'Input.dispatchMouseEvent',
       { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 },
-      this.#sessionId);
+      this.#commandSessionId);
     await this.#sendCommand(
       'Input.dispatchMouseEvent',
       { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 },
-      this.#sessionId);
+      this.#commandSessionId);
     await this.#evaluate(`
       (() => {
         const button = document.querySelector('button');
@@ -477,7 +472,7 @@ class BrowserHarness {
       expression,
       awaitPromise: true,
       returnByValue: true,
-    }, this.#sessionId);
+    }, this.#commandSessionId);
 
     if (response?.exceptionDetails) {
       throw new Error(`Legacy Chromium evaluation failed: ${JSON.stringify(response.exceptionDetails)}`);
@@ -624,6 +619,10 @@ class BrowserHarness {
     }
 
     this.#pending.clear();
+  }
+
+  get #commandSessionId() {
+    return this.#usesDirectPageCommands ? undefined : this.#sessionId;
   }
 }
 
@@ -1252,6 +1251,45 @@ async function fileExists(filePath) {
 function parseBrowserMajor(versionText) {
   const match = /^(\d+)\./.exec(versionText ?? '');
   return match ? Number(match[1]) : null;
+}
+
+export async function attachToDevToolsTarget(sendCommand) {
+  try {
+    const target = await sendCommand('Target.createTarget', { url: 'about:blank' });
+    const targetId = target?.targetId;
+    if (!targetId) {
+      throw new Error('CDP did not return a target id.');
+    }
+
+    const attached = await sendCommand('Target.attachToTarget', { targetId, flatten: true });
+    const sessionId = attached?.sessionId;
+    if (!sessionId) {
+      throw new Error('CDP did not return a session id.');
+    }
+
+    return {
+      targetId,
+      sessionId,
+      usesDirectPageCommands: false,
+    };
+  } catch (error) {
+    if (isMethodNotFoundError(error, 'Target.createTarget')) {
+      return {
+        targetId: '',
+        sessionId: '',
+        usesDirectPageCommands: true,
+      };
+    }
+
+    throw error;
+  }
+}
+
+export function isMethodNotFoundError(error, method) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return message.includes(`'${method}' wasn't found`) ||
+    message.includes(`"${method}" wasn't found`) ||
+    (/method not found/i.test(message) && message.includes(method));
 }
 
 function parseCounterValue(text) {
