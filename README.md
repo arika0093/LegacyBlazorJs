@@ -1,6 +1,6 @@
 # LegacyBlazorJs
 
-LegacyBlazorJs rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
+Rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
 
 ## Motivation
 
@@ -29,7 +29,7 @@ Then, replace the official script in your Blazor Web App's `Components/App.razor
 + <script src="_content/LegacyBlazorJs/blazor.web.es2015.js"></script>
 ```
 
-The `es2015` part can be changed according to the browser target. Please refer to the [Included files and intended browser targets](#included-files-and-intended-browser-targets) section for details.
+The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
 
 ### Blazor WebAssembly
 
@@ -65,14 +65,14 @@ The versions listed below are available.
 
 | Version | Intended browser target |
 |---------|-------------------------|
-| `ie11`   | ES5 + Internet Explorer 11 (best effort) |
-| `es5`    | Chrome 23+, Edge 12+, Firefox 21+, Safari 6+ |
-| `es2015` | Chrome 51+, Edge 15+, Firefox 54+, Safari 10+ |
-| `es2017` | Chrome 58+, Edge 16+, Firefox 54+, Safari 11+ |
-| `es2020` | Chrome 80+, Edge 80+, Firefox 74+, Safari 13.1+ |
-| `es2021` | Chrome 85+, Edge 85+, Firefox 79+, Safari 14.1+ |
-| `es2022` | Chrome 94+, Edge 94+, Firefox 93+, Safari 15.4+ |
+| `ie11`   | Internet Explorer 11 [best effort] |
+| `es5`    | Chrome 23+ (Edge 12+, Firefox 21+, Safari 6+) |
+| `es2015` | Chrome 49+ (Edge 15+, Firefox 54+, Safari 10+) |
+| `es2017` | Chrome 58+ (Edge 16+, Firefox 54+, Safari 11+) |
+| `es2020` | Chrome 80+ (Edge 80+, Firefox 74+, Safari 13.1+) |
+| `es2022` | Chrome 94+ (Edge 94+, Firefox 93+, Safari 15.4+) |
 
+The browsers in parentheses are reference values.
 The authoritative profile definitions are in [config/targets.json](config/targets.json).
 
 > [!NOTE]

@@ -12,7 +12,7 @@
     "ecma": 5,
     "typescriptTarget": "es5",
     "intendedBrowsers": {
-      "chrome": "38"
+      "chrome": "23"
     }
   },
   "es2015": {
@@ -20,10 +20,7 @@
     "ecma": 2015,
     "typescriptTarget": "es2015",
     "intendedBrowsers": {
-      "chrome": "49",
-      "firefox": "45",
-      "safari": "10",
-      "edge": "12"
+      "chrome": "49"
     }
   },
   "es2017": {
@@ -31,10 +28,7 @@
     "ecma": 2017,
     "typescriptTarget": "es2017",
     "intendedBrowsers": {
-      "chrome": "58",
-      "firefox": "54",
-      "safari": "11",
-      "edge": "16"
+      "chrome": "58"
     }
   },
   "es2020": {
@@ -43,14 +37,6 @@
     "typescriptTarget": "es2020",
     "intendedBrowsers": {
       "chrome": "80"
-    }
-  },
-  "es2021": {
-    "description": "comprehensive ES2021 support",
-    "ecma": 2021,
-    "typescriptTarget": "es2021",
-    "intendedBrowsers": {
-      "chrome": "85"
     }
   },
   "es2022": {
