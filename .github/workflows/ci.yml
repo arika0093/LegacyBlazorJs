@@ -99,9 +99,6 @@ jobs:
           path: artifacts/packages
       # > npm dependencies
       - run: npm ci --ignore-scripts
-      # > install Linux browser dependencies; the compatibility harness downloads each profile's old Chromium
-      - run: dotnet tool install --global Microsoft.Playwright.CLI
-      - run: playwright install-deps chromium
       # execute compatibility test matrix for this .NET version
       - name: Run ES20x compatibility matrix (.NET ${{ matrix.dotnet }})
         run: npm run test:compat
