@@ -235,19 +235,6 @@ export async function buildVariants({
     for (const [name, profile] of Object.entries(targets)) {
       console.log(`****** Build "${name}" (target: ${profile.typescriptTarget}) ******`);
 
-      const tsconfig = JSON.parse(originalTsconfig);
-      tsconfig.compilerOptions.target = profile.typescriptTarget;
-      if (profile.typescriptTarget === 'es5') {
-        tsconfig.compilerOptions.downlevelIteration = true;
-      }
-      if (npmWorkspace) {
-        tsconfig.compilerOptions.importHelpers = false;
-        if (profile.ecma < 2018) {
-          tsconfig.compilerOptions.target = 'es2018';
-        }
-      }
-      await writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
-
       const ecmaPatchedBundlerConfig = originalBundlerConfig.replace(/ecma:\s*\d+/g, `ecma: ${profile.ecma}`);
       if (ecmaPatchedBundlerConfig === originalBundlerConfig && !originalBundlerConfig.includes(`ecma: ${profile.ecma}`)) {
         throw new Error('Could not locate the upstream bundler/Terser ECMA target.');
