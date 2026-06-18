@@ -47,14 +47,17 @@ jobs:
           name: LegacyBlazorJs-packages
           path: artifacts/packages/*.nupkg
 
-  # Run a single smoke test against the es2015 variant using Blazor Server
+  # Run smoke tests against the es2015 variant using Blazor Server and WebAssembly
   smoke-test:
     needs: build-package
     strategy:
       fail-fast: false
       matrix:
-        profile: [es2015]
-        hosting: [Server]
+        include:
+          - { profile: es5, hosting: Server }
+          - { profile: es2015, hosting: Server }
+          # WebAssembly only support Chromium > 57, so only test es2017(Chromium 64+) for WebAssembly hosting model
+          - { profile: es2017, hosting: WebAssembly }
     # Legacy Chromium often has shared library dependency issues on Linux, so run on Windows environment.
     runs-on: windows-latest
     steps:
