@@ -12,21 +12,21 @@ import { legacyPostBabelPlugin } from './post-babel.mjs';
  */
 export function legacyBlazorPlugins(targets) {
   return [
-    // legacyCommonjsPlugin(),
-    // legacyWhatwgFetchPlugin(),
-    // legacyDynamicImportPlugin(),
-    // legacyBabelPlugin(targets),
-    // legacyIE11FixesPlugin(), // Apply IE11-specific fixes before final Babel pass
-    // legacyPostBabelPlugin(targets), // Post-process entire output to transpile Rollup helpers
-    // legacyCoreJsPolyfillPlugin(), // Prepend final core-js polyfills before any entry code runs
-
     legacyCommonjsPlugin(),
+    // Prepend non-ECMAScript Web API polyfills before any entry code runs
     legacyWhatwgFetchPlugin(),
-    legacyCoreJsPolyfillPlugin(), // Prepend final core-js polyfills before any entry code runs
-    // legacyBabelPlugin(targets),
-    legacyWebApiPolyfillPlugin(), // Prepend non-ECMAScript Web API polyfills before any entry code runs
-    legacyIE11FixesPlugin(), // Apply IE11-specific fixes before final Babel pass
-    legacyPostBabelPlugin(targets), // Post-process entire output to transpile Rollup helpers
+    legacyWebApiPolyfillPlugin(),
+    // Convert syntax and features to be compatible with legacy environments, based on specified targets
+    legacyBabelPlugin(targets),
+
+    // below plugins are applied after the above transformations
+    // (use renderChunk to ensure they run after Babel transforms the code, including Rollup helpers)
+    // ----------------------------
+    // Prepend final core-js polyfills before any entry code runs
+    legacyCoreJsPolyfillPlugin(),
+    // handle dynamic imports in a way compatible with legacy environments
     legacyDynamicImportPlugin(),
+    // Apply IE11-specific fixes
+    legacyIE11FixesPlugin(targets),
   ];
 }
