@@ -46,7 +46,7 @@ The versions listed below are available.
 
 | Version   | Browser target    | Notes                 |
 |-----------|-------------------|-----------------------|
-| `es5`     | Chrome 23+, IE 11 | Well, I hope it works. |
+| `es5`     | Chrome 23+, IE 11 | Well, don't expect too much. |
 | `es2015`  | Chrome 49+ |  |
 | `es2017`  | Chrome 58+ |  |
 | `es2018`  | Chrome 64+ |  |
@@ -97,12 +97,12 @@ Overview of the build process is as follows.
 see [rollup-plugins](./scripts/build/lib/rollup-plugins/index.mjs) for details.
 
 * Convert CommonJS modules to ES modules.
-* Insert Polyfill for [whatwg-fetch](https://github.com/whatwg/fetch) because it is not available in older browsers.
+* Insert Polyfill for [whatwg-fetch](https://github.com/whatwg/fetch) and [webcomponents](https://github.com/webcomponents/polyfills).
+* Use Babel to transform syntax for older browsers.
+* Insert Polyfill of [core-js](https://github.com/zloirock/core-js).
 * Convert `import()` to `Function("u", "return import(u)")(u);` because `import()` syntax will cause an error in older browsers.
   * Even if you run in this state, it will cause an error, but since this part is not executed except for WASM (`dotnet.js`), it is not a problem.
-* Use Babel to transform syntax for older browsers.
-* Transform the output of rollup again with Babel (because rollup helpers do not work in older browsers).
-* Insert Polyfill of [core-js](https://github.com/zloirock/core-js).
+* Other transformations are also performed for older browsers.
 
 These settings are inserted before terser is applied in [upstream rollup settings](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Shared.JS/rollup.config.mjs).
 
