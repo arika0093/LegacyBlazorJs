@@ -38,8 +38,9 @@ The following files are included under `_content/LegacyBlazorJs/`:
 
 - blazor.web.{version}.js
 - blazor.server.{version}.js
-- ~~blazor.webassembly.{version}.js~~ Although it is included, the dependent `dotnet.js` does not work.
-- ~~blazor.webview.{version}.js~~ Although it is included, the dependent `dotnet.js` does not work.
+- blazor.webassembly.{version}.js 
+- blazor.webview.{version}.js
+  - Although webassembly and webview are also converted, it is likely that they will not work in older browsers due to issues on the `dotnet.js` side that they reference.
 
 The versions listed below are available.
 
