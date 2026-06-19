@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { run } from './lib/process.mjs';
 import { readSelectedTargets } from './lib/config.mjs';
 import { patchBlazorRegex } from './patches/patch-blazor-regex.mjs';
+import { patchSignalRLogging } from './patches/patch-signalr-logging.mjs';
 
 function resolveBabelTargets(profile) {
   return profile.intendedBrowsers;
@@ -158,6 +159,7 @@ export async function buildVariants({
   }
 
   await patchBlazorRegex(path.join(sourceDir, 'src/Services/ComponentDescriptorDiscovery.ts'));
+  await patchSignalRLogging(path.join(sourceDir, 'src/Platform/Circuits/CircuitStartOptions.ts'));
 
   const targets = await readSelectedTargets();
   const npmWorkspace = await resolveNpmWorkspace(sourceDir);

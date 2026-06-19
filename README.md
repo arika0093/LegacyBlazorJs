@@ -113,6 +113,9 @@ Before building, apply the following patches first. These patches basically repl
   * Name Capture Group is [only supported](https://caniuse.com/mdn-javascript_regular_expressions_named_capturing_group) in ES2018 and later, so it is modified to retrieve it by index specification.
 * [patch-signalr-abort-controller.mjs](./scripts/build/patches/patch-signalr-abort-controller.mjs)
   * AbortController is [not supported](https://caniuse.com/abortcontroller) in older browsers, so if it is not available, it is modified not to use it.
+* [patch-signalr-logging.mjs](./scripts/build/patches/patch-signalr-logging.mjs)
+  * If `SIGNALR_LOGGING` is set (for example, `SIGNALR_LOGGING=Debug`), it replaces the default `logLevel: LogLevel.Warning` in `src/Platform/Circuits/CircuitStartOptions.ts`.
+  * Valid values are `Trace`, `Debug`, `Information`, `Warning`, `Error`, and `Critical`.
 
 ### Rollup Build
 
