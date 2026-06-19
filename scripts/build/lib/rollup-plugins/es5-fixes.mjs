@@ -28,6 +28,7 @@ export function applyLegacyES5Fixes(code, targets) {
   );
 
   // Fix 3: prefer vendor-prefixed MutationObserver implementations when present.
+  // (Chrome 23 support only Webkit-prefixed version)
   transformed = transformed.replace(
     /new MutationObserver\(/g,
     'new (window.MutationObserver || window.WebKitMutationObserver)('

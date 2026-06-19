@@ -55,6 +55,8 @@ function isLegacyEs5Profile(profile) {
   return profile === 'es5';
 }
 
+// https://caniuse.com/wf-mutationobserver
+// IE10 and below. (Chrome 23 is supported with WebKit prefix)
 function needsMutationObserverPolyfill(targets) {
   const ieMajor = getTargetMajor(targets, 'ie');
   return ieMajor !== null && ieMajor <= 10;
@@ -65,36 +67,35 @@ function needsPlatformDomPolyfill(targets) {
   return ieMajor !== null && ieMajor <= 11;
 }
 
+// https://caniuse.com/template
+// All IE, Chrome before 26
 function needsTemplatePolyfill(targets) {
   const ieMajor = getTargetMajor(targets, 'ie');
-  if (ieMajor !== null && ieMajor <= 11) {
+  if (ieMajor !== null) {
     return true;
   }
-
   const chromeMajor = getTargetMajor(targets, 'chrome');
   return chromeMajor !== null && chromeMajor < 26;
 }
 
+// https://caniuse.com/mdn-api_customelementregistry
+// All IE, Chrome before 54
 function needsCustomElementsPolyfill(targets) {
   const ieMajor = getTargetMajor(targets, 'ie');
   if (ieMajor !== null) {
     return true;
   }
-
   const chromeMajor = getTargetMajor(targets, 'chrome');
   return chromeMajor !== null && chromeMajor < 54;
 }
 
+// https://caniuse.com/mdn-api_node_getrootnode
+// All IE, Chrome before 54
 function needsDomApiShims(targets, profile) {
-  if (!isLegacyEs5Profile(profile)) {
-    return false;
-  }
-
   const ieMajor = getTargetMajor(targets, 'ie');
   if (ieMajor !== null && ieMajor <= 11) {
     return true;
   }
-
   const chromeMajor = getTargetMajor(targets, 'chrome');
   return chromeMajor !== null && chromeMajor < 54;
 }
@@ -108,10 +109,6 @@ function patchMutationObserverPackageSource(source) {
 }
 
 function resolvePolyfillEntries(targets, profile) {
-  if (!isLegacyEs5Profile(profile)) {
-    return [];
-  }
-
   const entries = [];
 
   if (needsMutationObserverPolyfill(targets)) {

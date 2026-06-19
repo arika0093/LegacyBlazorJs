@@ -12,6 +12,8 @@ export function legacyIE11FixesPlugin(targets) {
         return null;
       }
 
+      //  Currently, there are no IE11-specific fixes. 
+
       return transformed === code ? null : { code: transformed, map: null };
     }
   };
