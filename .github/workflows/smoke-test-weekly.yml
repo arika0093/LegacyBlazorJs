@@ -71,6 +71,7 @@ jobs:
   # Run smoke tests against the upstream-main package to detect layout/build regressions early
   smoke-test:
     needs: build-package-preview
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
