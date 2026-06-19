@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 env:
-  BUILD_TARGET_PROFILES: es2015
+  BUILD_TARGET_PROFILES: es5,es2015
 
 permissions:
   contents: read
@@ -66,6 +66,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { profile: es5,    hosting: Server }
           - { profile: es2015, hosting: Server }
     runs-on: windows-latest
     steps:
