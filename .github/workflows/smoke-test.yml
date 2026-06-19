@@ -22,6 +22,8 @@ permissions:
 jobs:
   build-package:
     runs-on: ubuntu-latest
+    outputs:
+      package-version: ${{ steps.lts-version.outputs.version }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -35,10 +37,17 @@ jobs:
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
 
+      - name: Resolve latest LTS package version
+        id: lts-version
+        run: node scripts/build/resolve-version.mjs
+        env:
+          BUILD_CHANNEL: lts
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Build latest LTS source and NuGet package
         run: npm run build
         env:
-          BUILD_CHANNEL: lts
+          ASPNETCORE_TAG: ${{ steps.lts-version.outputs.tag }}
           BUILD_TARGET_PROFILES: ${{ env.BUILD_TARGET_PROFILES }}
           GITHUB_TOKEN: ${{ github.token }}
           LEGACY_BLAZOR_DISABLE_TERSER: true
@@ -73,17 +82,12 @@ jobs:
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
-      - name: Select package version
-        shell: bash
-        run: |
-          PACKAGE_VERSION=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const summary = JSON.parse(readFileSync('artifacts/packages/build-summary.json', 'utf8')); const build = summary.builds.find(entry => entry.channel === 'lts'); if (!build) { throw new Error('Latest LTS build not found in build summary.'); } process.stdout.write(build.version);")
-          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
       - run: npm ci --ignore-scripts
       - name: Select old Chromium for smoke test
         run: node scripts/test/export-browser-env.mjs ${{ matrix.profile }}
       - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
         run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:
-          PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
+          PACKAGE_VERSION: ${{ needs.build-package.outputs.package-version }}
           SMOKE_TEST_PROFILE: ${{ matrix.profile }}
           SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}

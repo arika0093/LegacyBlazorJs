@@ -23,6 +23,8 @@ jobs:
   # Build upstream main with the current preview SDK surface and upload the generated package
   build-package:
     runs-on: ubuntu-latest
+    outputs:
+      package-version: ${{ steps.preview-version.outputs.version }}
     steps:
       # setup environment
       # > source
@@ -95,12 +97,6 @@ jobs:
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
-      # pick the upstream-main package built in this workflow
-      - name: Select package version
-        shell: bash
-        run: |
-          PACKAGE_VERSION=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const summary = JSON.parse(readFileSync('artifacts/packages/build-summary.json', 'utf8')); const build = summary.builds.at(-1); if (!build) { throw new Error('No build outputs were found.'); } process.stdout.write(build.version);")
-          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
       # > npm dependencies
       - run: npm ci --ignore-scripts
       # > browser setup downloads the target profile's Chromium directly
@@ -110,6 +106,6 @@ jobs:
       - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
         run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:
-          PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
+          PACKAGE_VERSION: ${{ needs.build-package.outputs.package-version }}
           SMOKE_TEST_PROFILE: ${{ matrix.profile }}
           SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}
