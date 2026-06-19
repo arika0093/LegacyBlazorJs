@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       run_compat:
-        description: Run compatibility tests for the latest LTS package
+        description: Run compatibility tests for the latest LTS and preview packages
         type: boolean
         default: true
       publish_github:
@@ -21,41 +21,54 @@ on:
 permissions:
   contents: write
 
-env:
-  LTS_DOTNET_MAJOR: '10'
-  PREVIEW_DOTNET_MAJOR: '11'
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      lts-package-version: ${{ steps.lts-version.outputs.version }}
+      lts-package-major: ${{ steps.lts-version.outputs.major }}
+      preview-package-version: ${{ steps.preview-version.outputs.version }}
+      preview-package-major: ${{ steps.preview-version.outputs.major }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 20
+          node-version: latest
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
-          dotnet-version: 10.0.x
-      - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
-        if: github.event_name != 'schedule'
-        with:
-          dotnet-version: 11.0.x
+          dotnet-version: latest
+          # The LTS build can also be built with the preview SDK, so we use the preview SDK fixedly.
           dotnet-quality: preview
+
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
+
+      - name: Resolve latest LTS package version
+        id: lts-version
+        run: node scripts/build/resolve-version.mjs
+        env:
+          BUILD_CHANNEL: lts
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Resolve latest preview package version
+        id: preview-version
+        run: node scripts/build/resolve-version.mjs
+        env:
+          BUILD_CHANNEL: preview
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Build upstream source, browser variants, and NuGet package
         run: npm run build
         env:
-          BUILD_CHANNELS: ${{ github.event_name == 'schedule' && 'lts' || 'lts,preview' }}
+          BUILD_CHANNELS: 'lts,preview'
           GITHUB_TOKEN: ${{ github.token }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: LegacyBlazorJs-build-output
-          path: dist/**/*.js
+          path: dist/**/*
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: LegacyBlazorJs-packages
@@ -72,68 +85,90 @@ jobs:
       matrix:
         profile: [es2015, es2017, es2018, es2020]
         hosting: [Server]
+        channel: [lts, preview]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 20
+          node-version: latest
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
-          dotnet-version: ${{ env.LTS_DOTNET_MAJOR }}.0.x
+          dotnet-version: latest
+          dotnet-quality: preview 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
-      - name: Select latest LTS package
-        shell: bash
-        run: |
-          PACKAGE_VERSION=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const summary = JSON.parse(readFileSync('artifacts/packages/build-summary.json', 'utf8')); const build = summary.builds.find(entry => entry.channel === 'lts'); if (!build) { throw new Error('Latest LTS build not found in build summary.'); } process.stdout.write(build.version);")
-          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
       - run: npm ci --ignore-scripts
       - name: Select old Chromium for smoke test
         run: node scripts/test/export-browser-env.mjs ${{ matrix.profile }}
-      - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
+      - name: Run smoke test (${{ matrix.channel }}, ${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
         run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:
-          PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
+          PACKAGE_VERSION: ${{ matrix.channel == 'lts' && needs.build.outputs.lts-package-version || needs.build.outputs.preview-package-version }}
           SMOKE_TEST_PROFILE: ${{ matrix.profile }}
           SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}
 
   release-github:
     needs: [build, test-compat]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_github && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped')
+    if: inputs.publish_github && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: latest
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: LegacyBlazorJs-packages
           path: artifacts/packages
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: LegacyBlazorJs-build-output
+          path: .
+
+      - name: Prepare JS release archives
+        run: node scripts/build/export-release-assets.mjs
 
       - name: Create GitHub releases
         run: |
+          shopt -s nullglob
           for nupkg in artifacts/packages/*.nupkg; do
             VERSION="$(basename "$nupkg" | sed -E 's/^LegacyBlazorJs\.(.+)\.nupkg$/\1/')"
+            JS_ZIP="artifacts/releases/LegacyBlazorJs.${VERSION}.zip"
             if [ -z "$VERSION" ] || [ "$VERSION" = "$(basename "$nupkg")" ]; then
               echo "::warning::Could not parse version from $(basename "$nupkg"), skipping."
               continue
             fi
+            if [ ! -f "$JS_ZIP" ]; then
+              echo "::error::Missing JS archive for $VERSION: $JS_ZIP"
+              exit 1
+            fi
+            RELEASE_ARGS=()
+            if [[ "$VERSION" == *-* ]]; then
+              RELEASE_ARGS+=(--prerelease)
+            fi
             if gh release view "$VERSION" >/dev/null 2>&1; then
-              echo "Version $VERSION is already released. Skipping."
+              echo "Version $VERSION is already released. Uploading assets."
             else
               echo "Creating release for $VERSION"
-              gh release create "$VERSION" "$nupkg" \
+              gh release create "$VERSION" \
                 --title "LegacyBlazorJs $VERSION" \
-                --notes "Automated release of LegacyBlazorJs $VERSION built from the latest ASP.NET Core source."
+                --notes "Automated release of LegacyBlazorJs $VERSION built from the latest ASP.NET Core source." \
+                "${RELEASE_ARGS[@]}"
             fi
+            gh release upload "$VERSION" "$nupkg" "$JS_ZIP" --clobber
           done
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
   release-nuget:
     needs: [build, test-compat]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_nuget && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped')
+    if: inputs.publish_nuget && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
