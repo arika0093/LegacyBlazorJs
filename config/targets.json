@@ -1,4 +1,13 @@
 {
+  "es5": {
+    "description": "comprehensive ES5 support (experimental)",
+    "ecma": 5,
+    "typescriptTarget": "es5",
+    "intendedBrowsers": {
+      "chrome": "23",
+      "ie": "11"
+    }
+  },
   "es2015": {
     "description": "comprehensive ES2015 support",
     "ecma": 2015,

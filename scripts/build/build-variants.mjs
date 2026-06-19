@@ -57,7 +57,8 @@ async function writeRollupLegacyPluginsModule(bundlerConfigPath) {
 
 export function legacyBlazorPlugins() {
   const targets = JSON.parse(process.env.LEGACY_BLAZOR_BABEL_TARGETS ?? '{}');
-  return legacyBlazorPluginsImpl(targets);
+  const profile = process.env.LEGACY_BLAZOR_TARGET_PROFILE ?? '';
+  return legacyBlazorPluginsImpl(targets, profile);
 }
 `;
 
@@ -190,6 +191,7 @@ export async function buildVariants({
       }
 
       process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
+      process.env.LEGACY_BLAZOR_TARGET_PROFILE = name;
       await writeFile(bundlerConfigPath, bundlerConfig);
       await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], { cwd: npmWorkspace.root });
 
@@ -216,6 +218,7 @@ export async function buildVariants({
     await writeFile(bundlerConfigPath, originalBundlerConfig);
     await unlink(rollupLegacyPluginsPath).catch(() => {});
     delete process.env.LEGACY_BLAZOR_BABEL_TARGETS;
+    delete process.env.LEGACY_BLAZOR_TARGET_PROFILE;
     if (previousProfiles) {
       process.env.BUILD_TARGET_PROFILES = previousProfiles;
     } else {

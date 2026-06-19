@@ -43,43 +43,16 @@ The following files are included under `_content/LegacyBlazorJs/`:
 
 The versions listed below are available.
 
-| Version   | Browser target   | Notes                 |
-|-----------|------------------|-----------------------|
-| ~~`es5`~~ | ~~Chrome 23+~~   |                       |
-| `es2015`  | Chrome 49+       |                       |
-| `es2017`  | Chrome 58+       |                       |
-| `es2018`  | Chrome 64+       |                       |
-| `es2020`  | Chrome 80+       | Default for .NET 8    |
-| `es2022`  | Chrome 94+       | Default for .NET 9    |
+| Version   | Browser target    | Notes                 |
+|-----------|-------------------|-----------------------|
+| `es5`     | Chrome 23+, IE 11 | Well, I hope it works. |
+| `es2015`  | Chrome 49+ |  |
+| `es2017`  | Chrome 58+ |  |
+| `es2018`  | Chrome 64+ |  |
+| `es2020`  | Chrome 80+ | Default for .NET 8 |
+| `es2022`  | Chrome 94+ | Default for .NET 9 |
 
 The profile definitions are in [config/targets.json](config/targets.json).
-
-### Why not include ES5/IE11?
-
-**Short answer**:  
-APIs are missing, testing is difficult, so trial-and-error is challenging.
-
-**Long answer**:  
-ES5 syntax is [supported](https://caniuse.com/es5) even in quite old browsers. It works on Chrome 23+ and IE 10+ (since 2012!).  
-However, the situation is not so straightforward.
-
-* Old browsers do not recognize the latest syntax (e.g., replacing arrow functions).
-  * It can be done relatively easily using [Babel](https://babeljs.io/docs/).
-* Old browsers lack many Javascript APIs (e.g. `Set`, `Map`, `Promise`, etc.).
-  * It can be supplemented with [core-js](https://github.com/zloirock/core-js). but it requires replacing the build process, which is somewhat complicated.
-* Old browsers lack many browser APIs (e.g., [fetch](https://caniuse.com/fetch), [getRootNode](https://caniuse.com/mdn-api_node_getrootnode), etc.).
-  * The polyfill is insufficient. In particular, it is difficult to select when supporting IE11.
-* Beyond JavaScript-side issues, since .NET dynamically invokes JS, the range of APIs that need to be supported is extremely wide.
-* The bidirectional nature of JS/.NET communication makes debugging difficult.
-* Tools like `playwright` and `puppeteer` cannot be used, so automated testing is difficult.
-  * This means that upstream modifications cannot be detected immediately, making early problem detection and verification of solutions extremely difficult.
-
-However, there is hope.
-
-* Automated testing can be executed on Chrome 23 (ES5)!
-* WebSocket connections can be established on both ES5 and IE11.
-* The problem is narrowed down after that. In other words, if a good approach can be found, it may be possible to support ES5/IE11 as well.
-
 
 ## Development Guide
 ### How it works
@@ -88,7 +61,7 @@ To be specific, the process is as follows:
 
 1. First, resolve the upstream [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore) targets.
     * By default, the build targets the latest LTS line and the latest preview line.
-    * The defaults are controlled in [config/majors.json](config/majors.json) and can be overridden with environment variables such as `BUILD_CHANNELS`, `LTS_DOTNET_MAJOR`, `PREVIEW_DOTNET_MAJOR`, `ASPNETCORE_TAG`, and `UPSTREAM_REF`.
+    * The defaults are controlled in [config/majors.json](config/majors.json) and can be overridden with environment variable `BUILD_CHANNELS`.
 2. Clone the upstream.
 3. Build the upstream JavaScript packages with npm workspaces.
 4. Build the dependencies in advance. As of .NET 10, the following are included in the dependencies.

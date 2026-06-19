@@ -10,12 +10,12 @@ import { legacyES5FixesPlugin } from './es5-fixes.mjs';
 /**
  * Get all legacy Blazor plugins for Rollup
  */
-export function legacyBlazorPlugins(targets) {
+export function legacyBlazorPlugins(targets, profile = process.env.LEGACY_BLAZOR_TARGET_PROFILE ?? '') {
   return [
     legacyCommonjsPlugin(),
     // Prepend non-ECMAScript Web API polyfills before any entry code runs
     legacyWhatwgFetchPlugin(),
-    legacyWebApiPolyfillPlugin(),
+    legacyWebApiPolyfillPlugin(targets, profile),
     // Convert syntax and features to be compatible with legacy environments, based on specified targets
     legacyBabelPlugin(targets),
 

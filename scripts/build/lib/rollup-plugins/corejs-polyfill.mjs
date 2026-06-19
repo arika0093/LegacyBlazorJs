@@ -1,62 +1,31 @@
 import path from 'node:path';
 import process from 'node:process';
 import { createRequire } from 'node:module';
-import { LEGACY_COMMONJS_INCLUDE_PATTERNS } from './commonjs.mjs';
 
 const VIRTUAL_ID = 'legacy-blazor-corejs-polyfill';
 const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-corejs-polyfill';
-const POLYFILL_ENTRY_MODULE = 'core-js/stable';
 
-function createPolyfillEntrySource(babel, targets) {
-  const result = babel.transformSync(
-    `import ${JSON.stringify(POLYFILL_ENTRY_MODULE)};\n`,
-    {
-      filename: 'legacy-corejs-polyfill-entry.js',
-      sourceType: 'module',
-      compact: false,
-      presets: [[
-        '@babel/preset-env',
-        {
-          targets,
-          bugfixes: true,
-          modules: false,
-          useBuiltIns: 'entry',
-          corejs: {
-            version: 3,
-            proposals: false,
-          },
-        },
-      ]],
-    });
-
-  if (!result?.code) {
-    throw new Error('Could not generate the target-specific core-js entry source.');
-  }
-
-  return result.code;
-}
+export const polyfillModules = [
+  'core-js/actual',
+];
 
 /**
- * Build only the target-specific core-js modules selected by preset-env,
- * then prepend that final output to every entry chunk.
+ * Build core-js separately, then prepend that final ES5-safe output to every entry chunk.
  */
-export function legacyCoreJsPolyfillPlugin(targets = {})
+export function legacyCoreJsPolyfillPlugin()
 {
   let polyfillSource = null;
-  let polyfillEntrySource = null;
 
   return {
     name: 'legacy-corejs-polyfill',
     async buildStart()
     {
       const workspaceRequire = createRequire(path.join(process.cwd(), 'package.json'));
-      const babel = workspaceRequire('@babel/core');
       const { rollup } = workspaceRequire('rollup');
       const nodeResolveModule = workspaceRequire('@rollup/plugin-node-resolve');
       const commonjsModule = workspaceRequire('@rollup/plugin-commonjs');
       const nodeResolve = nodeResolveModule.default ?? nodeResolveModule.nodeResolve ?? nodeResolveModule;
       const commonjs = commonjsModule.default ?? commonjsModule;
-      polyfillEntrySource = createPolyfillEntrySource(babel, targets);
 
       const bundle = await rollup({
         input: VIRTUAL_ID,
@@ -74,7 +43,7 @@ export function legacyCoreJsPolyfillPlugin(targets = {})
                 return null;
               }
 
-              return polyfillEntrySource;
+              return `${polyfillModules.map(moduleId => `import ${JSON.stringify(moduleId)};`).join('\n')}\n`;
             },
           },
           {
@@ -95,7 +64,7 @@ export function legacyCoreJsPolyfillPlugin(targets = {})
           },
           nodeResolve(),
           commonjs({
-            include: LEGACY_COMMONJS_INCLUDE_PATTERNS,
+            include: /node_modules/,
           }),
         ],
         treeshake: false,
@@ -136,7 +105,7 @@ export function legacyCoreJsPolyfillPlugin(targets = {})
         return null;
       }
 
-      return polyfillEntrySource;
+      return `${polyfillModules.map(moduleId => `import ${JSON.stringify(moduleId)};`).join('\n')}\n`;
     },
     renderChunk(code, chunk)
     {
@@ -145,7 +114,7 @@ export function legacyCoreJsPolyfillPlugin(targets = {})
         return null;
       }
 
-      if (polyfillSource === null)
+      if (!polyfillSource)
       {
         throw new Error('core-js polyfill source was not generated before renderChunk.');
       }
