@@ -147,6 +147,11 @@ export class BrowserHarness {
       'document.readyState === "complete" && document.querySelector("button") !== null && document.querySelector(\'[role="status"]\') !== null',
       INTERACTION_TIMEOUT_MS,
       'counter UI to render');
+    this.#logger.info('Waiting for Blazor event handlers to attach.');
+    await this.#waitForCondition(
+      '(function () { var button = document.querySelector("button"); if (!button) { return false; } for (var key in button) { if (key.indexOf("_blazorEvents_") === 0) { return true; } } return false; })()',
+      INTERACTION_TIMEOUT_MS,
+      'Blazor event handlers to attach');
 
     this.#logger.info('Counter UI rendered. Attempting interaction.');
     const deadline = Date.now() + INTERACTION_TIMEOUT_MS;
@@ -216,13 +221,13 @@ export class BrowserHarness {
   async #ensurePageReadyForInput() {
     await this.#sendOptionalCommand('Page.bringToFront', undefined, this.#commandSessionId);
     await this.#evaluate(`
-      (() => {
-        const button = document.querySelector('button');
+      (function () {
+        var button = document.querySelector('button');
         if (!button) {
           return false;
         }
 
-        button.scrollIntoView({ block: 'center', inline: 'center' });
+        button.scrollIntoView();
         button.focus();
         return true;
       })()
@@ -248,16 +253,16 @@ export class BrowserHarness {
 
   async #clickButton() {
     const buttonCenter = await this.#evaluateJson(`
-      (() => {
-        const button = document.querySelector('button');
+      (function () {
+        var button = document.querySelector('button');
         if (!button) {
           return null;
         }
 
-        button.scrollIntoView({ block: 'center', inline: 'center' });
+        button.scrollIntoView();
         button.focus();
-        const rect = button.getBoundingClientRect();
-        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        var rect = button.getBoundingClientRect();
+        var hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
         return {
           x: rect.left + rect.width / 2,
           y: rect.top + rect.height / 2,
@@ -291,8 +296,8 @@ export class BrowserHarness {
     }
 
     await this.#evaluate(`
-      (() => {
-        const button = document.querySelector('button');
+      (function () {
+        var button = document.querySelector('button');
         if (!button) {
           return false;
         }
@@ -302,15 +307,15 @@ export class BrowserHarness {
           return true;
         }
 
-        const dispatchLegacyMouseEvent = type => {
+        var dispatchLegacyMouseEvent = function (type) {
           if (document.createEvent) {
-            const event = document.createEvent('MouseEvent');
+            var event = document.createEvent('MouseEvent');
             event.initMouseEvent(type, true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null);
             button.dispatchEvent(event);
             return;
           }
 
-          const fallbackEvent = document.createEvent('Event');
+          var fallbackEvent = document.createEvent('Event');
           fallbackEvent.initEvent(type, true, true);
           button.dispatchEvent(fallbackEvent);
         };
@@ -347,6 +352,10 @@ export class BrowserHarness {
       createRuntimeEvaluateParams(expression),
       this.#commandSessionId);
 
+    if (response?.wasThrown) {
+      throw new Error(`Legacy Chromium evaluation threw: ${formatRemoteObjectValue(response.result)}`);
+    }
+
     if (response?.exceptionDetails) {
       throw new Error(`Legacy Chromium evaluation failed: ${JSON.stringify(response.exceptionDetails)}`);
     }
@@ -363,7 +372,7 @@ export class BrowserHarness {
     }
 
     return await this.#evaluate(`
-      (() => {
+      (function () {
         location.href = ${JSON.stringify(url)};
         return true;
       })()
@@ -454,12 +463,26 @@ export class BrowserHarness {
 
   async #captureDiagnostics() {
     const diagnostics = await this.#evaluateJson(`
-      (() => {
-        const button = document.querySelector('button');
-        const status = document.querySelector('[role="status"]');
-        const scripts = Array.from(document.scripts).map(script => script.src).filter(Boolean);
-        const rect = button ? button.getBoundingClientRect() : null;
-        const hit = rect ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) : null;
+      (function () {
+        var button = document.querySelector('button');
+        var status = document.querySelector('[role="status"]');
+        var scripts = [];
+        for (var i = 0; i < document.scripts.length; i += 1) {
+          if (document.scripts[i].src) {
+            scripts.push(document.scripts[i].src);
+          }
+        }
+        var rect = button ? button.getBoundingClientRect() : null;
+        var hit = rect ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) : null;
+        var hasBlazorEvents = false;
+        if (button) {
+          for (var key in button) {
+            if (key.indexOf('_blazorEvents_') === 0) {
+              hasBlazorEvents = true;
+              break;
+            }
+          }
+        }
 
         return {
           readyState: document.readyState,
@@ -469,12 +492,9 @@ export class BrowserHarness {
           buttonText: button ? button.textContent : null,
           buttonDisabled: button ? button.disabled : null,
           activeElement: document.activeElement ? document.activeElement.tagName : null,
-          smokeUnhandledRejections: Array.isArray(window.__smokeUnhandledRejections)
-            ? window.__smokeUnhandledRejections.slice(0, 10)
-            : [],
-          smokeWindowErrors: Array.isArray(window.__smokeWindowErrors)
-            ? window.__smokeWindowErrors.slice(0, 10)
-            : [],
+          hasBlazorEvents: hasBlazorEvents,
+          smokeUnhandledRejections: window.__smokeUnhandledRejections ? window.__smokeUnhandledRejections.slice(0, 10) : [],
+          smokeWindowErrors: window.__smokeWindowErrors ? window.__smokeWindowErrors.slice(0, 10) : [],
           buttonRect: rect ? {
             left: rect.left,
             top: rect.top,
