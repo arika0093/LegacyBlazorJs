@@ -139,6 +139,7 @@ export class BrowserHarness {
     await this.#sendOptionalCommand('Network.enable', undefined, sessionId);
     await this.#sendOptionalCommand('Page.bringToFront', undefined, sessionId);
     await this.#sendOptionalCommand('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId);
+    await this.#installUnhandledRejectionCapture();
 
     await this.#navigate(new URL('/counter', baseUri).toString());
     this.#logger.info('Waiting for counter UI to render.');
@@ -228,6 +229,23 @@ export class BrowserHarness {
     `);
   }
 
+  async #installUnhandledRejectionCapture() {
+    const source = buildUnhandledRejectionCaptureScript();
+    const sessionId = this.#commandSessionId;
+    const injectedForNewDocument = await this.#sendOptionalCommand(
+      'Page.addScriptToEvaluateOnNewDocument',
+      { source },
+      sessionId);
+    if (injectedForNewDocument !== UNSUPPORTED_METHOD_RESULT) {
+      return;
+    }
+
+    await this.#sendOptionalCommand(
+      'Page.addScriptToEvaluateOnLoad',
+      { scriptSource: source },
+      sessionId);
+  }
+
   async #clickButton() {
     const buttonCenter = await this.#evaluate(`
       (() => {
@@ -283,14 +301,27 @@ export class BrowserHarness {
           return false;
         }
 
-        const eventOptions = { bubbles: true, cancelable: true, view: window };
-        button.dispatchEvent(new MouseEvent('mousedown', eventOptions));
-        button.dispatchEvent(new MouseEvent('mouseup', eventOptions));
         if (typeof button.click === 'function') {
           button.click();
-        } else {
-          button.dispatchEvent(new MouseEvent('click', eventOptions));
+          return true;
         }
+
+        const dispatchLegacyMouseEvent = type => {
+          if (document.createEvent) {
+            const event = document.createEvent('MouseEvent');
+            event.initMouseEvent(type, true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null);
+            button.dispatchEvent(event);
+            return;
+          }
+
+          const fallbackEvent = document.createEvent('Event');
+          fallbackEvent.initEvent(type, true, true);
+          button.dispatchEvent(fallbackEvent);
+        };
+
+        dispatchLegacyMouseEvent('mousedown');
+        dispatchLegacyMouseEvent('mouseup');
+        dispatchLegacyMouseEvent('click');
         return true;
       })()
     `);
@@ -433,6 +464,12 @@ export class BrowserHarness {
           buttonText: button ? button.textContent : null,
           buttonDisabled: button ? button.disabled : null,
           activeElement: document.activeElement ? document.activeElement.tagName : null,
+          smokeUnhandledRejections: Array.isArray(window.__smokeUnhandledRejections)
+            ? window.__smokeUnhandledRejections.slice(0, 10)
+            : [],
+          smokeWindowErrors: Array.isArray(window.__smokeWindowErrors)
+            ? window.__smokeWindowErrors.slice(0, 10)
+            : [],
           buttonRect: rect ? {
             left: rect.left,
             top: rect.top,
@@ -682,4 +719,57 @@ export function createRuntimeEvaluateParams(expression) {
     expression,
     returnByValue: true,
   };
+}
+
+function buildUnhandledRejectionCaptureScript() {
+  return `
+    (function () {
+      if (window.__smokeUnhandledRejectionCaptureInstalled) {
+        return;
+      }
+
+      window.__smokeUnhandledRejectionCaptureInstalled = true;
+      window.__smokeUnhandledRejections = [];
+      window.__smokeWindowErrors = [];
+
+      var previousUnhandledRejectionHandler = window.onunhandledrejection;
+      window.onunhandledrejection = function (event) {
+        window.__smokeUnhandledRejections.push(formatSmokeReason(event && event.reason));
+        if (typeof previousUnhandledRejectionHandler === 'function') {
+          return previousUnhandledRejectionHandler.call(this, event);
+        }
+      };
+
+      if (typeof window.addEventListener === 'function') {
+        window.addEventListener('error', function (event) {
+          var message = event && typeof event.message === 'string' && event.message.length > 0
+            ? event.message
+            : formatSmokeReason(event && event.error);
+          window.__smokeWindowErrors.push(message);
+        });
+      }
+
+      function formatSmokeReason(reason) {
+        if (reason && typeof reason === 'object') {
+          if (typeof reason.stack === 'string' && reason.stack.length > 0) {
+            return reason.stack;
+          }
+
+          if (typeof reason.message === 'string' && reason.message.length > 0) {
+            return reason.message;
+          }
+        }
+
+        if (typeof reason === 'string') {
+          return reason;
+        }
+
+        try {
+          return JSON.stringify(reason);
+        } catch (error) {
+          return String(reason);
+        }
+      }
+    })();
+  `;
 }
