@@ -9,34 +9,33 @@ on:
       - 'scripts/**'
       - 'src/**'
       - 'tests/**'
+      - '.github/workflows/ci-profile-build.yml'
       - '.github/workflows/smoke-test.yml'
   pull_request:
   workflow_dispatch:
-
-env:
-  BUILD_TARGET_PROFILES: es5,es2015
 
 permissions:
   contents: read
 
 jobs:
-  build-package:
+  resolve-build:
     runs-on: ubuntu-latest
     outputs:
       package-version: ${{ steps.lts-version.outputs.version }}
     steps:
+      # setup environment
+      # > source
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
+      # > node (latest)
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: latest
-      - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
-        with:
-          dotnet-version: latest
+      # > npm dependencies
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
-
+      # Resolve a package version/TFM pair compatible with the LTS SDK
       - name: Resolve latest LTS package version
         id: lts-version
         run: node scripts/build/resolve-version.mjs
@@ -44,53 +43,17 @@ jobs:
           BUILD_CHANNEL: lts
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Build latest LTS source and NuGet package
-        run: npm run build
-        env:
-          BUILD_CHANNEL: lts
-          BUILD_TARGET_PROFILES: ${{ env.BUILD_TARGET_PROFILES }}
-          GITHUB_TOKEN: ${{ github.token }}
-          LEGACY_BLAZOR_DISABLE_TERSER: true
-          SIGNALR_LOGGING: Trace
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: LegacyBlazorJs-packages
-          path: |
-            artifacts/packages/*.nupkg
-            artifacts/packages/build-summary.json
-
   smoke-test:
-    needs: build-package
-    timeout-minutes: 10
+    needs: [resolve-build]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { profile: es5,    hosting: Server }
-          - { profile: es2015, hosting: Server }
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: latest
-          cache: npm
-      - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
-        with:
-          dotnet-version: latest
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: LegacyBlazorJs-packages
-          path: artifacts/packages
-      - run: npm ci --ignore-scripts
-      - name: Select old Chromium for smoke test
-        run: node scripts/test/export-browser-env.mjs ${{ matrix.profile }}
-      - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
-        run: node --test tests/PlaywrightTest/smoke.test.mjs
-        env:
-          PACKAGE_VERSION: ${{ needs.build-package.outputs.package-version }}
-          SMOKE_TEST_PROFILE: ${{ matrix.profile }}
-          SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}
+        profile: [es5, es2015]
+    uses: ./.github/workflows/ci-profile-build.yml
+    with:
+      channel: lts
+      profile: ${{ matrix.profile }}
+      package-version: ${{ needs.resolve-build.outputs.package-version }}
+      run-compat: true
+      disable-terser: true
+      signalr-logging: Trace
