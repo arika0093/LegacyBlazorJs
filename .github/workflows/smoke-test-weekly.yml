@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   # Build upstream main with the current preview SDK surface and upload the generated package
-  build-package:
+  build-package-preview:
     runs-on: ubuntu-latest
     outputs:
       package-version: ${{ steps.preview-version.outputs.version }}
@@ -54,11 +54,11 @@ jobs:
       - name: Build upstream main source and NuGet package
         run: npm run build
         env:
+          BUILD_CHANNEL: preview
           BUILD_TARGET_PROFILES: ${{ env.BUILD_TARGET_PROFILES }}
           GITHUB_TOKEN: ${{ github.token }}
           LEGACY_BLAZOR_DISABLE_TERSER: true
-          PACKAGE_VERSION: ${{ steps.preview-version.outputs.version }}
-          LEGACY_BLAZOR_TARGET_FRAMEWORK: net${{ steps.preview-version.outputs.major }}.0
+
       # upload packages
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -69,7 +69,7 @@ jobs:
 
   # Run smoke tests against the upstream-main package to detect layout/build regressions early
   smoke-test:
-    needs: build-package
+    needs: build-package-preview
     strategy:
       fail-fast: false
       matrix:
@@ -106,6 +106,6 @@ jobs:
       - name: Run smoke test (${{ matrix.profile }}, Blazor ${{ matrix.hosting }})
         run: node --test tests/PlaywrightTest/smoke.test.mjs
         env:
-          PACKAGE_VERSION: ${{ needs.build-package.outputs.package-version }}
+          PACKAGE_VERSION: ${{ needs.build-package-preview.outputs.package-version }}
           SMOKE_TEST_PROFILE: ${{ matrix.profile }}
           SMOKE_TEST_HOSTING_MODEL: ${{ matrix.hosting }}

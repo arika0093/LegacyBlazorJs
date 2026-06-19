@@ -47,7 +47,7 @@ jobs:
       - name: Build latest LTS source and NuGet package
         run: npm run build
         env:
-          ASPNETCORE_TAG: ${{ steps.lts-version.outputs.tag }}
+          BUILD_CHANNEL: lts
           BUILD_TARGET_PROFILES: ${{ env.BUILD_TARGET_PROFILES }}
           GITHUB_TOKEN: ${{ github.token }}
           LEGACY_BLAZOR_DISABLE_TERSER: true

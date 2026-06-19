@@ -8,6 +8,7 @@
     "build:variants": "node scripts/build/build-variants.mjs",
     "build": "node scripts/build/build-all.mjs",
     "build:quick": "LEGACY_BLAZOR_DISABLE_TERSER=true SKIP_PREBUILD=true BUILD_CHANNEL=lts BUILD_TARGET_PROFILES=es2015 node scripts/build/build-all.mjs",
+    "build:quick-prev": "LEGACY_BLAZOR_DISABLE_TERSER=true SKIP_PREBUILD=true BUILD_CHANNEL=preview BUILD_TARGET_PROFILES=es2015 node scripts/build/build-all.mjs",
     "test:smoke": "node --test tests/PlaywrightTest/smoke.test.mjs",
     "test:compat": "node scripts/test/run-compat-tests.mjs",
     "readme:compat": "node scripts/test/update-readme-compat.mjs",
