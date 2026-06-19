@@ -20,19 +20,11 @@ export function applyLegacyES5Fixes(code, targets) {
     'new RangeError("Insufficient data")'
   );
 
-  // Fix 2: shouldAutoStart
-  // IE11's document.currentScript is null in IIFE contexts.
-  // Solution: Fall back to getElementsByTagName('script')
+  // Fix 2: shouldAutoStart function logic
+  // IE does not start automatically, so override the shouldAutoStart function to always return true.
   transformed = transformed.replace(
     /function shouldAutoStart\(\)\s*\{[^}]+\}/,
-    `function shouldAutoStart() {
-  var script = document && document.currentScript;
-  if (!script) {
-    var scripts = document.getElementsByTagName('script');
-    script = scripts[scripts.length - 1];
-  }
-  return !script || script.getAttribute('autostart') !== 'false';
-}`
+    `function shouldAutoStart() { return true; }`
   );
 
   return transformed;
