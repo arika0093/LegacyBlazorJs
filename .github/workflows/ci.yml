@@ -71,20 +71,7 @@ jobs:
     with:
       channel: ${{ matrix.channel }}
       profile: ${{ matrix.profile }}
-      package-version: ${{ matrix.channel == 'lts' ? needs.resolve-builds.outputs.lts-package-version : needs.resolve-builds.outputs.preview-package-version }}
-      run-compat: ${{ github.event_name == 'workflow_dispatch' && inputs.run_compat }}
-
-  build-test-preview:
-    needs: [resolve-builds]
-    strategy:
-      fail-fast: false
-      matrix:
-        profile: [es5, es2015, es2017, es2020]
-    uses: ./.github/workflows/ci-profile-build.yml
-    with:
-      channel: preview
-      profile: ${{ matrix.profile }}
-      package-version: ${{ needs.resolve-builds.outputs.preview-package-version }}
+      package-version: ${{ matrix.channel == 'lts' && needs.resolve-builds.outputs.lts-package-version || needs.resolve-builds.outputs.preview-package-version }}
       run-compat: ${{ github.event_name == 'workflow_dispatch' && inputs.run_compat }}
 
   package-lts:
