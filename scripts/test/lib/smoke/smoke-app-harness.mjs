@@ -137,7 +137,7 @@ export class SmokeAppHarness {
 
     const scriptHostPath = getScriptHostPath(this.#rootDirectory, this.#hostingModel);
     const scriptName = this.#hostingModel === 'Server'
-      ? `blazor.web.${this.#scriptProfile}.js`
+      ? `blazor.server.${this.#scriptProfile}.js`
       : `blazor.webassembly.${this.#scriptProfile}.js`;
     const replacement = `<script src="_content/LegacyBlazorJs/${scriptName}"></script>`;
     this.#logger.info(`Injecting generated script '${scriptName}' into '${scriptHostPath}'.`);
