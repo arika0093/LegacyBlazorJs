@@ -1,18 +1,8 @@
 name: Weekly smoke test upstream (preview target)
 
 on:
-  push:
-    branches:
-      - main
-    files:
-      - 'config/**'
-      - 'scripts/**'
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/ci-profile-build.yml'
-      - '.github/workflows/smoke-test-weekly.yml'
   schedule:
-    - cron: '53 5 * * 1'
+    - cron: '53 5 * * 1' # Run at 5:53 AM UTC every Monday
 
 permissions:
   contents: read

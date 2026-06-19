@@ -15,7 +15,8 @@ on:
       package-version:
         required: true
         type: string
-      # Whether to run compatibility tests (smoke tests that run the built package against a real browser and real Blazor apps)
+      # Whether to run compatibility tests
+      # (smoke tests that run the built package against a real browser and real Blazor apps)
       run-compat:
         required: true
         type: boolean
