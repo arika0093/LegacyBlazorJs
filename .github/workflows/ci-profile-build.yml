@@ -97,7 +97,9 @@ jobs:
       - name: Select old Chromium for smoke test
         run: node scripts/test/export-browser-env.mjs ${{ inputs.profile }}
       - name: Run smoke test (${{ inputs.channel }}, ${{ inputs.profile }}, Blazor Server)
-        run: node scripts/test/run-with-retry.mjs --timeout-minutes 10 --max-attempts 2 --retry-on timeout -- node --test tests/PlaywrightTest/smoke.test.mjs
+        run: >
+          node scripts/test/run-with-retry.mjs --timeout-minutes 5 --max-attempts 3 --retry-on timeout --
+          node --test tests/PlaywrightTest/smoke.test.mjs
         env:
           PACKAGE_VERSION: ${{ inputs.package-version }}
           SMOKE_TEST_PROFILE: ${{ inputs.profile }}
