@@ -61,15 +61,6 @@ export function run(command, args, options = {}) {
     let timer;
     let aliveTimer;
 
-    // Periodic "still alive" check for long-running processes
-    if (!timeoutMs || timeoutMs > 30000) {
-      aliveTimer = setInterval(() => {
-        if (child.pid && !child.killed) {
-          process.stdout.write(`[DEBUG] Process ${child.pid} still running...\n`);
-        }
-      }, 10000); // Check every 10 seconds
-    }
-
     if (timeoutMs) {
       timer = setTimeout(() => {
         clearInterval(aliveTimer);
