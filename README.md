@@ -3,13 +3,21 @@
 Rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
 
 ## Motivation
+### Background
 
 The official ASP.NET Core [Blazor browser support](https://learn.microsoft.com/en-us/aspnet/core/blazor/supported-platforms) targets "evergreen" browsers only.
 
 However, there are cases where supporting older browsers is necessary, especially for enterprise use.
 Unfortunately, .NET 9 and later target [ES2022](https://github.com/dotnet/aspnetcore/blob/v9.0.0/src/Components/Shared.JS/tsconfig.json#L3), and there have been [reports](https://github.com/dotnet/aspnetcore/issues/58212) of it not working on somewhat older browsers.
 
-This project aims to make Blazor available on older browsers by rebuilding the Blazor JavaScript runtime, blazor.web.js, to support multiple versions from ES2015 to ES2022.
+This project aims to make Blazor available on older browsers by rebuilding the Blazor JavaScript runtime, blazor.web.js, to support multiple versions from ES5 to ES2022.
+
+### Automation
+
+The build, verification, and release processes are [automated and scheduled](./.github/workflows/ci.yml) to run regularly. This allows us to:
+* Be more aware of upstream updates and breaking changes.
+* If it's released, it should have passed the tests, so it should work.
+* Even if I get bored, it should continue to be updated in principle.
 
 ## How to use
 ### Blazor Server
@@ -60,21 +68,22 @@ The profile definitions are in [config/targets.json](config/targets.json).
 |--------|---------|---------|--------|---------|
 | es5    | IE      | 9       | ❌️(1)  | ✖️(2)  |
 | es5    | IE      | 10      | ⚠️(3)  | ✖️(2)  |
-| es5    | IE      | 11      | 🆗(4)  | ✖️(2)  |
+| es5    | IE      | 11      | 👌(4)  | ✖️(2)  |
 | es5    | Chrome  | 23      | ✅     | ✖️(2)  |
 | es2015 | Chrome  | 49      | ✅     | ✖️(2)  |
-| es2017 | Chrome  | 58      | ✅     | ✖️(5)  |
-| es2018 | Chrome  | 64      | ✅     | ❌️(6)  |
-| es2020 | Chrome  | 80      | ✅     | ❔️(7)  |
-| es2022 | Chrome  | 94      | ✅     | ❔️(7)  |
+| es2017 | Chrome  | 58      | ⚠️(5)  | ✖️(6)  |
+| es2018 | Chrome  | 64      | ✅     | ❌️(7)  |
+| es2020 | Chrome  | 80      | ✅     | ❔️(8)  |
+| es2022 | Chrome  | 94      | ✅     | ❔️(8)  |
 
 1. IE9 and earlier are difficult to run due to a significant lack of APIs.
 2. WebAssembly itself is not supported.
 3. It works, but there is a bug that the UI collapses.
 4. Confirmed to work. Since regular testing is not performed, it may stop working at some point.
-5. WebAssembly works, but BigInt/dynamic import are not available, so it does not work as a result.
-6. It cannot interpret the syntax on the dotnet.js side, so it does not work as a result.
-7. Unconfirmed.
+5. LTS(10.0.x) does not work on testing, but Preview(11.0.0-preview.x) does work. The root cause is unknown...
+6. WebAssembly works, but BigInt/dynamic import are not available, so it does not work as a result.
+7. It cannot interpret the syntax on the dotnet.js side, so it does not work as a result.
+8. Unconfirmed.
 
 ## Development Guide
 ### How it works

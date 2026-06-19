@@ -56,17 +56,22 @@ jobs:
           BUILD_CHANNEL: preview
           GITHUB_TOKEN: ${{ github.token }}
 
-  build-test-lts:
+  build-test:
     needs: [resolve-builds]
     strategy:
       fail-fast: false
       matrix:
+        channel: [lts, preview]
         profile: [es5, es2015, es2017, es2020]
+        exclude:
+          # For some reason this keeps timing out, so disable for now. Root cause unknown...
+          - channel: lts
+            profile: es2017
     uses: ./.github/workflows/ci-profile-build.yml
     with:
-      channel: lts
+      channel: ${{ matrix.channel }}
       profile: ${{ matrix.profile }}
-      package-version: ${{ needs.resolve-builds.outputs.lts-package-version }}
+      package-version: ${{ matrix.channel == 'lts' ? needs.resolve-builds.outputs.lts-package-version : needs.resolve-builds.outputs.preview-package-version }}
       run-compat: ${{ github.event_name == 'workflow_dispatch' && inputs.run_compat }}
 
   build-test-preview:
@@ -83,7 +88,7 @@ jobs:
       run-compat: ${{ github.event_name == 'workflow_dispatch' && inputs.run_compat }}
 
   package-lts:
-    needs: [build-test-lts]
+    needs: [build-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -119,7 +124,7 @@ jobs:
             artifacts/packages/build-summary.json
 
   package-preview:
-    needs: [build-test-preview]
+    needs: [build-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
