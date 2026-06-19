@@ -7,25 +7,32 @@ on:
       channel:
         required: true
         type: string
-      # The profile to build/test, e.g. "es5" or "es2015"
+      # The profile to build, e.g. "es5" or "es2015"
       profile:
-        required: true
+        required: false
         type: string
-      # The package version to test against, e.g. "7.0.0-preview.5"
+        default: ''
+      # The profiles to build as a comma-separated list. Leave empty to use "profile",
+      # or to build every target profile defined in config/targets.json when "profile" is also empty.
+      build-profiles:
+        required: false
+        type: string
+        default: ''
+      # Optional suffix for the uploaded build artifact name.
+      artifact-suffix:
+        required: false
+        type: string
+        default: ''
+      # The package version to build against, e.g. "7.0.0-preview.5"
       package-version:
         required: true
         type: string
-      # Whether to run compatibility tests
-      # (smoke tests that run the built package against a real browser and real Blazor apps)
-      run-compat:
-        required: true
-        type: boolean
       # Whether to disable Terser (used for minifying JavaScript)
       disable-terser:
         required: false
         type: boolean
         default: false
-      # The logging level to use for SignalR in the smoke tests, e.g. "Trace" or "Information"
+      # The logging level to bake into the built scripts, e.g. "Trace" or "Information"
       signalr-logging:
         required: false
         type: string
@@ -58,50 +65,15 @@ jobs:
         run: npm run build
         env:
           BUILD_CHANNEL: ${{ inputs.channel }}
-          BUILD_TARGET_PROFILES: ${{ inputs.profile }}
+          BUILD_TARGET_PROFILES: ${{ inputs.build-profiles != '' && inputs.build-profiles || inputs.profile }}
           GITHUB_TOKEN: ${{ github.token }}
           LEGACY_BLAZOR_DISABLE_TERSER: ${{ inputs.disable-terser && 'true' || '' }}
           SIGNALR_LOGGING: ${{ inputs.signalr-logging }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: LegacyBlazorJs-build-${{ inputs.channel }}-${{ inputs.profile }}
+          name: LegacyBlazorJs-build-${{ inputs.channel }}-${{ inputs.artifact-suffix != '' && inputs.artifact-suffix || inputs.profile }}
           path: |
             dist/**/*
             artifacts/packages/*.nupkg
             artifacts/packages/build-summary.json
-
-  test-compat:
-    needs: [build]
-    if: inputs.run-compat
-    timeout-minutes: 25
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: latest
-          cache: npm
-      - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
-        with:
-          dotnet-version: latest
-          dotnet-quality: preview
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: LegacyBlazorJs-build-${{ inputs.channel }}-${{ inputs.profile }}
-          path: .
-
-      - run: npm ci --ignore-scripts
-      - name: Select old Chromium for smoke test
-        run: node scripts/test/export-browser-env.mjs ${{ inputs.profile }}
-      - name: Run smoke test (${{ inputs.channel }}, ${{ inputs.profile }}, Blazor Server)
-        run: >
-          node scripts/test/run-with-retry.mjs --timeout-minutes 5 --max-attempts 3 --retry-on timeout --
-          node --test tests/PlaywrightTest/smoke.test.mjs
-        env:
-          PACKAGE_VERSION: ${{ inputs.package-version }}
-          SMOKE_TEST_PROFILE: ${{ inputs.profile }}
-          SMOKE_TEST_HOSTING_MODEL: Server

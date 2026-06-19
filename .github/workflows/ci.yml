@@ -31,6 +31,7 @@ jobs:
       preview-package-version: ${{ steps.preview-version.outputs.version }}
       preview-package-major: ${{ steps.preview-version.outputs.major }}
       preview-tag: ${{ steps.preview-version.outputs.tag }}
+      target-profiles: ${{ steps.target-profiles.outputs.profiles }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -56,26 +57,45 @@ jobs:
           BUILD_CHANNEL: preview
           GITHUB_TOKEN: ${{ github.token }}
 
-  build-test:
+      - name: Resolve target profiles
+        id: target-profiles
+        run: >
+          node --input-type=module -e
+          "import { appendFile, readFile } from 'node:fs/promises';
+          const targets = JSON.parse(await readFile('config/targets.json', 'utf8'));
+          await appendFile(process.env.GITHUB_OUTPUT, \`profiles=\${JSON.stringify(Object.keys(targets))}\n\`);"
+
+  # Build and upload for each LTS/Preview and each profile
+  build-all:
     needs: [resolve-builds]
     strategy:
       fail-fast: false
       matrix:
         channel: [lts, preview]
-        profile: [es5, es2015, es2017, es2020]
-        exclude:
-          # For some reason this keeps timing out, so disable for now. Root cause unknown...
-          - channel: lts
-            profile: es2017
+        profile: ${{ fromJson(needs.resolve-builds.outputs.target-profiles) }}
     uses: ./.github/workflows/ci-profile-build.yml
     with:
       channel: ${{ matrix.channel }}
       profile: ${{ matrix.profile }}
       package-version: ${{ matrix.channel == 'lts' && needs.resolve-builds.outputs.lts-package-version || needs.resolve-builds.outputs.preview-package-version }}
-      run-compat: ${{ github.event_name == 'workflow_dispatch' && inputs.run_compat }}
+
+  test-compat:
+    needs: [resolve-builds, build-all]
+    if: github.event_name == 'workflow_dispatch' && inputs.run_compat
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [lts, preview]
+        profile: [es5, es2015, es2020]
+    uses: ./.github/workflows/ci-profile-test.yml
+    with:
+      channel: ${{ matrix.channel }}
+      profile: ${{ matrix.profile }}
+      package-version: ${{ matrix.channel == 'lts' && needs.resolve-builds.outputs.lts-package-version || needs.resolve-builds.outputs.preview-package-version }}
 
   package-lts:
-    needs: [build-test]
+    needs: [build-all, test-compat]
+    if: ${{ always() && needs.build-all.result == 'success' && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -111,7 +131,8 @@ jobs:
             artifacts/packages/build-summary.json
 
   package-preview:
-    needs: [build-test]
+    needs: [build-all, test-compat]
+    if: ${{ always() && needs.build-all.result == 'success' && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3

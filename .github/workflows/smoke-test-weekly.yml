@@ -33,8 +33,8 @@ jobs:
           BUILD_CHANNEL: preview
           GITHUB_TOKEN: ${{ github.token }}
 
-  # Run smoke tests against the upstream-main package to detect layout/build regressions early
-  smoke-test:
+  # Build the upstream-main package variants to detect layout/build regressions early
+  build:
     needs: [resolve-build-preview]
     strategy:
       fail-fast: false
@@ -45,6 +45,18 @@ jobs:
       channel: preview
       profile: ${{ matrix.profile }}
       package-version: ${{ needs.resolve-build-preview.outputs.package-version }}
-      run-compat: true
       disable-terser: true
       signalr-logging: Trace
+
+  # Run smoke tests against the built preview package
+  smoke-test:
+    needs: [resolve-build-preview, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [es5, es2015]
+    uses: ./.github/workflows/ci-profile-test.yml
+    with:
+      channel: preview
+      profile: ${{ matrix.profile }}
+      package-version: ${{ needs.resolve-build-preview.outputs.package-version }}

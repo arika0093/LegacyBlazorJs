@@ -10,6 +10,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - '.github/workflows/ci-profile-build.yml'
+      - '.github/workflows/ci-profile-test.yml'
       - '.github/workflows/smoke-test.yml'
   pull_request:
   workflow_dispatch:
@@ -52,7 +53,7 @@ jobs:
           BUILD_CHANNEL: preview
           GITHUB_TOKEN: ${{ github.token }}
 
-  smoke-tests:
+  build:
     needs: [resolve-builds]
     strategy:
       fail-fast: false
@@ -64,6 +65,18 @@ jobs:
       channel: ${{ matrix.channel }}
       profile: ${{ matrix.profile }}
       package-version: ${{ matrix.channel == 'lts' && needs.resolve-builds.outputs.lts-package-version || needs.resolve-builds.outputs.preview-package-version }}
-      run-compat: true
       disable-terser: true
       signalr-logging: Trace
+
+  smoke-tests:
+    needs: [resolve-builds, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [lts, preview]
+        profile: [es5, es2015]
+    uses: ./.github/workflows/ci-profile-test.yml
+    with:
+      channel: ${{ matrix.channel }}
+      profile: ${{ matrix.profile }}
+      package-version: ${{ matrix.channel == 'lts' && needs.resolve-builds.outputs.lts-package-version || needs.resolve-builds.outputs.preview-package-version }}
