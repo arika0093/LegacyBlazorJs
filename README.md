@@ -40,7 +40,6 @@ The following files are included under `_content/LegacyBlazorJs/`:
 - blazor.server.{version}.js
 - blazor.webassembly.{version}.js 
 - blazor.webview.{version}.js
-  - Although webassembly and webview are also converted, it is likely that they will not work in older browsers due to issues on the `dotnet.js` side that they reference.
 
 The versions listed below are available.
 
@@ -54,6 +53,28 @@ The versions listed below are available.
 | `es2022`  | Chrome 94+ | Default for .NET 9 |
 
 The profile definitions are in [config/targets.json](config/targets.json).
+
+## Compatibility results
+
+| Target | Browser | Version | Server | Wasm    |
+|--------|---------|---------|--------|---------|
+| es5    | IE      | 9       | ❌️(1)  | ✖️(2)  |
+| es5    | IE      | 10      | ⚠️(3)  | ✖️(2)  |
+| es5    | IE      | 11      | 🆗(4)  | ✖️(2)  |
+| es5    | Chrome  | 23      | ✅     | ✖️(2)  |
+| es2015 | Chrome  | 49      | ✅     | ✖️(2)  |
+| es2017 | Chrome  | 58      | ✅     | ✖️(5)  |
+| es2018 | Chrome  | 64      | ✅     | ❌️(6)  |
+| es2020 | Chrome  | 80      | ✅     | ❔️(7)  |
+| es2022 | Chrome  | 94      | ✅     | ❔️(7)  |
+
+1. IE9 and earlier are difficult to run due to a significant lack of APIs.
+2. WebAssembly itself is not supported.
+3. It works, but there is a bug that the UI collapses.
+4. Confirmed to work. Since regular testing is not performed, it may stop working at some point.
+5. WebAssembly works, but BigInt/dynamic import are not available, so it does not work as a result.
+6. It cannot interpret the syntax on the dotnet.js side, so it does not work as a result.
+7. Unconfirmed.
 
 ## Development Guide
 ### How it works
@@ -106,11 +127,6 @@ see [rollup-plugins](./scripts/build/lib/rollup-plugins/index.mjs) for details.
 
 These settings are inserted before terser is applied in [upstream rollup settings](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Shared.JS/rollup.config.mjs).
 
-## Compatibility results
-
-<!-- compatibility-results:start -->
-TODO
-<!-- compatibility-results:end -->
 
 ## License
 
