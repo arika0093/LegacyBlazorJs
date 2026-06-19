@@ -58,6 +58,7 @@ jobs:
           BUILD_TARGET_PROFILES: ${{ env.BUILD_TARGET_PROFILES }}
           GITHUB_TOKEN: ${{ github.token }}
           LEGACY_BLAZOR_DISABLE_TERSER: true
+          SIGNALR_LOGGING: Trace
 
       # upload packages
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
