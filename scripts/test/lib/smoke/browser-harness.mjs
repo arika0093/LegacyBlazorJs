@@ -247,7 +247,7 @@ export class BrowserHarness {
   }
 
   async #clickButton() {
-    const buttonCenter = await this.#evaluate(`
+    const buttonCenter = await this.#evaluateJson(`
       (() => {
         const button = document.querySelector('button');
         if (!button) {
@@ -267,13 +267,9 @@ export class BrowserHarness {
       })()
     `);
 
-    if (!buttonCenter) {
-      return;
-    }
-
-    const x = toFiniteInteger(buttonCenter.x);
-    const y = toFiniteInteger(buttonCenter.y);
-    if (x !== null && y !== null) {
+    const x = buttonCenter ? toFiniteInteger(buttonCenter.x) : null;
+    const y = buttonCenter ? toFiniteInteger(buttonCenter.y) : null;
+    if (buttonCenter && x !== null && y !== null) {
       try {
         await this.#sendOptionalCommand(
           'Input.dispatchMouseEvent',
@@ -329,6 +325,15 @@ export class BrowserHarness {
 
   async #evaluateBoolean(expression) {
     return Boolean(await this.#evaluate(expression));
+  }
+
+  async #evaluateJson(expression) {
+    const serialized = await this.#evaluateString(`JSON.stringify(${expression})`);
+    if (!serialized) {
+      return null;
+    }
+
+    return JSON.parse(serialized);
   }
 
   async #evaluateString(expression) {
@@ -448,7 +453,7 @@ export class BrowserHarness {
   }
 
   async #captureDiagnostics() {
-    const diagnostics = await this.#evaluate(`
+    const diagnostics = await this.#evaluateJson(`
       (() => {
         const button = document.querySelector('button');
         const status = document.querySelector('[role="status"]');
