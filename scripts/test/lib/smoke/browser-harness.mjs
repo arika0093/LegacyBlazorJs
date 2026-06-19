@@ -151,10 +151,6 @@ export class BrowserHarness {
     const deadline = Date.now() + INTERACTION_TIMEOUT_MS;
     let attempts = 0;
     while (Date.now() < deadline) {
-      if (this.#errors.length > 0 || this.#failedResponses.length > 0) {
-        break;
-      }
-
       const countText = await this.#evaluateString(`
         (function () {
           var status = document.querySelector('[role="status"]');
@@ -205,10 +201,6 @@ export class BrowserHarness {
   async #waitForCondition(expression, timeoutMs, description) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      if (this.#errors.length > 0 || this.#failedResponses.length > 0) {
-        return;
-      }
-
       if (await this.#evaluateBoolean(expression)) {
         return;
       }
