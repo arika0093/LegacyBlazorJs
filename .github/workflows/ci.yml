@@ -254,7 +254,7 @@ jobs:
             else
               echo "Creating release for $VERSION"
               gh release create "$VERSION" \
-                --title "LegacyBlazorJs $VERSION" \
+                --title "v$VERSION" \
                 --notes "Automated release of LegacyBlazorJs $VERSION built from the latest ASP.NET Core source." \
                 "${RELEASE_ARGS[@]}"
             fi
@@ -267,6 +267,9 @@ jobs:
     needs: [assemble-release-artifacts]
     if: github.event_name == 'workflow_dispatch' && inputs.publish_nuget
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
