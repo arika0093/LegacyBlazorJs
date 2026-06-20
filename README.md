@@ -15,9 +15,9 @@ This project aims to make Blazor available on older browsers by rebuilding the B
 ### Automation
 
 The build, verification, and release processes are [automated and scheduled](./.github/workflows/ci.yml) to run regularly. This allows us to:
-* Be more aware of upstream updates and breaking changes.
-* If it's released, it should have passed the tests, so it should work.
-* Even if I get bored, it should continue to be updated in principle.
+* Instant access to upstream updates and breaking changes.
+* Released versions should pass testing and therefore function correctly.
+* Updates continue even if I lose interest. (Sustainability!)
 
 ## How to use
 ### Blazor Server
@@ -64,25 +64,21 @@ The profile definitions are in [config/targets.json](config/targets.json).
 
 ## Compatibility results
 
-| Target | Browser | Version | Server | Wasm    |
-|--------|---------|---------|--------|---------|
-| es5    | IE      | 9       | ❌️(1)  | ✖️(2)  |
-| es5    | IE      | 10      | ❌️(3)  | ✖️(2)  |
-| es5    | IE      | 11      | 👌(4)  | ✖️(2)  |
-| es5    | Chrome  | 23      | ✅     | ✖️(2)  |
-| es2015 | Chrome  | 49      | ✅     | ✖️(2)  |
-| es2017 | Chrome  | 58      | ✅     | ✖️(5)  |
-| es2018 | Chrome  | 64      | ✅     | ❌️(6)  |
-| es2020 | Chrome  | 80      | ✅     | ❔️(7)  |
-| es2022 | Chrome  | 94      | ✅     | ❔️(7)  |
+| Target | Browser | Version | Server |
+|--------|---------|---------|--------|
+| es5    | IE      | 9       | ❌️(1)  |
+| es5    | IE      | 10      | ❌️(2)  |
+| es5    | IE      | 11      | 👌(3)  |
+| es5    | Chrome  | 23      | ✅     |
+| es2015 | Chrome  | 49      | ✅     |
+| es2017 | Chrome  | 58      | ✅     |
+| es2018 | Chrome  | 64      | ✅     |
+| es2020 | Chrome  | 80      | ✅     |
+| es2022 | Chrome  | 94      | ✅     |
 
 1. IE9 and earlier are difficult to run due to a significant lack of APIs.
-2. WebAssembly itself is not supported.
-3. The SignalR connection can be established, but subsequent UI updates are broken.
-4. Confirmed to work. Since regular testing is not performed, it may stop working at some point.
-5. WebAssembly works, but BigInt/dynamic import are not available, so it does not work as a result.
-6. It cannot interpret the syntax on the dotnet.js side, so it does not work as a result.
-7. Unconfirmed.
+2. The SignalR connection can be established, but subsequent UI updates are broken.
+3. Confirmed to work. Since regular testing is not performed, it may stop working at some point.
 
 ## Development Guide
 ### How it works
@@ -135,6 +131,22 @@ see [rollup-plugins](./scripts/build/lib/rollup-plugins/index.mjs) for details.
 
 These settings are inserted before terser is applied in [upstream rollup settings](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Shared.JS/rollup.config.mjs).
 
+## How to Test Functionality
+
+Although there are many limitations, methods for testing functionality remain available for IE and Chrome as of 2026.
+
+### For IE
+
+Open Edge, go to "Settings" → "Existing Browser" → "Internet Explorer Mode Pages," add `http://localhost:(port)`, and then open the application.
+
+To open the developer tools, run `%systemroot%\system32\f12\IEChooser.exe`.
+
+### For Chrome
+
+Download `chrome-win32.zip` from `https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Win/(Id)/`, extract it, and run it to run the older version.  
+The ID uses the correspondence table in [chromium-snapshot.json](./config/chromium-snapshot.json).
+
+Note that older Linux versions may lack shared libraries, potentially preventing the application from starting. Therefore, using the Windows version is a more straightforward approach.
 
 ## License
 
