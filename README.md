@@ -24,10 +24,10 @@ The build, verification, and release processes are [automated and scheduled](./.
 
 Install the NuGet package `LegacyBlazorJs` in your Blazor application.
 
-For example, if you are using dotnet(aspnetcore) 10.0.1, the version you should install is `10.0.1`.
+For example, if you are using .NET 10, the version you should install is `10.*`.
 
 ```bash
-dotnet add package LegacyBlazorJs --version 10.0.1
+dotnet add package LegacyBlazorJs
 ```
 
 Then, replace the official script in your Blazor Web App's `Components/App.razor` with the required profile:
