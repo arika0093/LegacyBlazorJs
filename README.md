@@ -67,23 +67,22 @@ The profile definitions are in [config/targets.json](config/targets.json).
 | Target | Browser | Version | Server | Wasm    |
 |--------|---------|---------|--------|---------|
 | es5    | IE      | 9       | ❌️(1)  | ✖️(2)  |
-| es5    | IE      | 10      | ⚠️(3)  | ✖️(2)  |
+| es5    | IE      | 10      | ❌️(3)  | ✖️(2)  |
 | es5    | IE      | 11      | 👌(4)  | ✖️(2)  |
 | es5    | Chrome  | 23      | ✅     | ✖️(2)  |
 | es2015 | Chrome  | 49      | ✅     | ✖️(2)  |
-| es2017 | Chrome  | 58      | ⚠️(5)  | ✖️(6)  |
-| es2018 | Chrome  | 64      | ✅     | ❌️(7)  |
-| es2020 | Chrome  | 80      | ✅     | ❔️(8)  |
-| es2022 | Chrome  | 94      | ✅     | ❔️(8)  |
+| es2017 | Chrome  | 58      | ✅     | ✖️(5)  |
+| es2018 | Chrome  | 64      | ✅     | ❌️(6)  |
+| es2020 | Chrome  | 80      | ✅     | ❔️(7)  |
+| es2022 | Chrome  | 94      | ✅     | ❔️(7)  |
 
 1. IE9 and earlier are difficult to run due to a significant lack of APIs.
 2. WebAssembly itself is not supported.
-3. It works, but there is a bug that the UI collapses.
+3. The SignalR connection can be established, but subsequent UI updates are broken.
 4. Confirmed to work. Since regular testing is not performed, it may stop working at some point.
-5. LTS(10.0.x) does not work on testing, but Preview(11.0.0-preview.x) does work. The root cause is unknown...
-6. WebAssembly works, but BigInt/dynamic import are not available, so it does not work as a result.
-7. It cannot interpret the syntax on the dotnet.js side, so it does not work as a result.
-8. Unconfirmed.
+5. WebAssembly works, but BigInt/dynamic import are not available, so it does not work as a result.
+6. It cannot interpret the syntax on the dotnet.js side, so it does not work as a result.
+7. Unconfirmed.
 
 ## Development Guide
 ### How it works
