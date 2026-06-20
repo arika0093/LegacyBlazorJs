@@ -20,9 +20,13 @@ The build, verification, and release processes are [automated and scheduled](./.
 * Updates continue even if I lose interest. (Sustainability!)
 
 ## How to use
-### Blazor Server
+### Use from NuGet packages
 
-Install the NuGet package `LegacyBlazorJs` in your Blazor application.
+[![Current](https://img.shields.io/nuget/v/LegacyBlazorJs?logo=nuget&label=current)](https://www.nuget.org/packages/LegacyBlazorJs) [![Preview](https://img.shields.io/nuget/vpre/LegacyBlazorJs?logo=nuget&label=preview)](https://www.nuget.org/packages/LegacyBlazorJs)
+
+
+
+Install the [NuGet package](https://www.nuget.org/packages/LegacyBlazorJs) `LegacyBlazorJs` in your Blazor application.
 
 For example, if you are using .NET 10, the version you should install is `10.*`.
 
@@ -33,11 +37,21 @@ dotnet add package LegacyBlazorJs
 Then, replace the official script in your Blazor Web App's `Components/App.razor` with the required profile:
 
 ```diff
-- <script src="_framework/blazor.web.js"></script>
-+ <script src="_content/LegacyBlazorJs/blazor.web.es2015.js"></script>
+- <script src="@Assets["_framework/blazor.web.js"]"></script>
++ <script src="@Assets["_content/LegacyBlazorJs/blazor.web.es2015.js"]"></script>
 ```
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
+
+### Use from GitHub Release
+
+You can also download and use the compiled JavaScript files from GitHub Releases, which are uploaded there.
+
+The procedure is as follows:
+
+1. Download the latest js files from [`Release/LegacyBlazorJs.x.y.z.zip`](https://github.com/arika0093/LegacyBlazorJs/releases).
+2. Unzip the files and copy the necessary JavaScript files to wwwroot.
+3. Load those JavaScript files as scripts in App.razor.
 
 ## Included files
 ### Overview
