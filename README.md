@@ -51,12 +51,12 @@ The following files are included under `_content/LegacyBlazorJs/`:
 
 The versions listed below are available.
 
-| Version   | Browser target    | Notes                 |
-|-----------|-------------------|-----------------------|
-| `es5`     | Chrome 23+, IE 11 | Well, don't expect too much. |
-| `es2015`  | Chrome 49+ |  |
-| `es2017`  | Chrome 58+ |  |
-| `es2018`  | Chrome 64+ |  |
+| Version   | Browser target    | Notes                       |
+|-----------|-------------------|-----------------------------|
+| `es5`     | Chrome 23+, IE 11 | Only `blazor.server` works. |
+| `es2015`  | Chrome 49+ | |
+| `es2017`  | Chrome 58+ | |
+| `es2018`  | Chrome 64+ | |
 | `es2020`  | Chrome 80+ | Default for .NET 8 |
 | `es2022`  | Chrome 94+ | Default for .NET 9 |
 
