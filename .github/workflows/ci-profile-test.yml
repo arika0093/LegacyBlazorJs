@@ -20,13 +20,18 @@ on:
       package-version:
         required: true
         type: string
+      # The Blazor hosting model to execute, e.g. "Server" or "WebAssembly"
+      hosting-model:
+        required: false
+        type: string
+        default: 'Server'
 
 permissions:
   contents: read
 
 jobs:
   test-compat:
-    timeout-minutes: 25
+    timeout-minutes: 20
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -49,11 +54,11 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Select old Chromium for smoke test
         run: node scripts/test/export-browser-env.mjs ${{ inputs.profile }}
-      - name: Run smoke test (${{ inputs.channel }}, ${{ inputs.profile }}, Blazor Server)
+      - name: Run smoke test (${{ inputs.channel }}, ${{ inputs.profile }}, Blazor ${{ inputs.hosting-model }})
         run: >
           node scripts/test/run-with-retry.mjs --timeout-minutes 5 --max-attempts 3 --retry-on timeout --
           node --test tests/PlaywrightTest/smoke.test.mjs
         env:
           PACKAGE_VERSION: ${{ inputs.package-version }}
           SMOKE_TEST_PROFILE: ${{ inputs.profile }}
-          SMOKE_TEST_HOSTING_MODEL: Server
+          SMOKE_TEST_HOSTING_MODEL: ${{ inputs.hosting-model }}

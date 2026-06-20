@@ -59,7 +59,7 @@ jobs:
       fail-fast: false
       matrix:
         channel: [lts, preview]
-        profile: [es5, es2015]
+        profile: [es5, es2015, es2020]
     uses: ./.github/workflows/ci-profile-build.yml
     with:
       channel: ${{ matrix.channel }}
@@ -75,8 +75,14 @@ jobs:
       matrix:
         channel: [lts, preview]
         profile: [es5, es2015]
+        hosting: [Server]
+        include:
+          - channel: lts
+            profile: es2020
+            hosting: WebAssembly
     uses: ./.github/workflows/ci-profile-test.yml
     with:
       channel: ${{ matrix.channel }}
       profile: ${{ matrix.profile }}
       package-version: ${{ matrix.channel == 'lts' && needs.resolve-builds.outputs.lts-package-version || needs.resolve-builds.outputs.preview-package-version }}
+      hosting-model: ${{ matrix.hosting }}
