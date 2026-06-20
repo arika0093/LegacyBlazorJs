@@ -1,4 +1,4 @@
-name: Weekly smoke test upstream (preview target)
+name: Weekly smoke test upstream main
 
 on:
   schedule:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  resolve-build-preview:
+  resolve-build-metadata:
     runs-on: ubuntu-latest
     outputs:
       package-version: ${{ steps.preview-version.outputs.version }}
@@ -25,7 +25,8 @@ jobs:
       # > npm dependencies
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
-      # Resolve a package version/TFM pair compatible with the preview SDK
+      # Resolve the latest preview package version so restore/pack still uses a valid NuGet version
+      # while the upstream source itself is built from main.
       - name: Resolve latest preview package version
         id: preview-version
         run: node scripts/build/resolve-version.mjs
@@ -35,7 +36,7 @@ jobs:
 
   # Build the upstream-main package variants to detect layout/build regressions early
   build:
-    needs: [resolve-build-preview]
+    needs: [resolve-build-metadata]
     strategy:
       fail-fast: false
       matrix:
@@ -44,13 +45,14 @@ jobs:
     with:
       channel: preview
       profile: ${{ matrix.profile }}
-      package-version: ${{ needs.resolve-build-preview.outputs.package-version }}
+      package-version: ${{ needs.resolve-build-metadata.outputs.package-version }}
+      upstream-ref: main
       disable-terser: true
       signalr-logging: Trace
 
-  # Run smoke tests against the built preview package
+  # Run smoke tests against the built main package using the latest preview NuGet line
   smoke-test:
-    needs: [resolve-build-preview, build]
+    needs: [resolve-build-metadata, build]
     strategy:
       fail-fast: false
       matrix:
@@ -59,4 +61,4 @@ jobs:
     with:
       channel: preview
       profile: ${{ matrix.profile }}
-      package-version: ${{ needs.resolve-build-preview.outputs.package-version }}
+      package-version: ${{ needs.resolve-build-metadata.outputs.package-version }}

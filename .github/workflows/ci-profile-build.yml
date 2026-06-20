@@ -27,6 +27,12 @@ on:
       package-version:
         required: true
         type: string
+      # Optional upstream ref to build from, e.g. "main". When set, build against this ref
+      # while still using "package-version" for NuGet package metadata and target framework resolution.
+      upstream-ref:
+        required: false
+        type: string
+        default: ''
       # Whether to disable Terser (used for minifying JavaScript)
       disable-terser:
         required: false
@@ -67,6 +73,8 @@ jobs:
           BUILD_CHANNEL: ${{ inputs.channel }}
           BUILD_TARGET_PROFILES: ${{ inputs.build-profiles != '' && inputs.build-profiles || inputs.profile }}
           GITHUB_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ inputs.package-version }}
+          UPSTREAM_REF: ${{ inputs.upstream-ref }}
           LEGACY_BLAZOR_DISABLE_TERSER: ${{ inputs.disable-terser && 'true' || '' }}
           SIGNALR_LOGGING: ${{ inputs.signalr-logging }}
 
