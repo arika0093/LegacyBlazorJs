@@ -3,6 +3,7 @@ name: Weekly smoke test upstream main
 on:
   schedule:
     - cron: '53 5 * * 1' # Run at 5:53 AM UTC every Monday
+  workflow_dispatch:
 
 permissions:
   contents: read
