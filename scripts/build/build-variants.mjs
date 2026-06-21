@@ -34,7 +34,6 @@ async function firstExistingReleaseDirectory(paths) {
         access(path.join(candidate, 'blazor.web.js')),
         access(path.join(candidate, 'blazor.webassembly.js')),
         access(path.join(candidate, 'blazor.server.js')),
-        access(path.join(candidate, 'blazor.webview.js')),
       ]);
       return candidate;
     } catch (error) {
@@ -44,7 +43,21 @@ async function firstExistingReleaseDirectory(paths) {
     }
   }
 
-  throw new Error(`None of the expected upstream release directories contain the required JS bundles:\n${paths.join('\n')}`);
+  throw new Error(`None of the expected upstream release directories contain the required framework JS bundles:\n${paths.join('\n')}`);
+}
+
+async function resolveBuildOutputLayout(sourceDir) {
+  const frameworkDir = await firstExistingReleaseDirectory([
+    path.join(sourceDir, 'dist/Release/_framework'),
+    path.join(sourceDir, 'dist/Release'),
+  ]);
+
+  const webviewPath = await firstExisting([
+    path.join(sourceDir, 'dist/Release/blazor.webview.js'),
+    path.join(sourceDir, 'dist/Release/_framework/blazor.webview.js'),
+  ]);
+
+  return { frameworkDir, webviewPath };
 }
 
 async function resolveNpmWorkspace(sourceDir) {
@@ -195,10 +208,6 @@ export async function buildVariants({
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
   const files = {};
-  const releaseDir = await firstExistingReleaseDirectory([
-    path.join(sourceDir, 'dist/Release/_framework'),
-    path.join(sourceDir, 'dist/Release'),
-  ]);
 
   try {
     for (const [name, profile] of Object.entries(targets)) {
@@ -218,15 +227,16 @@ export async function buildVariants({
       process.env.LEGACY_BLAZOR_TARGET_PROFILE = name;
       await writeFile(bundlerConfigPath, bundlerConfig);
       await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], { cwd: npmWorkspace.root });
+      const { frameworkDir, webviewPath } = await resolveBuildOutputLayout(sourceDir);
 
       const webFilename = `blazor.web.${name}.js`;
       const webAssemblyFilename = `blazor.webassembly.${name}.js`;
       const serverFilename = `blazor.server.${name}.js`;
       const webviewFilename = `blazor.webview.${name}.js`;
-      await copyFile(path.join(releaseDir, 'blazor.web.js'), path.join(output, webFilename));
-      await copyFile(path.join(releaseDir, 'blazor.webassembly.js'), path.join(output, webAssemblyFilename));
-      await copyFile(path.join(releaseDir, 'blazor.server.js'), path.join(output, serverFilename));
-      await copyFile(path.join(releaseDir, 'blazor.webview.js'), path.join(output, webviewFilename));
+      await copyFile(path.join(frameworkDir, 'blazor.web.js'), path.join(output, webFilename));
+      await copyFile(path.join(frameworkDir, 'blazor.webassembly.js'), path.join(output, webAssemblyFilename));
+      await copyFile(path.join(frameworkDir, 'blazor.server.js'), path.join(output, serverFilename));
+      await copyFile(webviewPath, path.join(output, webviewFilename));
       files[name] = {
         file: webFilename,
         webAssemblyFile: webAssemblyFilename,
