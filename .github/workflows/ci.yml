@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       run_compat:
-        description: Run compatibility tests for the latest LTS and preview packages
+        description: Run compatibility tests for the configured package lines
         type: boolean
         default: true
       publish_github:
@@ -25,13 +25,8 @@ jobs:
   resolve-builds:
     runs-on: ubuntu-latest
     outputs:
-      lts-package-version: ${{ steps.lts-version.outputs.version }}
-      lts-package-major: ${{ steps.lts-version.outputs.major }}
-      lts-tag: ${{ steps.lts-version.outputs.tag }}
-      preview-package-version: ${{ steps.preview-version.outputs.version }}
-      preview-package-major: ${{ steps.preview-version.outputs.major }}
-      preview-tag: ${{ steps.preview-version.outputs.tag }}
-      target-profiles: ${{ steps.target-profiles.outputs.profiles }}
+      builds: ${{ steps.builds.outputs.builds }}
+      target-profiles: ${{ steps.builds.outputs.target-profiles }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -43,41 +38,25 @@ jobs:
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
       
-      - name: Resolve latest LTS package version
-        id: lts-version
-        run: node scripts/build/resolve-version.mjs
+      - name: Resolve configured package lines
+        id: builds
+        run: node scripts/build/resolve-builds.mjs
         env:
-          BUILD_CHANNEL: lts
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Resolve latest preview package version
-        id: preview-version
-        run: node scripts/build/resolve-version.mjs
-        env:
-          BUILD_CHANNEL: preview
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Resolve target profiles
-        id: target-profiles
-        run: >
-          node --input-type=module -e
-          "import { appendFile, readFile } from 'node:fs/promises';
-          const targets = JSON.parse(await readFile('config/targets.json', 'utf8'));
-          await appendFile(process.env.GITHUB_OUTPUT, \`profiles=\${JSON.stringify(Object.keys(targets))}\n\`);"
-
-  # Build and upload for each LTS/Preview and each profile
+  # Build and upload for each configured package line and each profile
   build-all:
     needs: [resolve-builds]
     strategy:
       fail-fast: false
       matrix:
-        channel: [lts, preview]
+        build: ${{ fromJson(needs.resolve-builds.outputs.builds) }}
         profile: ${{ fromJson(needs.resolve-builds.outputs.target-profiles) }}
     uses: ./.github/workflows/ci-profile-build.yml
     with:
-      channel: ${{ matrix.channel }}
+      channel: ${{ matrix.build.channel }}
       profile: ${{ matrix.profile }}
-      package-version: ${{ matrix.channel == 'lts' && needs.resolve-builds.outputs.lts-package-version || needs.resolve-builds.outputs.preview-package-version }}
+      package-version: ${{ matrix.build.version }}
 
   test-compat:
     needs: [resolve-builds, build-all]
@@ -85,17 +64,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        channel: [lts, preview]
+        build: ${{ fromJson(needs.resolve-builds.outputs.builds) }}
         profile: [es5, es2015, es2020]
     uses: ./.github/workflows/ci-profile-test.yml
     with:
-      channel: ${{ matrix.channel }}
+      channel: ${{ matrix.build.channel }}
       profile: ${{ matrix.profile }}
-      package-version: ${{ matrix.channel == 'lts' && needs.resolve-builds.outputs.lts-package-version || needs.resolve-builds.outputs.preview-package-version }}
+      package-version: ${{ matrix.build.version }}
 
-  package-lts:
-    needs: [build-all, test-compat]
+  package-all:
+    needs: [resolve-builds, build-all, test-compat]
     if: ${{ always() && needs.build-all.result == 'success' && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build: ${{ fromJson(needs.resolve-builds.outputs.builds) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -113,62 +96,25 @@ jobs:
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: LegacyBlazorJs-build-lts-*
-          path: .work/ci/lts
+          pattern: LegacyBlazorJs-build-${{ matrix.build.channel }}-*
+          path: .work/ci/${{ matrix.build.channel }}
 
-      - name: Assemble LTS profile artifacts
-        run: node scripts/build/assemble-profile-builds.mjs .work/ci/lts
+      - name: Assemble profile artifacts (${{ matrix.build.channel }})
+        run: node scripts/build/assemble-profile-builds.mjs .work/ci/${{ matrix.build.channel }}
 
-      - name: Pack final LTS package
+      - name: Pack final package (${{ matrix.build.channel }})
         run: node scripts/build/package-from-build-summary.mjs
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: LegacyBlazorJs-release-lts
-          path: |
-            dist/**/*
-            artifacts/packages/*.nupkg
-            artifacts/packages/build-summary.json
-
-  package-preview:
-    needs: [build-all, test-compat]
-    if: ${{ always() && needs.build-all.result == 'success' && (needs.test-compat.result == 'success' || needs.test-compat.result == 'skipped') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: latest
-      - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
-        with:
-          dotnet-version: latest
-          dotnet-quality: preview
-      - name: Install npm dependencies
-        run: npm ci --ignore-scripts
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: LegacyBlazorJs-build-preview-*
-          path: .work/ci/preview
-
-      - name: Assemble preview profile artifacts
-        run: node scripts/build/assemble-profile-builds.mjs .work/ci/preview
-
-      - name: Pack final preview package
-        run: node scripts/build/package-from-build-summary.mjs
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: LegacyBlazorJs-release-preview
+          name: LegacyBlazorJs-release-${{ matrix.build.channel }}
           path: |
             dist/**/*
             artifacts/packages/*.nupkg
             artifacts/packages/build-summary.json
 
   assemble-release-artifacts:
-    needs: [package-lts, package-preview]
+    needs: [package-all]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -182,24 +128,21 @@ jobs:
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: LegacyBlazorJs-release-lts
-          path: .work/release/lts
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: LegacyBlazorJs-release-preview
-          path: .work/release/preview
+          pattern: LegacyBlazorJs-release-*
+          path: .work/release
 
-      - name: Merge channel release artifacts
+      - name: Merge release artifacts
         run: |
           rm -rf dist artifacts/packages
           mkdir -p dist artifacts/packages
-          cp -a .work/release/lts/dist/. dist/
-          cp -a .work/release/preview/dist/. dist/
-          cp -a .work/release/lts/artifacts/packages/*.nupkg artifacts/packages/
-          cp -a .work/release/preview/artifacts/packages/*.nupkg artifacts/packages/
-          node scripts/build/merge-build-summaries.mjs \
-            .work/release/lts/artifacts/packages/build-summary.json \
-            .work/release/preview/artifacts/packages/build-summary.json
+          while IFS= read -r dist_dir; do
+            cp -a "$dist_dir"/. dist/
+          done < <(find .work/release -type d -path '*/dist' | sort)
+          while IFS= read -r nupkg; do
+            cp -a "$nupkg" artifacts/packages/
+          done < <(find .work/release -type f -path '*/artifacts/packages/*.nupkg' | sort)
+          mapfile -t summaries < <(find .work/release -type f -path '*/artifacts/packages/build-summary.json' | sort)
+          node scripts/build/merge-build-summaries.mjs "${summaries[@]}"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

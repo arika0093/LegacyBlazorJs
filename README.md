@@ -100,7 +100,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 To be specific, the process is as follows:
 
 1. First, resolve the upstream [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore) targets.
-    * By default, the build targets the latest LTS line and the latest preview line.
+    * By default, the build targets the configured `net9`, `net10`, and `net11-preview` lines.
     * The defaults are controlled in [config/majors.json](config/majors.json) and can be overridden with environment variable `BUILD_CHANNELS`.
 2. Clone the upstream.
 3. Build the upstream JavaScript packages with npm workspaces.

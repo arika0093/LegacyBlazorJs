@@ -3,7 +3,7 @@ name: CI profile test
 on:
   workflow_call:
     inputs:
-      # The build channel to test against, e.g. "lts" or "preview"
+      # The build channel to test against, e.g. "current" or "preview"
       channel:
         required: true
         type: string

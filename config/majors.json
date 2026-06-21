@@ -1,7 +1,11 @@
 {
-  "defaultBuildChannels": ["lts", "preview"],
+  "defaultBuildChannels": ["net9", "current", "preview"],
   "channels": {
-    "lts": {
+    "net9": {
+      "major": 9,
+      "prereleaseMode": "stable"
+    },
+    "current": {
       "major": 10,
       "prereleaseMode": "stable"
     },

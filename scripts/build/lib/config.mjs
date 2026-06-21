@@ -61,6 +61,10 @@ function normalizeChannel(name) {
   return name.trim().toLowerCase();
 }
 
+function toChannelEnvKey(name) {
+  return normalizeChannel(name).replace(/[^a-z0-9]+/g, '_').toUpperCase();
+}
+
 export async function getConfiguredBuildChannels() {
   const { defaultBuildChannels = [], channels = {} } = await readMajorsConfig();
   const requested = splitCsvEnv(process.env.BUILD_CHANNELS ?? process.env.BUILD_CHANNEL);
@@ -74,7 +78,7 @@ export async function getConfiguredBuildChannels() {
       throw new Error(`Unknown build channel '${name}'. Expected one of: ${Object.keys(channels).join(', ')}`);
     }
 
-    const majorOverride = process.env[`${name.toUpperCase()}_DOTNET_MAJOR`];
+    const majorOverride = process.env[`${toChannelEnvKey(name)}_DOTNET_MAJOR`];
     const major = Number(majorOverride ?? configured.major);
     if (Number.isNaN(major)) {
       throw new Error(`Invalid .NET major for build channel '${name}': ${majorOverride ?? configured.major}`);
