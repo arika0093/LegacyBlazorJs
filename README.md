@@ -67,7 +67,7 @@ The versions listed below are available.
 
 | Version   | Browser target    | Notes                       |
 |-----------|-------------------|-----------------------------|
-| `es5`     | Chrome 23+, IE 11 | Only `blazor.server` works. |
+| `es5`     | Chrome 23+, IE 11 | `blazor.server` only works. |
 | `es2015`  | Chrome 49+ | |
 | `es2017`  | Chrome 58+ | |
 | `es2018`  | Chrome 64+ | |
