@@ -4,17 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "resolve-version": "node scripts/build/resolve-version.mjs",
-    "resolve-builds": "node scripts/build/resolve-builds.mjs",
-    "build:variants": "node scripts/build/build-variants.mjs",
-    "build": "node scripts/build/build-all.mjs",
-    "build:quick": "LEGACY_BLAZOR_DISABLE_TERSER=true SKIP_PREBUILD=true BUILD_CHANNEL=current BUILD_TARGET_PROFILES=es2015 node scripts/build/build-all.mjs",
-    "build:quick-prev": "LEGACY_BLAZOR_DISABLE_TERSER=true SKIP_PREBUILD=true BUILD_CHANNEL=preview BUILD_TARGET_PROFILES=es2015 node scripts/build/build-all.mjs",
-    "test:smoke": "node --test tests/PlaywrightTest/smoke.test.mjs",
-    "test:compat": "node scripts/test/run-compat-tests.mjs",
-    "readme:compat": "node scripts/test/update-readme-compat.mjs",
-    "test:compat:update-readme": "node scripts/test/run-compat-tests.mjs && node scripts/test/update-readme-compat.mjs",
-    "setup:compat-browser": "node scripts/test/setup-compat-browser.mjs"
+    "resolve-version": "node src/build/resolve-version.mjs",
+    "resolve-builds": "node src/build/resolve-builds.mjs",
+    "build:variants": "node src/build/build-variants.mjs",
+    "build": "node src/build/index.mjs",
+    "build:quick": "LEGACY_BLAZOR_DISABLE_TERSER=true SKIP_PREBUILD=true BUILD_CHANNEL=current BUILD_TARGET_PROFILES=es2015 node src/build/index.mjs",
+    "build:quick-prev": "LEGACY_BLAZOR_DISABLE_TERSER=true SKIP_PREBUILD=true BUILD_CHANNEL=preview BUILD_TARGET_PROFILES=es2015 node src/build/index.mjs",
+    "test:smoke": "node --test tests/ChromeSmokeTest/smoke.test.mjs",
+    "test:compat": "node src/run/run-compat-tests.mjs",
+    "readme:compat": "node src/run/update-readme-compat.mjs",
+    "test:compat:update-readme": "node src/run/run-compat-tests.mjs && node src/run/update-readme-compat.mjs",
+    "setup:compat-browser": "node src/run/setup-compat-browser.mjs",
+    "readme:status": "node util/update-readme-status.mjs"
   },
   "engines": {
     "node": ">=20"
