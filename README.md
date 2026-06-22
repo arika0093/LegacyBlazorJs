@@ -146,10 +146,10 @@ Therefore, the following Polyfills and Patches are applied.
 
 Before building, apply the following patches first. These patches basically replace the upstream code itself with simple fixes.
 
-* [batch-blazor-regex.mjs](./scripts/build/patches/patch-blazor-regex.mjs)
+* [batch-blazor-regex.mjs](./src/build/patches/patch-blazor-regex.mjs)
   * Blazor uses a regular expression to retrieve comments (`<!--Blazor:*** -->`) included in HTML and connect them, but the regular expression uses Name Capture Group.
   * Name Capture Group is [only supported](https://caniuse.com/mdn-javascript_regular_expressions_named_capturing_group) in ES2018 and later, so it is modified to retrieve it by index specification.
-* [patch-signalr-logging.mjs](./scripts/build/patches/patch-signalr-logging.mjs)
+* [patch-signalr-logging.mjs](./src/build/patches/patch-signalr-logging.mjs)
   * Replaces the SignalR log output level.
   * By default, this results in a warning, but it makes debugging easier.
   * This is only effective during development; it remains unchanged in the release version.
@@ -157,7 +157,7 @@ Before building, apply the following patches first. These patches basically repl
 ### Rollup Build
 
 Overview of the build process is as follows. 
-see [rollup-plugins](./scripts/build/lib/rollup-plugins/index.mjs) for details.
+see [rollup-plugins](./src/build/rollup-plugins/index.mjs) for details.
 
 * Convert CommonJS modules to ES modules.
 * Insert Polyfill for [whatwg-fetch](https://github.com/whatwg/fetch) and [webcomponents](https://github.com/webcomponents/polyfills).

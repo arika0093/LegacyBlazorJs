@@ -36,7 +36,7 @@ jobs:
       
       - name: Resolve configured package lines
         id: builds
-        run: node scripts/build/resolve-builds.mjs
+        run: node src/build/resolve-builds.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
 

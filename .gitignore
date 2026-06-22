@@ -1,8 +1,8 @@
 node_modules/
 .work/
 artifacts/
-src/LegacyBlazorJs/wwwroot/*
-!src/LegacyBlazorJs/wwwroot/.gitkeep
+dotnet/src/LegacyBlazorJs/wwwroot/*
+!dotnet/src/LegacyBlazorJs/wwwroot/.gitkeep
 bin/
 obj/
 *.nupkg

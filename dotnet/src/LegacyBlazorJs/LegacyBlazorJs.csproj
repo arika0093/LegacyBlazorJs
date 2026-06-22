@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>$(LegacyBlazorTargetFramework)</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <PackageId>LegacyBlazorJs</PackageId>
+    <Authors>LegacyBlazorJs contributors</Authors>
+    <Description>Browser-targeted builds of the official ASP.NET Core blazor.web.js.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/arika0093/LegacyBlazorJs</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>false</IncludeSymbols>
+    <NoWarn>$(NoWarn);NU5100</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

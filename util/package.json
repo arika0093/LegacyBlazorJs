@@ -1,0 +1,15 @@
+{
+  "name": "legacy-blazor-js-util",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "update-readme-status": "node update-readme-status.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "optionalDependencies": {
+    "undici": "^7.16.0"
+  }
+}
