@@ -10,13 +10,13 @@ on:
       publish_github:
         description: Create GitHub releases
         type: boolean
-        default: false
+        default: true
       publish_nuget:
         description: Publish packages to NuGet.org
         type: boolean
-        default: false
+        default: true
   schedule:
-    - cron: '23 7 * * 1'
+    - cron: '23 7 * * 3'
 
 permissions:
   contents: write
@@ -255,7 +255,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Commit and push README changes
-        uses: stefanzweifel/git-auto-commit-action@b863ae1c6b1ed6fd6f52175a4f6da91a0f4f6367 # v5.3.0
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "docs: update build status tables [weekly]"
           file_pattern: "README.md"
