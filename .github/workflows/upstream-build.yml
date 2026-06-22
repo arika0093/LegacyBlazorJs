@@ -1,8 +1,8 @@
-name: Weekly smoke test upstream main
+name: Daily build and testing
 
 on:
   schedule:
-    - cron: '53 5 * * 1' # Run at 5:53 AM UTC every Monday
+    - cron: '0 21 * * *' # Run at 21:00 UTC everyday
   workflow_dispatch:
 
 permissions:
