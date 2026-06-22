@@ -22,7 +22,7 @@ Our goal is to make this work on the following platforms:
 
 ### Automation
 
-The build, verification, and release processes are [automated and scheduled](./.github/workflows/ci.yml) to run regularly. This allows us to:
+The build, verification, and release processes are [automated](#build-status) and scheduled to run regularly. This allows us to:
 
 * Instant access to upstream updates and breaking changes.
 * Released versions should pass testing and therefore function correctly.
@@ -103,7 +103,24 @@ The profile definitions are in [config/targets.json](config/targets.json).
 2. The SignalR connection can be established, but subsequent UI updates are broken.
 3. Confirmed to work. Since regular testing is not performed, it may stop working at some point.
 
-## Development Guide
+## Build status
+### Weekly release builds
+
+<!-- start:weekly-release-builds -->
+| Result | Run ID | Date | Message |
+|--------|--------|------|---------|
+| - | - | - | No recent scheduled runs |
+<!-- end:weekly-release-builds -->
+
+### Daily main build
+
+<!-- start:daily-main-build -->
+| Result | Run ID | Date | Message | Upstream main hash |
+|--------|--------|------|---------|--------------------|
+| - | - | - | No recent scheduled runs | - |
+<!-- end:daily-main-build -->
+
+## Development guide
 ### How it works
 
 To be specific, the process is as follows:
