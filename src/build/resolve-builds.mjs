@@ -29,7 +29,6 @@ async function resolveBuild(channel) {
 
 const channels = await getConfiguredBuildChannels();
 const builds = await Promise.all(channels.map(resolveBuild));
-const { readTargetsConfig } = await import('./lib/config.mjs');
 const targetProfiles = Object.keys(await readTargetsConfig());
 
 console.log(JSON.stringify({ builds, targetProfiles }, null, 2));
