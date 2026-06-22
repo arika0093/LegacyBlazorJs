@@ -255,13 +255,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Commit and push README changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet README.md; then
-            echo "No README changes to commit."
-            exit 0
-          fi
-          git add README.md
-          git commit -m "docs: update build status tables [weekly]"
-          git push
+        uses: stefanzweifel/git-auto-commit-action@b863ae1c6b1ed6fd6f52175a4f6da91a0f4f6367 # v5.3.0
+        with:
+          commit_message: "docs: update build status tables [weekly]"
+          file_pattern: "README.md"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
