@@ -109,7 +109,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:weekly-release-builds -->
 | Result | Run ID | Date | Message |
 |--------|--------|------|---------|
-| - | - | - | No recent scheduled runs |
+| ❌ | [#24](https://github.com/arika0093/LegacyBlazorJs/actions/runs/27942781392) | 2026-06-22 | Error in update-readme |
 <!-- end:weekly-release-builds -->
 
 ### Daily main build
@@ -117,7 +117,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:daily-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
-| - | - | - | No recent scheduled runs | - |
+| ❌ | [#1](https://github.com/arika0093/LegacyBlazorJs/actions/runs/27986118987) | 2026-06-22 | Error in resolve-build-metadata | [5b47094e](https://github.com/dotnet/aspnetcore/commit/5b47094e) |
 <!-- end:daily-main-build -->
 
 ## Development guide
