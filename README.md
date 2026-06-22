@@ -133,7 +133,7 @@ To be specific, the process is as follows:
     * [JSInterop](https://github.com/dotnet/aspnetcore/tree/main/src/JSInterop/Microsoft.JSInterop.JS/src)
     * [SignalR](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/clients/ts/signalr)
     * dotnet.js is built in the [runtime](https://github.com/dotnet/runtime/tree/main/src/mono/wasm), but since it is loaded by dynamic import, it does not need to be built in advance.
-5. It is compiled by [roolup](https://rollupjs.org/).
+5. It is compiled by [rollup](https://rollupjs.org/).
     * At this time, by inserting a transformation plugin via Babel, it is converted for older browsers such as ES2015.
 6. The generated JS files are packaged together into `LegacyBlazorJs`.
 7. Smoke tests are performed (using an old Chromium), and then the package is released.
