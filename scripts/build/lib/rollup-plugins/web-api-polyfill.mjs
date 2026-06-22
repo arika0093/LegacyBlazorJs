@@ -89,6 +89,17 @@ function needsCustomElementsPolyfill(targets) {
   return chromeMajor !== null && chromeMajor < 54;
 }
 
+// https://caniuse.com/abortcontroller
+// IE11, Chrome before 66
+function needsAbortControllerPolyfill(targets) {
+  const ieMajor = getTargetMajor(targets, 'ie');
+  if (ieMajor !== null && ieMajor <= 11) {
+    return true;
+  }
+  const chromeMajor = getTargetMajor(targets, 'chrome');
+  return chromeMajor !== null && chromeMajor < 66;
+}
+
 // https://caniuse.com/mdn-api_node_getrootnode
 // All IE, Chrome before 54
 function needsDomApiShims(targets, profile) {
@@ -133,6 +144,12 @@ function resolvePolyfillEntries(targets, profile) {
   if (needsCustomElementsPolyfill(targets)) {
     entries.push({
       path: require.resolve('@webcomponents/custom-elements/custom-elements.min.js'),
+    });
+  }
+
+  if (needsAbortControllerPolyfill(targets)) {
+    entries.push({
+      path: require.resolve('abortcontroller-polyfill/dist/abortcontroller-polyfill-only.js'),
     });
   }
 

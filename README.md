@@ -149,11 +149,10 @@ Before building, apply the following patches first. These patches basically repl
 * [batch-blazor-regex.mjs](./scripts/build/patches/patch-blazor-regex.mjs)
   * Blazor uses a regular expression to retrieve comments (`<!--Blazor:*** -->`) included in HTML and connect them, but the regular expression uses Name Capture Group.
   * Name Capture Group is [only supported](https://caniuse.com/mdn-javascript_regular_expressions_named_capturing_group) in ES2018 and later, so it is modified to retrieve it by index specification.
-* [patch-signalr-abort-controller.mjs](./scripts/build/patches/patch-signalr-abort-controller.mjs)
-  * AbortController is [not supported](https://caniuse.com/abortcontroller) in older browsers, so if it is not available, it is modified not to use it.
 * [patch-signalr-logging.mjs](./scripts/build/patches/patch-signalr-logging.mjs)
-  * Replaces the SignalR log output level for development purposes.
-  * This is primarily for testing purposes.
+  * Replaces the SignalR log output level.
+  * By default, this results in a warning, but it makes debugging easier.
+  * This is only effective during development; it remains unchanged in the release version.
 
 ### Rollup Build
 
