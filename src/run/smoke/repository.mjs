@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { getRootDir } from '../compat.mjs';
+import { getRootDir } from '../lib/compat.mjs';
 
 export const repositoryRoot = getRootDir();
 export const packageSourceDirectory = path.join(repositoryRoot, 'artifacts', 'packages');
