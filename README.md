@@ -2,29 +2,36 @@
 
 Rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
 
-## Motivation
-### Background
+## Overview
+### Motivation
 
 The official ASP.NET Core [Blazor browser support](https://learn.microsoft.com/en-us/aspnet/core/blazor/supported-platforms) targets "evergreen" browsers only.
 
 However, there are cases where supporting older browsers is necessary, especially for enterprise use.
-Unfortunately, .NET 9 and later target [ES2022](https://github.com/dotnet/aspnetcore/blob/v9.0.0/src/Components/Shared.JS/tsconfig.json#L3), and there have been [reports](https://github.com/dotnet/aspnetcore/issues/58212) of it not working on somewhat older browsers.
+Unfortunately, .NET 9 and later target ES2022, and there have been [reports](https://github.com/dotnet/aspnetcore/issues/58212) of it not working on somewhat older browsers.
 
 This project aims to make Blazor available on older browsers by rebuilding the Blazor JavaScript runtime, blazor.web.js, to support multiple versions from ES5 to ES2022.
+
+### Goals
+
+Our goal is to make this work on the following platforms:
+
+* Chrome 23+ (This is the first Chrome to support [ES5](https://caniuse.com/es5))
+* Internet Explorer 11 (As much as possible. Testing is insufficient, but it works for now)
+* And newer browsers. It should probably work on any Chrome-based browser.
 
 ### Automation
 
 The build, verification, and release processes are [automated and scheduled](./.github/workflows/ci.yml) to run regularly. This allows us to:
+
 * Instant access to upstream updates and breaking changes.
 * Released versions should pass testing and therefore function correctly.
 * Updates continue even if I lose interest. (Sustainability!)
 
 ## How to use
-### Use from NuGet packages
+### from NuGet packages
 
 [![Current](https://img.shields.io/nuget/v/LegacyBlazorJs?logo=nuget&label=current)](https://www.nuget.org/packages/LegacyBlazorJs) [![Preview](https://img.shields.io/nuget/vpre/LegacyBlazorJs?logo=nuget&label=preview)](https://www.nuget.org/packages/LegacyBlazorJs)
-
-
 
 Install the [NuGet package](https://www.nuget.org/packages/LegacyBlazorJs) `LegacyBlazorJs` in your Blazor application.
 
@@ -43,7 +50,7 @@ Then, replace the official script in your Blazor Web App's `Components/App.razor
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
 
-### Use from GitHub Release
+### from GitHub Release
 
 You can also download and use the compiled JavaScript files from GitHub Releases, which are uploaded there.
 
@@ -60,8 +67,10 @@ The following files are included under `_content/LegacyBlazorJs/`:
 
 - blazor.web.{version}.js
 - blazor.server.{version}.js
-- blazor.webassembly.{version}.js 
-- blazor.webview.{version}.js
+
+> [!TIP]
+> When running on Blazor Server, there is not much difference between the two. 
+> `blazor.server.js` is recommended because it has simpler functionality and a smaller size.
 
 The versions listed below are available.
 
@@ -80,7 +89,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 
 | Target | Browser | Version | Server |
 |--------|---------|---------|--------|
-| es5    | IE      | 9       | ❌️(1)  |
+| es5    | IE      | ~9      | ❌️(1)  |
 | es5    | IE      | 10      | ❌️(2)  |
 | es5    | IE      | 11      | 👌(3)  |
 | es5    | Chrome  | 23      | ✅     |
@@ -100,17 +109,16 @@ The profile definitions are in [config/targets.json](config/targets.json).
 To be specific, the process is as follows:
 
 1. First, resolve the upstream [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore) targets.
-    * By default, the build targets the configured `net9`, `net10`, and `net11-preview` lines.
-    * The defaults are controlled in [config/majors.json](config/majors.json) and can be overridden with environment variable `BUILD_CHANNELS`.
+    * The defaults are controlled in [config/majors.json](config/majors.json).
 2. Clone the upstream.
 3. Build the upstream JavaScript packages with npm workspaces.
 4. Build the dependencies in advance. As of .NET 10, the following are included in the dependencies.
     * [JSInterop](https://github.com/dotnet/aspnetcore/tree/main/src/JSInterop/Microsoft.JSInterop.JS/src)
     * [SignalR](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/clients/ts/signalr)
     * dotnet.js is built in the [runtime](https://github.com/dotnet/runtime/tree/main/src/mono/wasm), but since it is loaded by dynamic import, it does not need to be built in advance.
-5. It is compiled by `@rollup/plugin-typescript`.
+5. It is compiled by [roolup](https://rollupjs.org/).
     * At this time, by inserting a transformation plugin via Babel, it is converted for older browsers such as ES2015.
-6. The generated JS files (`blazor.(type).(version).js`) are packaged together into `LegacyBlazorJs`.
+6. The generated JS files are packaged together into `LegacyBlazorJs`.
 7. Smoke tests are performed (using an old Chromium), and then the package is released.
     * It is released with the same version as the upstream.
 
@@ -127,8 +135,8 @@ Before building, apply the following patches first. These patches basically repl
 * [patch-signalr-abort-controller.mjs](./scripts/build/patches/patch-signalr-abort-controller.mjs)
   * AbortController is [not supported](https://caniuse.com/abortcontroller) in older browsers, so if it is not available, it is modified not to use it.
 * [patch-signalr-logging.mjs](./scripts/build/patches/patch-signalr-logging.mjs)
-  * If `SIGNALR_LOGGING` is set (for example, `SIGNALR_LOGGING=Debug`), it replaces the default `logLevel: LogLevel.Warning` in `src/Platform/Circuits/CircuitStartOptions.ts`.
-  * Valid values are `Trace`, `Debug`, `Information`, `Warning`, `Error`, and `Critical`.
+  * Replaces the SignalR log output level for development purposes.
+  * This is primarily for testing purposes.
 
 ### Rollup Build
 
