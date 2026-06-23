@@ -39,7 +39,7 @@ jobs:
       - name: Resolve upstream main commit
         id: upstream
         run: |
-          SHA=$(git ls-remote https://github.com/dotnet/aspnetcore.git main | cut -f1)
+          SHA=$(git ls-remote https://github.com/dotnet/aspnetcore.git refs/heads/main | awk '{print $1}')
           echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
 
   # Build the upstream-main package variants to detect layout/build regressions early
