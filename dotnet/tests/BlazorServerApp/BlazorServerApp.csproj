@@ -6,6 +6,6 @@
     <RootNamespace>BlazorServerApp</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\LegacyBlazorJs\LegacyBlazorJs.csproj" />
+    <PackageReference Include="LegacyBlazorJs" Version="__PACKAGE_VERSION__" />
   </ItemGroup>
 </Project>

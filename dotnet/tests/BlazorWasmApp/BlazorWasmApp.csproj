@@ -11,6 +11,6 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="__ASPNETCORE_VERSION__" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\LegacyBlazorJs\LegacyBlazorJs.csproj" />
+    <PackageReference Include="LegacyBlazorJs" Version="__PACKAGE_VERSION__" />
   </ItemGroup>
 </Project>
