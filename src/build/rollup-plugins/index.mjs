@@ -1,5 +1,4 @@
 import { legacyCommonjsPlugin } from './commonjs.mjs';
-import { legacyWhatwgFetchPlugin } from './whatwg-fetch.mjs';
 import { legacyCoreJsPolyfillPlugin } from './corejs-polyfill.mjs';
 import { legacyWebApiPolyfillPlugin } from './web-api-polyfill.mjs';
 import { legacyDynamicImportPlugin } from './dynamic-import.mjs';
@@ -14,7 +13,6 @@ export function legacyBlazorPlugins(targets, profile = process.env.LEGACY_BLAZOR
   return [
     legacyCommonjsPlugin(),
     // Prepend non-ECMAScript Web API polyfills before any entry code runs
-    legacyWhatwgFetchPlugin(),
     legacyWebApiPolyfillPlugin(targets, profile),
     // Convert syntax and features to be compatible with legacy environments, based on specified targets
     legacyBabelPlugin(targets),

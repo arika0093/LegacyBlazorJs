@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { injectModuleImport } from '../lib/legacy-output.mjs';
+import { sourceUsesFetch } from '../lib/legacy-output.mjs';
 
 const require = createRequire(import.meta.url);
 const VIRTUAL_ID = 'legacy-blazor-web-api-polyfill';
 const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-web-api-polyfill.js';
+const WHATWG_FETCH_VIRTUAL_ID = 'legacy-blazor-whatwg-fetch';
+const WHATWG_FETCH_RESOLVED_VIRTUAL_ID = '\0legacy-blazor-whatwg-fetch';
 const ENTRY_MODULE_PATTERN = /\/Boot\.(?:Server|Web|WebAssembly|WebView)\.ts$/;
 
 export const legacyDomApiShimsSource = `
@@ -111,6 +113,17 @@ function needsDomApiShims(targets, profile) {
   return chromeMajor !== null && chromeMajor < 54;
 }
 
+// https://caniuse.com/fetch
+// IE, Chrome before 42
+function needsFetchPolyfill(targets) {
+  const ieMajor = getTargetMajor(targets, 'ie');
+  if (ieMajor !== null && ieMajor <= 11) {
+    return true;
+  }
+  const chromeMajor = getTargetMajor(targets, 'chrome');
+  return chromeMajor !== null && chromeMajor < 42;
+}
+
 function patchMutationObserverPackageSource(source) {
   return [
     '(function (window) {',
@@ -162,10 +175,21 @@ function resolvePolyfillEntries(targets, profile) {
   return entries;
 }
 
+function injectModuleImport(source, moduleId) {
+  const importLine = `import ${JSON.stringify(moduleId)};`;
+  if (source.includes(importLine)) {
+    return source;
+  }
+
+  return `${importLine}\n${source}`;
+}
+
 export function legacyWebApiPolyfillPlugin(targets, profile)
 {
   const polyfillEntries = resolvePolyfillEntries(targets, profile);
+  const needsFetch = needsFetchPolyfill(targets);
   let polyfillSource = null;
+  let fetchPolyfillSource = null;
 
   return {
     name: 'legacy-web-api-polyfill',
@@ -181,6 +205,10 @@ export function legacyWebApiPolyfillPlugin(targets, profile)
       }));
 
       polyfillSource = parts.filter(Boolean).join('\n');
+
+      if (needsFetch) {
+        fetchPolyfillSource = await readFile(require.resolve('whatwg-fetch/fetch.js'), 'utf8');
+      }
     },
     resolveId(source)
     {
@@ -189,30 +217,54 @@ export function legacyWebApiPolyfillPlugin(targets, profile)
         return RESOLVED_VIRTUAL_ID;
       }
 
+      if (source === WHATWG_FETCH_VIRTUAL_ID)
+      {
+        return WHATWG_FETCH_RESOLVED_VIRTUAL_ID;
+      }
+
       return null;
     },
     load(id)
     {
-      if (id !== RESOLVED_VIRTUAL_ID)
+      if (id === RESOLVED_VIRTUAL_ID)
       {
-        return null;
+        if (polyfillSource === null)
+        {
+          throw new Error('web API polyfill source was not generated before load.');
+        }
+
+        return polyfillSource;
       }
 
-      if (polyfillSource === null)
+      if (id === WHATWG_FETCH_RESOLVED_VIRTUAL_ID)
       {
-        throw new Error('web API polyfill source was not generated before load.');
+        if (fetchPolyfillSource === null)
+        {
+          throw new Error('whatwg-fetch polyfill source was not generated before load.');
+        }
+
+        return fetchPolyfillSource;
       }
 
-      return polyfillSource;
+      return null;
     },
     transform(code, id)
     {
-      if (id === RESOLVED_VIRTUAL_ID || !ENTRY_MODULE_PATTERN.test(id) || !polyfillEntries.length)
+      if (id === RESOLVED_VIRTUAL_ID || id === WHATWG_FETCH_RESOLVED_VIRTUAL_ID || !ENTRY_MODULE_PATTERN.test(id))
       {
         return null;
       }
 
-      const transformed = injectModuleImport(code, VIRTUAL_ID);
+      let transformed = code;
+
+      if (polyfillEntries.length) {
+        transformed = injectModuleImport(transformed, VIRTUAL_ID);
+      }
+
+      if (needsFetch && sourceUsesFetch(transformed, id)) {
+        transformed = injectModuleImport(transformed, WHATWG_FETCH_VIRTUAL_ID);
+      }
+
       return transformed === code ? null : { code: transformed, map: null };
     },
   };

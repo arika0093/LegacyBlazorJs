@@ -12,7 +12,6 @@ const generate = generatorModule.default ?? generatorModule;
 export const LEGACY_DYNAMIC_IMPORT_HELPER_NAME = '__legacyDynamicImport';
 export const LEGACY_DYNAMIC_IMPORT_HELPER_SOURCE =
   'function __legacyDynamicImport(u) { return Function("u", "return import(u)")(u); }';
-export const WHATWG_FETCH_VIRTUAL_MODULE_ID = 'legacy-blazor-whatwg-fetch';
 
 function parseSource(source, filename) {
   return parser.parse(source, {
@@ -112,14 +111,6 @@ export function sourceUsesFetch(source, filename = 'chunk.js') {
   });
 
   return usesFetch;
-}
-
-export function injectWhatwgFetchPolyfillImport(source, moduleId = WHATWG_FETCH_VIRTUAL_MODULE_ID, filename = 'chunk.js') {
-  if (!sourceUsesFetch(source, filename)) {
-    return source;
-  }
-
-  return injectModuleImport(source, moduleId);
 }
 
 export function injectModuleImport(source, moduleId) {
