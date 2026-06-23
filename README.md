@@ -15,7 +15,11 @@ The official ASP.NET Core [Blazor browser support](https://learn.microsoft.com/e
 However, there are cases where supporting older browsers is necessary, especially for enterprise use.
 Unfortunately, .NET 9 and later target ES2022, and there have been [reports](https://github.com/dotnet/aspnetcore/issues/58212) of it not working on somewhat older browsers.
 
-This project aims to make Blazor available on older browsers by rebuilding the Blazor JavaScript runtime, blazor.web.js, to support multiple versions from ES5 to ES2022.
+This project aims to make Blazor Server available on older browsers by rebuilding the Blazor JavaScript runtime, blazor.web.js, to support multiple versions from ES5 to ES2022.
+
+> [!WARNING]
+> This project is focused on Blazor Server only. WebAssembly is not supported.  
+> More details are in the [here](#why-does-not-support-webassembly) section.
 
 ### Goals
 
@@ -48,8 +52,12 @@ Then, replace the official script in your Blazor Web App's `Components/App.razor
 
 ```diff
 - <script src="@Assets["_framework/blazor.web.js"]"></script>
-+ <script src="@Assets["_content/LegacyBlazorJs/blazor.web.es2015.js"]"></script>
++ <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es2015.js"]"></script>
 ```
+
+> [!TIP]
+> If you do not use WebAssembly features, there is no particular reason to use `blazor.web.js`.
+> We recommend using `blazor.server.js`, which has a smaller file size.
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
 
@@ -70,10 +78,6 @@ The following files are included under `_content/LegacyBlazorJs/`:
 
 - blazor.web.{version}.js
 - blazor.server.{version}.js
-
-> [!TIP]
-> When running on Blazor Server, there is not much difference between the two. 
-> `blazor.server.js` is recommended because it has simpler functionality and a smaller size.
 
 The versions listed below are available.
 
