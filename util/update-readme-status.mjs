@@ -130,8 +130,8 @@ async function resolveReleaseTag(run, githubToken) {
   }
 }
 
-async function resolveWeeklyMessage(run, githubToken) {
-  if (run.conclusion === 'success') {
+async function resolveWeeklyMessage(run, runConclusion, githubToken) {
+  if (runConclusion === 'success') {
     const releaseTag = await resolveReleaseTag(run, githubToken);
     if (releaseTag) {
       return `[v${releaseTag} released](https://github.com/${REPO}/releases/tag/v${releaseTag})`;
@@ -142,6 +142,36 @@ async function resolveWeeklyMessage(run, githubToken) {
   const jobs = await fetchRunJobs(run.id, githubToken);
   const failedJob = jobs.find(job => job.conclusion === 'failure' || job.conclusion === 'timed_out');
   return failedJob?.name ? `Error in ${failedJob.name}` : 'Error';
+}
+
+const CURRENT_RUN_ID = process.env.GITHUB_RUN_ID;
+
+function isCurrentRun(run) {
+  return CURRENT_RUN_ID && String(run.id) === CURRENT_RUN_ID;
+}
+
+async function resolveEffectiveConclusion(run, githubToken) {
+  if (run.conclusion) {
+    return run.conclusion;
+  }
+  if (!isCurrentRun(run)) {
+    return run.status;
+  }
+
+  const jobs = await fetchRunJobs(run.id, githubToken);
+  // Exclude the current update-readme job, which is still running while this code executes.
+  const relevantJobs = jobs.filter(job => !/update.?readme/i.test(job.name));
+  const hasFailure = relevantJobs.some(
+    job => job.conclusion === 'failure' || job.conclusion === 'timed_out'
+  );
+  if (hasFailure) {
+    return 'failure';
+  }
+  const allCompleted = relevantJobs.every(job => job.status === 'completed');
+  if (allCompleted) {
+    return 'success';
+  }
+  return run.status;
 }
 
 async function resolveUpstreamMainHash(run, githubToken) {
@@ -157,11 +187,11 @@ async function resolveUpstreamMainHash(run, githubToken) {
 async function buildWeeklyRows(runs, githubToken) {
   const rows = [];
   for (const run of runs) {
-    const status = run.conclusion || run.status;
+    const conclusion = await resolveEffectiveConclusion(run, githubToken);
     const runLink = `[#${run.run_number}](${run.html_url})`;
     const date = formatDate(run.run_started_at || run.created_at);
-    const message = await resolveWeeklyMessage(run, githubToken);
-    rows.push(`| ${STATUS_EMOJI[status] ?? '❓'} | ${runLink} | ${date} | ${message} |`);
+    const message = await resolveWeeklyMessage(run, conclusion, githubToken);
+    rows.push(`| ${STATUS_EMOJI[conclusion] ?? '❓'} | ${runLink} | ${date} | ${message} |`);
   }
   return rows.join('\n');
 }
@@ -169,18 +199,18 @@ async function buildWeeklyRows(runs, githubToken) {
 async function buildDailyRows(runs, githubToken) {
   const rows = [];
   for (const run of runs) {
-    const status = run.conclusion || run.status;
+    const conclusion = await resolveEffectiveConclusion(run, githubToken);
     const runLink = `[#${run.run_number}](${run.html_url})`;
     const date = formatDate(run.run_started_at || run.created_at);
     let message = '';
-    if (status !== 'success') {
+    if (conclusion !== 'success') {
       const jobs = await fetchRunJobs(run.id, githubToken);
       const failedJob = jobs.find(job => job.conclusion === 'failure' || job.conclusion === 'timed_out');
       message = failedJob?.name ? `Error in ${failedJob.name}` : 'Error';
     }
     const upstreamHash = await resolveUpstreamMainHash(run, githubToken);
-    const upstreamLink = `[${upstreamHash}](https://github.com/${UPSTREAM_REPO}/commit/${upstreamHash})`;
-    rows.push(`| ${STATUS_EMOJI[status] ?? '❓'} | ${runLink} | ${date} | ${message} | ${upstreamLink} |`);
+    const upstreamLink = `[${upstreamHash}](https://github.com/${UPSTREAM_REPO}/tree/${upstreamHash})`;
+    rows.push(`| ${STATUS_EMOJI[conclusion] ?? '❓'} | ${runLink} | ${date} | ${message} | ${upstreamLink} |`);
   }
   return rows.join('\n');
 }
