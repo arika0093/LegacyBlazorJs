@@ -120,7 +120,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:daily-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
-| ❌ | [#1](https://github.com/arika0093/LegacyBlazorJs/actions/runs/27986118987) | 2026-06-22 | Error in resolve-build-metadata | [5b47094e](https://github.com/dotnet/aspnetcore/commit/5b47094e) |
+| ❌ | [#1](https://github.com/arika0093/LegacyBlazorJs/actions/runs/27986118987) | 2026-06-22 | Error in resolve-build-metadata | [2a0f0e07](https://github.com/dotnet/aspnetcore/tree/2a0f0e07) |
 <!-- end:daily-main-build -->
 
 ## Development guide
