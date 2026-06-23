@@ -229,19 +229,15 @@ export async function buildVariants({
       await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], { cwd: npmWorkspace.root });
       const { frameworkDir, webviewPath } = await resolveBuildOutputLayout(sourceDir);
 
+      // NOTE: WebAssembly and WebView are not currently supported, so there is no need to copy the output.
       const webFilename = `blazor.web.${name}.js`;
-      const webAssemblyFilename = `blazor.webassembly.${name}.js`;
       const serverFilename = `blazor.server.${name}.js`;
-      const webviewFilename = `blazor.webview.${name}.js`;
       await copyFile(path.join(frameworkDir, 'blazor.web.js'), path.join(output, webFilename));
-      await copyFile(path.join(frameworkDir, 'blazor.webassembly.js'), path.join(output, webAssemblyFilename));
       await copyFile(path.join(frameworkDir, 'blazor.server.js'), path.join(output, serverFilename));
-      await copyFile(webviewPath, path.join(output, webviewFilename));
+
       files[name] = {
         file: webFilename,
-        webAssemblyFile: webAssemblyFilename,
         serverFile: serverFilename,
-        webviewFile: webviewFilename,
         name,
         description: profile.description,
         ecma: profile.ecma,
