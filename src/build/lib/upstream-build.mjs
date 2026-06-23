@@ -3,7 +3,6 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { buildVariants } from '../build-variants.mjs';
-import { patchTslibOverride } from '../patches/patch-tslib-override.mjs';
 import { prepareNodeShim, retry, run } from './process.mjs';
 import {
   fetchLatestTagForMajor,
@@ -146,7 +145,6 @@ async function checkoutUpstreamSource(upstreamDir, ref, repository) {
 async function prebuildWorkspacePackages(upstreamDir, env) {
   console.log('---------------------------------------');
   console.log(' Build required packages (JSInterop, SignalR, and related packages)');
-  await patchTslibOverride(path.join(upstreamDir, 'package.json'));
   await retry(3, 15_000, () => run('npm', ['install', '--ignore-scripts'], { cwd: upstreamDir, env }));
   await run('npm', ['run', 'build', '--workspace=src/JSInterop/Microsoft.JSInterop.JS/src'], { cwd: upstreamDir, env });
   await run('npm', ['run', 'build', '--workspace=src/SignalR/clients/ts/signalr'], { cwd: upstreamDir, env });
