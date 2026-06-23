@@ -10,8 +10,15 @@ const traverse = traverseModule.default ?? traverseModule;
 const generate = generatorModule.default ?? generatorModule;
 
 export const LEGACY_DYNAMIC_IMPORT_HELPER_NAME = '__legacyDynamicImport';
-export const LEGACY_DYNAMIC_IMPORT_HELPER_SOURCE =
-  'function __legacyDynamicImport(u) { return Function("u", "return import(u)")(u); }';
+export const LEGACY_DYNAMIC_IMPORT_HELPER_SOURCE = 
+`function ${LEGACY_DYNAMIC_IMPORT_HELPER_NAME}(u) {
+  try {
+    return Function("u", "return import(u)")(u);
+  }
+  catch (e) {
+    throw new Error("Dynamic import is not supported in this environment:: ".concat(u));
+  }
+}`
 export const WHATWG_FETCH_VIRTUAL_MODULE_ID = 'legacy-blazor-whatwg-fetch';
 
 function parseSource(source, filename) {
