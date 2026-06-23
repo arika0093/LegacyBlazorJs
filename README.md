@@ -131,6 +131,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 
 * [How it works](./docs/how-it-works.md)
 * [How to build and testing](./docs/how-to-testing.md)
+* [Troubleshooting](./docs/troubleshooting.md)
 
 ## License
 
