@@ -2,37 +2,29 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import process from 'node:process';
 
+// Upstream wraps the regex in new RegExp(...), which prevents Babel's
+// transform-named-capturing-groups-regex plugin from statically detecting
+// the named capture group. Convert it to a RegExp literal so Babel can
+// transpile .groups access for legacy browsers.
+const ORIGINAL_LINE = 'const blazorCommentRegularExpression = new RegExp(/^\\s*Blazor:[^{]*(?<descriptor>.*)$/);';
+const REPLACEMENT_LINE = 'const blazorCommentRegularExpression = /^\\s*Blazor:[^{]*(?<descriptor>.*)$/;';
+
 export async function patchBlazorRegex(filePath) {
-  let content = await readFile(filePath, 'utf8');
+  const content = await readFile(filePath, 'utf8');
 
-  const originalLine = 'const blazorCommentRegularExpression = new RegExp(/^\\s*Blazor:[^{]*(?<descriptor>.*)$/);';
-  const replacement = `// LegacyBlazorJs patch: keep this as a RegExp literal instead of new RegExp(...).
-// See src/build/patches/patch-blazor-regex.mjs for the full explanation.
-const blazorCommentRegularExpression = /^\\s*Blazor:[^{]*(.*)$/;`;
-
-  if (content.includes(originalLine)) {
-    content = content.replace(originalLine, replacement);
-    content = content.replace(
-      "const json = definition && definition.groups && definition.groups['descriptor'];",
-      'const json = definition && definition[1];');
-    await writeFile(filePath, content);
-    console.log('Patched blazorCommentRegularExpression to use a RegExp literal.');
-    return;
-  }
-
-  if (content.includes('const blazorCommentRegularExpression = /^\\s*Blazor:')) {
-    content = content.replace(
-      'const blazorCommentRegularExpression = /^\\s*Blazor:[^{]*(?<descriptor>.*)$/;',
-      'const blazorCommentRegularExpression = /^\\s*Blazor:[^{]*(.*)$/;');
-    content = content.replace(
-      "const json = definition && definition.groups && definition.groups['descriptor'];",
-      'const json = definition && definition[1];');
-    await writeFile(filePath, content);
+  if (content.includes(REPLACEMENT_LINE)) {
     console.log('blazorCommentRegularExpression already uses a RegExp literal; skipping.');
     return;
   }
 
-  console.warn('Could not locate blazorCommentRegularExpression; patch not applied.');
+  if (!content.includes(ORIGINAL_LINE)) {
+    console.warn('Could not locate blazorCommentRegularExpression; patch not applied.');
+    return;
+  }
+
+  const patched = content.replace(ORIGINAL_LINE, REPLACEMENT_LINE);
+  await writeFile(filePath, patched);
+  console.log('Patched blazorCommentRegularExpression to use a RegExp literal.');
 }
 
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
