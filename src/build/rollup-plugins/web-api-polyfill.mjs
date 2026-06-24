@@ -90,6 +90,67 @@ export const legacyDomApiShimsSource = `
 })();
 `.trim();
 
+export const legacyCurrentScriptPolyfillSource = `
+(function () {
+  var documentObject = typeof document !== 'undefined' ? document : null;
+  if (!documentObject || 'currentScript' in documentObject) {
+    return;
+  }
+
+  function toAbsoluteUrl(url) {
+    var anchor = documentObject.createElement('a');
+    anchor.href = url;
+    return anchor.href;
+  }
+
+  function getScriptUrlFromStack(stack) {
+    if (!stack) {
+      return null;
+    }
+
+    var match = String(stack).match(/(?:https?|file):\\/\\/[^)\\r\\n]+/);
+    return match ? match[0].replace(/:\\d+(?::\\d+)?$/, '') : null;
+  }
+
+  function findScriptByUrl(url) {
+    if (!url) {
+      return null;
+    }
+
+    var resolvedUrl = toAbsoluteUrl(url);
+    var scripts = documentObject.getElementsByTagName('script');
+    for (var index = 0; index < scripts.length; index += 1) {
+      var script = scripts[index];
+      if (script.src && toAbsoluteUrl(script.src) === resolvedUrl) {
+        return script;
+      }
+    }
+
+    return null;
+  }
+
+  var currentScript = null;
+  try {
+    throw new Error();
+  } catch (error) {
+    currentScript = findScriptByUrl(getScriptUrlFromStack(error && error.stack));
+  }
+
+  Object.defineProperty(documentObject, 'currentScript', {
+    configurable: true,
+    enumerable: true,
+    get: function getCurrentScript() {
+      if (currentScript) {
+        return currentScript;
+      }
+
+      var scripts = documentObject.getElementsByTagName('script');
+      return scripts[scripts.length - 1] || null;
+    },
+  });
+})();
+`.trim();
+
 function getTargetMajor(targets, browserName) {
   const rawVersion = targets?.[browserName];
   if (rawVersion === undefined || rawVersion === null) {
@@ -143,6 +204,18 @@ function needsAbortControllerPolyfill(targets) {
   }
   const chromeMajor = getTargetMajor(targets, 'chrome');
   return chromeMajor !== null && chromeMajor < 66;
+}
+
+// https://caniuse.com/document-currentscript
+// All IE, Chrome before 29
+function needsCurrentScriptPolyfill(targets) {
+  const ieMajor = getTargetMajor(targets, 'ie');
+  if (ieMajor !== null) {
+    return true;
+  }
+
+  const chromeMajor = getTargetMajor(targets, 'chrome');
+  return chromeMajor !== null && chromeMajor < 29;
 }
 
 // https://caniuse.com/beacon
@@ -222,6 +295,10 @@ function resolvePolyfillEntries(targets) {
     entries.push({
       path: require.resolve('abortcontroller-polyfill/dist/abortcontroller-polyfill-only.js'),
     });
+  }
+
+  if (needsCurrentScriptPolyfill(targets)) {
+    entries.push(createInlinePolyfillEntry(legacyCurrentScriptPolyfillSource));
   }
 
   if (needsSendBeaconPolyfill(targets)) {

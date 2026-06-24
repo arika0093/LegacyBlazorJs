@@ -20,21 +20,14 @@ export function applyLegacyES5Fixes(code, targets) {
     'new RangeError("Insufficient data")'
   );
 
-  // Fix 2: shouldAutoStart function logic
-  // IE does not start automatically, so override the shouldAutoStart function to always return true.
-  transformed = transformed.replace(
-    /function shouldAutoStart\(\)\s*\{[^}]+\}/,
-    `function shouldAutoStart() { return true; }`
-  );
-
-  // Fix 3: prefer vendor-prefixed MutationObserver implementations when present.
+  // Fix 2: prefer vendor-prefixed MutationObserver implementations when present.
   // (Chrome 23 support only Webkit-prefixed version)
   transformed = transformed.replace(
     /new MutationObserver\(/g,
     'new (window.MutationObserver || window.WebKitMutationObserver)('
   );
 
-  // Fix 4: avoid Symbol-backed metadata keys on DOM nodes.
+  // Fix 3: avoid Symbol-backed metadata keys on DOM nodes.
   // Blazor's logical DOM bookkeeping touches comment/text nodes during JS.AttachComponent.
   // Replacing these internal keys with opaque strings avoids the polyfilled
   // Symbol access path that can recurse and overflow the stack in IE11.
