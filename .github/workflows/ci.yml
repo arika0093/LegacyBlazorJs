@@ -16,6 +16,7 @@ on:
         type: boolean
         default: true
   schedule:
+    # Run weekly on Wednesdays at 7:23 UTC (16:23 JST)
     - cron: '23 7 * * 3'
 
 permissions:

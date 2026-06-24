@@ -2,7 +2,8 @@ name: Daily build and testing
 
 on:
   schedule:
-    - cron: '0 21 * * *' # Run at 21:00 UTC everyday
+    # Run at 19:46 UTC (04:46 JST) everyday.
+    - cron: '46 19 * * *'
   workflow_dispatch:
 
 permissions:
