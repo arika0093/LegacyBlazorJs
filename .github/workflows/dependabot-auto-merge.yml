@@ -1,4 +1,4 @@
-name: Auto-merge Dependabot npm updates
+name: Auto-merge or close Dependabot npm updates
 
 on:
   workflow_run:
@@ -12,40 +12,55 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Enable auto-merge for successful Dependabot PRs.
-  enable-auto-merge:
+  # Resolve the pull request number for the Dependabot workflow run.
+  resolve-pr:
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.actor.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    outputs:
+      number: ${{ steps.resolve-pr.outputs.number }}
+    steps:
+      - name: Resolve pull request number
+        id: resolve-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ -z "$PR_NUMBER" ]; then
+            PR_NUMBER="$(gh pr list --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number')"
+          fi
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open pull request was found for workflow run branch: $HEAD_BRANCH"
+            exit 1
+          fi
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+  # Enable auto-merge for successful Dependabot PRs.
+  enable-auto-merge:
+    needs: [resolve-pr]
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Enable squash auto-merge
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.workflow_run.pull_requests[0].html_url }}
+          PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
         run: |
-          if [ -z "$PR_URL" ]; then
-            echo "No pull request was attached to this workflow run."
-            exit 1
-          fi
-          gh pr merge --auto --squash "$PR_URL"
+          gh pr merge --auto --squash "$PR_NUMBER"
 
   # Close failed Dependabot PRs so broken update branches do not stay open indefinitely.
   close-failed-pr:
+    needs: [resolve-pr]
     if: >-
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.actor.login == 'dependabot[bot]'
+      github.event.workflow_run.conclusion == 'failure'
     runs-on: ubuntu-latest
     steps:
       - name: Close failed pull request
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.workflow_run.pull_requests[0].html_url }}
+          PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
         run: |
-          if [ -z "$PR_URL" ]; then
-            echo "No pull request was attached to this workflow run."
-            exit 1
-          fi
-          gh pr close "$PR_URL" --comment "Closing this Dependabot PR automatically because the smoke-test workflow failed."
+          gh pr close "$PR_NUMBER" --comment "Closing this Dependabot PR automatically because the smoke-test workflow failed."
