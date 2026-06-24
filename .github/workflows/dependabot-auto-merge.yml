@@ -29,7 +29,7 @@ jobs:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           if [ -z "$PR_NUMBER" ]; then
-            PR_NUMBER="$(gh pr list --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number')"
+            PR_NUMBER="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number')"
           fi
           if [ -z "$PR_NUMBER" ]; then
             echo "No open pull request was found for workflow run branch: $HEAD_BRANCH"
@@ -49,7 +49,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
         run: |
-          gh pr merge --auto --squash "$PR_NUMBER"
+          gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$PR_NUMBER"
 
   # Close failed Dependabot PRs so broken update branches do not stay open indefinitely.
   close-failed-pr:
@@ -63,4 +63,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
         run: |
-          gh pr close "$PR_NUMBER" --comment "Closing this Dependabot PR automatically because the smoke-test workflow failed."
+          gh pr close --repo "$GITHUB_REPOSITORY" "$PR_NUMBER" --comment "Closing this Dependabot PR automatically because the smoke-test workflow failed."
