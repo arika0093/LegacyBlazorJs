@@ -1,67 +1,86 @@
 # How it works
 
-To be specific, the process is as follows:
+## Overview
 
-1. First, resolve the upstream [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore) targets.
-    * The defaults are controlled in [config/majors.json](../config/majors.json).
-2. Clone the upstream.
-3. Build the upstream JavaScript packages with npm workspaces.
-4. Build the dependencies in advance. As of .NET 10, the following are included in the dependencies.
-    * [JSInterop](https://github.com/dotnet/aspnetcore/tree/main/src/JSInterop/Microsoft.JSInterop.JS/src)
-    * [SignalR](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/clients/ts/signalr)
-    * dotnet.js is built in the [runtime](https://github.com/dotnet/runtime/tree/main/src/mono/wasm), but since it is loaded by dynamic import, it does not need to be built in advance.
-5. It is compiled by [rollup](https://rollupjs.org/).
-    * At this time, by inserting a transformation plugin via Babel, it is converted for older browsers such as ES2015.
-6. The generated JS files are packaged together into `LegacyBlazorJs`.
-7. Smoke tests are performed (using an old Chromium), and then the package is released.
-    * Weekly releases append this repository's commit height to the upstream version.
-    * The commit height counts only changes under `src/`, `dotnet/src/`, `config/`, and `package.json`, excluding Markdown files.
-    * e.g. `10.0.9`(upstream) -> `10.0.9.123`(LegacyBlazorJs)
+The current build pipeline rebuilds upstream Blazor JavaScript from the ASP.NET Core repository, applies a small set of legacy-browser-oriented patches and Rollup plugins, and then packs the generated files into the `LegacyBlazorJs` Razor Class Library.
 
-Since many modern APIs are missing in older browsers, syntax transformation by Babel alone is not sufficient.  
-Therefore, the following Polyfills and Patches are applied.
+At a high level, the flow is:
 
-## Pre-Patches
+1. Resolve the build channels from [config/majors.json](../config/majors.json).
+2. Resolve the target profiles from [config/targets.json](../config/targets.json).
+   * The profiles currently map from `es5` to `es2022`.
+3. For each channel/profile pair, fetch or clone the upstream [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore) source into `.work/aspnetcore-<ref>`.
+   * The upstream must use the npm workspace layout. The older yarn-based layout is no longer supported.
+4. Install upstream npm dependencies and prebuild the JavaScript packages that `Web.JS` depends on.
+   * Currently this includes:
+     * [`src/JSInterop/Microsoft.JSInterop.JS/src`](https://github.com/dotnet/aspnetcore/tree/main/src/JSInterop/Microsoft.JSInterop.JS/src)
+     * [`src/SignalR/clients/ts/signalr`](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/clients/ts/signalr)
+     * [`src/SignalR/clients/ts/signalr-protocol-msgpack`](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/clients/ts/signalr-protocol-msgpack)
+   * This step can be skipped locally with `SKIP_PREBUILD=true`.
+5. Patch the upstream `Web.JS` sources before each profile build.
+6. Inject LegacyBlazorJs Rollup plugins into the upstream Rollup config and rebuild `Web.JS` once per target profile.
+7. Copy the generated `blazor.web.js` and `blazor.server.js` files into `dist/<upstreamRef>/` with profile-specific names such as `blazor.server.es2015.js`.
+8. Copy the generated files into `dotnet/src/LegacyBlazorJs/wwwroot` and run `dotnet pack`.
+   * The package version comes from the resolved upstream version, or from `PACKAGE_VERSION` when building from a non-tag ref such as `main`.
+   * The target framework is inferred from the .NET major unless `LEGACY_BLAZOR_TARGET_FRAMEWORK` is set.
+9. In CI, profile builds are produced independently, then merged back together and repacked into one NuGet package per build channel.
+10. Smoke tests run against selected profiles, and release publication is performed only in the weekly workflow.
 
-Before building, apply the following patches first. These patches basically replace the upstream code itself with simple fixes.
+## Build and CI structure
 
-* [batch-blazor-regex.mjs](../src/build/patches/patch-blazor-regex.mjs)
-  * Blazor uses a regular expression to retrieve comments (`<!--Blazor:*** -->`) included in HTML and connect them, but the regular expression uses Name Capture Group.
-  * Name Capture Group is [only supported](https://caniuse.com/mdn-javascript_regular_expressions_named_capturing_group) in ES2018 and later, so it is modified to retrieve it by index specification.
+There are currently three main automation paths:
+
+* [ci.yml](../.github/workflows/ci.yml)
+  * Weekly build/release workflow.
+  * Resolves the configured channels, builds each profile separately, optionally runs compatibility tests, merges the artifacts, repacks the final NuGet packages, and can publish GitHub releases and NuGet packages on manual runs.
+* [smoke-test.yml](../.github/workflows/smoke-test.yml)
+  * Runs on pushes, pull requests, and manual dispatch.
+  * Builds selected profiles (`es5`, `es2015`) and runs the Windows smoke test workflow against them.
+* [upstream-build.yml](../.github/workflows/upstream-build.yml)
+  * Daily upstream-main regression check.
+  * Builds `main` from `dotnet/aspnetcore`, assigns a date-based package version, and runs smoke tests to detect upstream layout or behavior changes early.
+
+## Pre-patches
+
+Before invoking the upstream Rollup build, LegacyBlazorJs applies a small number of source patches.
+
+* [patch-blazor-regex.mjs](../src/build/patches/patch-blazor-regex.mjs)
+  * Upstream creates the Blazor comment regex with `new RegExp(...)`.
+  * That form prevents Babel from statically rewriting the named capture group usage for legacy browsers.
+  * This patch converts it to a RegExp literal so Babel can transform it correctly.
 * [patch-signalr-logging.mjs](../src/build/patches/patch-signalr-logging.mjs)
-  * Replaces the SignalR log output level.
-  * By default, this results in a warning, but it makes debugging easier.
-  * This is only effective during development; it remains unchanged in the release version.
+  * Optional patch controlled by `SIGNALR_LOGGING`.
+  * Rewrites the default SignalR circuit log level baked into the generated script.
+  * This is mainly used for debug or smoke-test builds; if the variable is unset, nothing is patched.
 
-## Rollup Build
+## Rollup build
 
-Overview of the build process is as follows. 
-see [rollup-plugins](../src/build/rollup-plugins/index.mjs) for details.
+LegacyBlazorJs does not replace the upstream bundling pipeline. Instead, it inserts additional plugins immediately before the upstream Terser step in `Shared.JS/rollup.config.mjs`.
 
-* Convert CommonJS modules to ES modules.
-* Insert Polyfill for [whatwg-fetch](https://github.com/whatwg/fetch) and [webcomponents](https://github.com/webcomponents/polyfills).
-* Use Babel to transform syntax for older browsers.
-* Insert Polyfill of [core-js](https://github.com/zloirock/core-js).
-* Convert `import()` to `Function("u", "return import(u)")(u);` because `import()` syntax will cause an error in older browsers.
-  * Even if you run in this state, it will cause an error, but since this part is not executed except for WASM (`dotnet.js`), it is not a problem.
-* Other transformations are also performed for older browsers.
+See [src/build/rollup-plugins/index.mjs](../src/build/rollup-plugins/index.mjs) for the exact plugin order.
 
-These settings are inserted before terser is applied in [upstream rollup settings](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Shared.JS/rollup.config.mjs).
+The added processing currently does the following:
 
-## Why does not support WebAssembly?
+* Convert CommonJS dependencies to ES modules.
+* Prepend `whatwg-fetch`.
+* Prepend additional Web API polyfills needed for older browsers.
+* Run Babel using the browser targets defined by each profile in [config/targets.json](../config/targets.json).
+* Prepend only the required `core-js` polyfills for that profile.
+* Rewrite dynamic `import()` usage into a form that older parsers can tolerate.
+* Apply IE11-specific fixes.
+* Apply extra ES5-specific fixes.
 
-**TL;DR**: Because the JS files are dynamically generated at `publish` time.
+For local debugging, Terser can also be disabled with `LEGACY_BLAZOR_DISABLE_TERSER=true`.
 
-To understand this, we need to know how WASM works. When you create a typical WASM project and run `dotnet publish`, files like the following are generated in `wwwroot/_framework`:
+## Why WebAssembly is not supported
 
-* `dotnet.js`
-* `dotnet.native.js`
-* `dotnet.runtime.js`
-* `dotnet.boot.js`
-* ...and various `*.wasm` files.
+**TL;DR**: this project is focused on Blazor Server, and the current build pipeline only repackages the server-oriented JavaScript bundles.
 
-These files are generated at each app's build time (because the required DLLs are unknown beforehand), so we cannot take an approach of transpiling them in advance. Additionally, each file's import list contains SHA256 hashes, and if we transpile them in advance, the hashes will change. To resolve this issue, each LegacyBlazorJs user would need to run JS file transformation themselves, which requires installing `node` and various packages—a time-consuming process. Even if users overcome this, WASM and related features simply don't work in older browsers anyway. Considering these factors, we determined that the support cost outweighs the benefits, so WebAssembly is not supported.
+More specifically:
 
-The following resources may be helpful:
-* https://github.com/dotnet/runtime/tree/main/src/mono/browser/build/README.md
-* https://github.com/dotnet/runtime/blob/main/src/mono/wasm/features.md
+* The repository currently copies only `blazor.web.js` and `blazor.server.js` into the package output.
+* WebAssembly-related files are generated together with app-specific publish output, and their final shape depends on the published application.
+* Those files also carry runtime-specific import graphs and hashes, which makes prebuilt redistribution much less practical.
+* Even if the transformation problem were solved, older browsers still lack many of the platform features required by the WebAssembly runtime.
+
+Because of that combination of technical cost and limited payoff, WebAssembly support is out of scope for this repository.

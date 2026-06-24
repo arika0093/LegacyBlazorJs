@@ -19,7 +19,7 @@ This project aims to make Blazor Server available on older browsers by rebuildin
 
 > [!WARNING]
 > This project is focused on Blazor Server only. WebAssembly is not supported.  
-> More details are in the [here](#why-does-not-support-webassembly) section.
+> More details are in the [here](./docs/how-it-works.md#why-webassembly-is-not-supported) section.
 
 ### Goals
 
@@ -28,6 +28,10 @@ Our goal is to make this work on the following platforms:
 * Chrome 23+ (This is the first Chrome to support [ES5](https://caniuse.com/es5))
 * Internet Explorer 11 (As much as possible. Testing is insufficient, but it works for now)
 * And newer browsers. It should probably work on any Chrome-based browser.
+
+> [!NOTE]
+> In environments where dynamic imports are not available, third-party libraries probably won't work.  
+> However, It should be possible to prepare at least a minimal page if Blazor Server works.
 
 ### Automation
 
