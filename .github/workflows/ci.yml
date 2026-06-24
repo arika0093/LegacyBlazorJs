@@ -190,7 +190,8 @@ jobs:
       - name: Create GitHub releases
         run: |
           shopt -s nullglob
-          for nupkg in artifacts/packages/*.nupkg; do
+          mapfile -t nupkgs < <(find artifacts/packages -maxdepth 1 -type f -name 'LegacyBlazorJs.*.nupkg' | sort -V)
+          for nupkg in "${nupkgs[@]}"; do
             VERSION="$(basename "$nupkg" | sed -E 's/^LegacyBlazorJs\.(.+)\.nupkg$/\1/')"
             JS_ZIP="artifacts/releases/LegacyBlazorJs.${VERSION}.zip"
             if [ -z "$VERSION" ] || [ "$VERSION" = "$(basename "$nupkg")" ]; then
