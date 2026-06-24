@@ -12,7 +12,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Enable auto-merge for Dependabot PRs
+  # Enable auto-merge for successful Dependabot PRs.
   enable-auto-merge:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
@@ -30,3 +30,22 @@ jobs:
             exit 1
           fi
           gh pr merge --auto --squash "$PR_URL"
+
+  # Close failed Dependabot PRs so broken update branches do not stay open indefinitely.
+  close-failed-pr:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close failed pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.workflow_run.pull_requests[0].html_url }}
+        run: |
+          if [ -z "$PR_URL" ]; then
+            echo "No pull request was attached to this workflow run."
+            exit 1
+          fi
+          gh pr close "$PR_URL" --comment "Closing this Dependabot PR automatically because the smoke-test workflow failed."
