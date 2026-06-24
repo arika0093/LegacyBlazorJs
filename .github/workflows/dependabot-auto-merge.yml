@@ -1,0 +1,32 @@
+name: Auto-merge Dependabot npm updates
+
+on:
+  workflow_run:
+    workflows:
+      - Smoke test generated scripts
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Enable auto-merge for Dependabot PRs
+  enable-auto-merge:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable squash auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.workflow_run.pull_requests[0].html_url }}
+        run: |
+          if [ -z "$PR_URL" ]; then
+            echo "No pull request was attached to this workflow run."
+            exit 1
+          fi
+          gh pr merge --auto --squash "$PR_URL"
