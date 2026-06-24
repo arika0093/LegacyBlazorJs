@@ -30,7 +30,9 @@ export class SmokeAppHarness {
 
     const projectPath = getProjectPath(rootDirectory, hostingModel);
     const baseUri = `http://127.0.0.1:${await getAvailablePort()}`;
-    const targetFramework = resolveTargetFrameworkMoniker(packageVersion);
+    const targetFramework = resolveTargetFrameworkMoniker(
+      packageVersion,
+      process.env.SMOKE_TEST_DOTNET_MAJOR?.trim());
     const scriptProfile = await resolveScriptProfile(profile);
     logger.info(`Resolved script profile '${scriptProfile}' for requested profile '${profile}'.`);
 
@@ -265,9 +267,14 @@ function getProjectPath(appDirectory, hostingModel) {
   }
 }
 
-function resolveTargetFrameworkMoniker(packageVersion) {
+function resolveTargetFrameworkMoniker(packageVersion, explicitMajor) {
+  const numericExplicitMajor = Number(explicitMajor);
+  if (Number.isFinite(numericExplicitMajor) && numericExplicitMajor > 0) {
+    return `net${numericExplicitMajor}.0`;
+  }
+
   const match = /^(?<major>\d+)\./.exec(packageVersion);
-  if (!match?.groups?.major) {
+  if (!match?.groups?.major || Number(match.groups.major) <= 0) {
     throw new Error(`Could not determine the target framework from package version '${packageVersion}'.`);
   }
 

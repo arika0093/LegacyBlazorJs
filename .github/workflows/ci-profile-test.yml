@@ -20,6 +20,11 @@ on:
       package-version:
         required: true
         type: string
+      # Optional .NET major used when the package version is synthetic (for example, daily date-based builds).
+      dotnet-major:
+        required: false
+        type: string
+        default: ''
       # The Blazor hosting model to execute, e.g. "Server" or "WebAssembly"
       hosting-model:
         required: false
@@ -60,5 +65,6 @@ jobs:
           node --test tests/ChromeSmokeTest/smoke.test.mjs
         env:
           PACKAGE_VERSION: ${{ inputs.package-version }}
+          SMOKE_TEST_DOTNET_MAJOR: ${{ inputs.dotnet-major }}
           SMOKE_TEST_PROFILE: ${{ inputs.profile }}
           SMOKE_TEST_HOSTING_MODEL: ${{ inputs.hosting-model }}
