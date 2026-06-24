@@ -4,6 +4,7 @@ on:
   schedule:
     # Run at 19:46 UTC (04:46 JST) everyday.
     - cron: '46 19 * * *'
+  pull_request:
   workflow_dispatch:
 
 permissions:
