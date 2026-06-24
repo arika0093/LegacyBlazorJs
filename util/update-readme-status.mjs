@@ -72,26 +72,16 @@ async function fetchWorkflowRuns(workflowId, githubToken) {
   return data.workflow_runs ?? [];
 }
 
-async function fetchRunJobOutputs(runId, githubToken) {
-  const url = `https://api.github.com/repos/${REPO}/actions/runs/${runId}/jobs`;
-  try {
-    const data = await fetchJson(url, githubToken);
-    const outputs = {};
-    for (const job of data.jobs ?? []) {
-      for (const [key, value] of Object.entries(job.outputs ?? {})) {
-        outputs[key] = value;
-      }
-    }
-    return outputs;
-  } catch {
-    return null;
-  }
-}
-
 async function fetchCommitShortHash(ref, githubToken) {
   const url = `https://api.github.com/repos/${UPSTREAM_REPO}/commits/${ref}`;
   const data = await fetchJson(url, githubToken);
   return data.sha?.slice(0, 8) ?? 'unknown';
+}
+
+async function fetchCommitShortHashAtTime(ref, isoString, githubToken) {
+  const url = `https://api.github.com/repos/${UPSTREAM_REPO}/commits?sha=${encodeURIComponent(ref)}&until=${encodeURIComponent(isoString)}&per_page=1`;
+  const data = await fetchJson(url, githubToken);
+  return data?.[0]?.sha?.slice(0, 8) ?? null;
 }
 
 function formatDate(isoString) {
@@ -175,10 +165,12 @@ async function resolveEffectiveConclusion(run, githubToken) {
 }
 
 async function resolveUpstreamMainHash(run, githubToken) {
-  const outputs = await fetchRunJobOutputs(run.id, githubToken);
-  const outputSha = outputs?.['upstream-main-sha'];
-  if (outputSha) {
-    return outputSha.slice(0, 8);
+  const runTimestamp = run.run_started_at || run.created_at;
+  if (runTimestamp) {
+    const historicalHash = await fetchCommitShortHashAtTime('main', runTimestamp, githubToken);
+    if (historicalHash) {
+      return historicalHash;
+    }
   }
 
   return fetchCommitShortHash('main', githubToken);
