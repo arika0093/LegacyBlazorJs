@@ -78,6 +78,7 @@ jobs:
       channel: preview
       profile: ${{ matrix.profile }}
       package-version: ${{ needs.resolve-build-metadata.outputs.package-version }}
+      dotnet-major: ${{ needs.resolve-build-metadata.outputs.dotnet-major }}
 
   # Update the README build status table with the latest daily run results.
   update-readme:

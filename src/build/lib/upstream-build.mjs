@@ -86,7 +86,10 @@ async function resolveBuildIdentity({
     }
 
     const parsed = parseAspNetTag(`v${resolvedPackageVersion}`);
-    const resolvedMajor = parsed?.major ?? Number(major);
+    const explicitMajor = Number(major);
+    const resolvedMajor = Number.isFinite(explicitMajor) && explicitMajor > 0
+      ? explicitMajor
+      : parsed?.major;
     if (!resolvedMajor || Number.isNaN(resolvedMajor)) {
       throw new Error(`Could not determine the .NET major for upstream ref '${ref}'.`);
     }
