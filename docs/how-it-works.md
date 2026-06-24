@@ -20,11 +20,12 @@ At a high level, the flow is:
 5. Patch the upstream `Web.JS` sources before each profile build.
 6. Inject LegacyBlazorJs Rollup plugins into the upstream Rollup config and rebuild `Web.JS` once per target profile.
 7. Copy the generated `blazor.web.js` and `blazor.server.js` files into `dist/<upstreamRef>/` with profile-specific names such as `blazor.server.es2015.js`.
-8. Copy the generated files into `dotnet/src/LegacyBlazorJs/wwwroot` and run `dotnet pack`.
+8. Run `es-check` against the generated profile files to confirm the emitted syntax stays within each selected profile target.
+9. Copy the generated files into `dotnet/src/LegacyBlazorJs/wwwroot` and run `dotnet pack`.
    * The package version comes from the resolved upstream version, or from `PACKAGE_VERSION` when building from a non-tag ref such as `main`.
    * The target framework is inferred from the .NET major unless `LEGACY_BLAZOR_TARGET_FRAMEWORK` is set.
-9. In CI, profile builds are produced independently, then merged back together and repacked into one NuGet package per build channel.
-10. Smoke tests run against selected profiles, and release publication is performed only in the weekly workflow.
+10. In CI, profile builds are produced independently, then merged back together and repacked into one NuGet package per build channel.
+11. Smoke tests run against selected profiles, and release publication is performed only in the weekly workflow.
 
 ## Build and CI structure
 

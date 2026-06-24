@@ -5,6 +5,7 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { run } from './lib/process.mjs';
 import { readSelectedTargets } from './lib/config.mjs';
+import { runEsCheck } from './run-es-check.mjs';
 import { patchBlazorRegex } from './patches/patch-blazor-regex.mjs';
 import { patchSignalRLogging } from './patches/patch-signalr-logging.mjs';
 
@@ -243,6 +244,8 @@ export async function buildVariants({
         ecma: profile.ecma,
       };
     }
+
+    await runEsCheck({ outputDir: output, targets });
   } finally {
     await writeFile(tsconfigPath, originalTsconfig);
     await writeFile(bundlerConfigPath, originalBundlerConfig);
