@@ -7,6 +7,55 @@ const VIRTUAL_ID = 'legacy-blazor-web-api-polyfill';
 const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-web-api-polyfill.js';
 const ENTRY_MODULE_PATTERN = /\/Boot\.(?:Server|Web|WebAssembly|WebView)\.ts$/;
 
+export const legacySendBeaconPolyfillSource = `
+(function () {
+  var navigatorObject = typeof navigator !== 'undefined' ? navigator : null;
+  if (navigatorObject && typeof navigatorObject.sendBeacon !== 'function') {
+    navigatorObject.sendBeacon = function sendBeacon(url, data) {
+      if (typeof fetch === 'function') {
+        fetch(url, {
+          method: 'POST',
+          body: data,
+          keepalive: true
+        });
+        return true;
+      }
+      if (typeof XMLHttpRequest === 'function') {
+        var request = new XMLHttpRequest();
+        request.open('POST', url, true);
+        request.send(data);
+        return true;
+      }
+      return false;
+    };
+  }
+})();
+`.trim();
+
+export const legacyAttachShadowPolyfillSource = `
+(function () {
+  var elementPrototype = typeof Element !== 'undefined' && Element.prototype;
+  if (elementPrototype && !elementPrototype.attachShadow) {
+    elementPrototype.attachShadow = function attachShadow() {
+      if (!this.__legacyShadowRoot) {
+        this.__legacyShadowRoot = this;
+      }
+      return this.__legacyShadowRoot;
+    };
+  }
+
+  if (elementPrototype && !('shadowRoot' in elementPrototype) && typeof Object.defineProperty === 'function') {
+    Object.defineProperty(elementPrototype, 'shadowRoot', {
+      configurable: true,
+      enumerable: true,
+      get: function get() {
+        return this.__legacyShadowRoot || null;
+      }
+    });
+  }
+})();
+`.trim();
+
 export const legacyDomApiShimsSource = `
 (function () {
   var nodePrototype = typeof Node !== 'undefined' && Node.prototype;
@@ -76,10 +125,6 @@ function getTargetMajor(targets, browserName) {
   return Number.isNaN(major) ? null : major;
 }
 
-function isLegacyEs5Profile(profile) {
-  return profile === 'es5';
-}
-
 // https://caniuse.com/wf-mutationobserver
 // IE10 and below. (Chrome 23 is supported with WebKit prefix)
 function needsMutationObserverPolyfill(targets) {
@@ -135,11 +180,31 @@ function needsCurrentScriptPolyfill(targets) {
 
   const chromeMajor = getTargetMajor(targets, 'chrome');
   return chromeMajor !== null && chromeMajor < 29;
+// https://caniuse.com/beacon
+// All IE, Chrome before 39
+function needsSendBeaconPolyfill(targets) {
+  const ieMajor = getTargetMajor(targets, 'ie');
+  if (ieMajor !== null && ieMajor <= 11) {
+    return true;
+  }
+  const chromeMajor = getTargetMajor(targets, 'chrome');
+  return chromeMajor !== null && chromeMajor < 39;
+}
+
+// https://caniuse.com/mdn-api_element_attachshadow
+// All IE, Chrome before 53
+function needsAttachShadowPolyfill(targets) {
+  const ieMajor = getTargetMajor(targets, 'ie');
+  if (ieMajor !== null) {
+    return true;
+  }
+  const chromeMajor = getTargetMajor(targets, 'chrome');
+  return chromeMajor !== null && chromeMajor < 53;
 }
 
 // https://caniuse.com/mdn-api_node_getrootnode
 // All IE, Chrome before 54
-function needsDomApiShims(targets, profile) {
+function needsDomApiShims(targets) {
   const ieMajor = getTargetMajor(targets, 'ie');
   if (ieMajor !== null && ieMajor <= 11) {
     return true;
@@ -156,7 +221,11 @@ function patchMutationObserverPackageSource(source) {
   ].join('\n');
 }
 
-function resolvePolyfillEntries(targets, profile) {
+function createInlinePolyfillEntry(source) {
+  return { source };
+}
+
+function resolvePolyfillEntries(targets) {
   const entries = [];
 
   if (needsMutationObserverPolyfill(targets)) {
@@ -191,23 +260,27 @@ function resolvePolyfillEntries(targets, profile) {
   }
 
   if (needsCurrentScriptPolyfill(targets)) {
-    entries.push({
-      source: legacyCurrentScriptPolyfillSource,
-    });
+    entries.push(createInlinePolyfillEntry(legacyCurrentScriptPolyfillSource));
   }
 
-  if (needsDomApiShims(targets, profile)) {
-    entries.push({
-      source: legacyDomApiShimsSource,
-    });
+  if (needsSendBeaconPolyfill(targets)) {
+    entries.push(createInlinePolyfillEntry(legacySendBeaconPolyfillSource));
+  }
+
+  if (needsAttachShadowPolyfill(targets)) {
+    entries.push(createInlinePolyfillEntry(legacyAttachShadowPolyfillSource));
+  }
+
+  if (needsDomApiShims(targets)) {
+    entries.push(createInlinePolyfillEntry(legacyDomApiShimsSource));
   }
 
   return entries;
 }
 
-export function legacyWebApiPolyfillPlugin(targets, profile)
+export function legacyWebApiPolyfillPlugin(targets, _profile)
 {
-  const polyfillEntries = resolvePolyfillEntries(targets, profile);
+  const polyfillEntries = resolvePolyfillEntries(targets);
   let polyfillSource = null;
 
   return {
