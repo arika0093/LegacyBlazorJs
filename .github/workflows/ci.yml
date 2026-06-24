@@ -252,7 +252,7 @@ jobs:
   # Update the README build status table with the latest weekly run results.
   update-readme:
     needs: [assemble-release-artifacts]
-    if: always()
+    if: ${{ always() && github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

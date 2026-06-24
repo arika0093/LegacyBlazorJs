@@ -81,7 +81,7 @@ jobs:
   # Update the README build status table with the latest daily run results.
   update-readme:
     needs: [smoke-test]
-    if: always()
+    if: ${{ always() && github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
