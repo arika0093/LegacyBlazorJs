@@ -91,8 +91,7 @@ async function writeRollupLegacyPluginsModule(bundlerConfigPath) {
 
 export function legacyBlazorPlugins() {
   const targets = JSON.parse(process.env.LEGACY_BLAZOR_BABEL_TARGETS ?? '{}');
-  const profile = process.env.LEGACY_BLAZOR_TARGET_PROFILE ?? '';
-  return legacyBlazorPluginsImpl(targets, profile);
+  return legacyBlazorPluginsImpl(targets);
 }
 `;
 
