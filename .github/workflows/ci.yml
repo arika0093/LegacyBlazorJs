@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       run_compat:
-        description: Run compatibility tests for the configured package lines
+        description: Run compatibility tests 
         type: boolean
         default: true
       publish_github:
@@ -73,7 +73,7 @@ jobs:
 
   test-compat:
     needs: [resolve-builds, build-all]
-    if: github.event_name == 'workflow_dispatch' && inputs.run_compat
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_compat }}
     strategy:
       fail-fast: false
       matrix:
@@ -167,7 +167,7 @@ jobs:
 
   release-github:
     needs: [assemble-release-artifacts]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_github
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_github }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -222,7 +222,7 @@ jobs:
 
   release-nuget:
     needs: [assemble-release-artifacts]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_nuget
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_nuget }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
