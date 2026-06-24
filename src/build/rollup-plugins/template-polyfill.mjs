@@ -7,6 +7,8 @@ import { createLegacyEntryPolyfillPlugin } from './helpers.mjs';
 
 const LEGACY_TEMPLATE_MODULE_ID = 'legacy-blazor-template-polyfill';
 
+// https://caniuse.com/template
+// All IE, Chrome before 26.
 export function needsTemplatePolyfill(targets) {
   return isAnyInternetExplorerTarget(targets) || isChromeTargetBefore(targets, 26);
 }

@@ -7,6 +7,8 @@ import { createLegacyEntryPolyfillPlugin } from './helpers.mjs';
 
 const LEGACY_ABORT_CONTROLLER_MODULE_ID = 'legacy-blazor-abort-controller-polyfill';
 
+// https://caniuse.com/abortcontroller
+// IE11, Chrome before 66.
 export function needsAbortControllerPolyfill(targets) {
   return isInternetExplorerTargetAtMost(targets, 11) || isChromeTargetBefore(targets, 66);
 }

@@ -6,6 +6,7 @@ import { createLegacyEntryPolyfillPlugin } from './helpers.mjs';
 
 const LEGACY_PLATFORM_DOM_MODULE_ID = 'legacy-blazor-platform-dom-polyfill';
 
+// WebComponents platform DOM polyfill for IE11 and below.
 export function needsPlatformDomPolyfill(targets) {
   return isInternetExplorerTargetAtMost(targets, 11);
 }

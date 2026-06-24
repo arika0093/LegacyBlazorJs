@@ -7,6 +7,8 @@ import { createLegacyEntryPolyfillPlugin } from './helpers.mjs';
 
 const LEGACY_CURRENT_SCRIPT_MODULE_ID = 'legacy-blazor-current-script-polyfill';
 
+// https://caniuse.com/document-currentscript
+// All IE, Chrome before 29.
 export function needsCurrentScriptPolyfill(targets) {
   return isAnyInternetExplorerTarget(targets) || isChromeTargetBefore(targets, 29);
 }

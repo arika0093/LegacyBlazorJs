@@ -14,6 +14,8 @@ function patchMutationObserverPackageSource(source) {
   ].join('\n');
 }
 
+// https://caniuse.com/mutationobserver
+// IE10 and below. (Chrome 23 is supported with WebKit prefix and handled elsewhere.)
 export function needsMutationObserverPolyfill(targets) {
   return isInternetExplorerTargetAtMost(targets, 10);
 }
