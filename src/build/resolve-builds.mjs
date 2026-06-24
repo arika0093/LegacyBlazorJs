@@ -5,6 +5,18 @@ import { getConfiguredBuildChannels, readTargetsConfig } from './lib/config.mjs'
 import { fetchLatestTagForMajor } from './lib/version.mjs';
 
 const repository = process.env.UPSTREAM_REPOSITORY ?? 'dotnet/aspnetcore';
+const repositoryCommitHeight = process.env.REPOSITORY_COMMIT_HEIGHT?.trim() ?? '';
+
+function appendRepositoryCommitHeight(version) {
+  if (!repositoryCommitHeight) {
+    return version;
+  }
+  if (!/^\d+$/.test(repositoryCommitHeight)) {
+    throw new Error(`REPOSITORY_COMMIT_HEIGHT must be numeric. Received: '${repositoryCommitHeight}'.`);
+  }
+
+  return `${version}.${repositoryCommitHeight}`;
+}
 
 async function resolveBuild(channel) {
   const selected = await fetchLatestTagForMajor({
@@ -23,7 +35,8 @@ async function resolveBuild(channel) {
     major: selected.major,
     prereleaseMode: channel.prereleaseMode,
     tag: selected.tag,
-    version: selected.version,
+    upstreamVersion: selected.version,
+    version: appendRepositoryCommitHeight(selected.version),
   };
 }
 

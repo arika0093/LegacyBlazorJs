@@ -16,6 +16,8 @@ const repository = process.env.UPSTREAM_REPOSITORY ?? 'dotnet/aspnetcore';
 const includePrerelease = process.env.INCLUDE_PRERELEASE === 'true';
 const explicitTag = process.env.ASPNETCORE_TAG;
 const explicitRef = process.env.UPSTREAM_REF;
+const explicitDotNetMajor = process.env.DOTNET_MAJOR?.trim();
+const explicitUpstreamTag = process.env.UPSTREAM_TAG?.trim();
 const explicitProfiles = process.env.BUILD_TARGET_PROFILES;
 
 async function buildFromTag(tag) {
@@ -45,10 +47,14 @@ async function buildFromRef(ref) {
     throw new Error('Set PACKAGE_VERSION when building from UPSTREAM_REF.');
   }
 
+  const resolvedDotNetMajor = explicitDotNetMajor || parseAspNetTag(`v${packageVersion}`)?.major;
   const targetFramework = process.env.LEGACY_BLAZOR_TARGET_FRAMEWORK?.trim()
-    ?? `net${process.env.DOTNET_MAJOR ?? parseAspNetTag(`v${packageVersion}`)?.major ?? ''}.0`;
+    ?? `net${resolvedDotNetMajor ?? ''}.0`;
   if (!/^net\d+\.\d+$/.test(targetFramework)) {
     throw new Error(`Could not determine LEGACY_BLAZOR_TARGET_FRAMEWORK for package version '${packageVersion}'.`);
+  }
+  if (!resolvedDotNetMajor || Number.isNaN(Number(resolvedDotNetMajor))) {
+    throw new Error(`Could not determine the .NET major from package version '${packageVersion}'.`);
   }
 
   await buildUpstream({
@@ -58,19 +64,15 @@ async function buildFromRef(ref) {
     repository,
     packageVersion,
     targetFramework,
+    upstreamTag: explicitUpstreamTag,
   });
-
-  const majorMatch = /^(\d+)\./.exec(packageVersion);
-  if (!majorMatch) {
-    throw new Error(`Could not determine the .NET major from package version '${packageVersion}'.`);
-  }
 
   return {
     channel: process.env.BUILD_CHANNEL ?? null,
-    major: Number(majorMatch[1]),
+    major: Number(resolvedDotNetMajor),
     patch: null,
     prerelease: packageVersion.includes('-') ? packageVersion.split('-').slice(1).join('-') : null,
-    tag: null,
+    tag: explicitUpstreamTag || null,
     upstreamRef: ref,
     version: packageVersion,
   };

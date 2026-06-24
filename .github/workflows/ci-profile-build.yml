@@ -27,9 +27,20 @@ on:
       package-version:
         required: true
         type: string
+      # Optional upstream tag to record in build metadata when building from "upstream-ref".
+      upstream-tag:
+        required: false
+        type: string
+        default: ''
       # Optional upstream ref to build from, e.g. "main". When set, build against this ref
       # while still using "package-version" for NuGet package metadata and target framework resolution.
       upstream-ref:
+        required: false
+        type: string
+        default: ''
+      # Optional .NET major used to resolve the target framework when "package-version"
+      # is not directly based on the upstream package version (for example, date-based versions).
+      dotnet-major:
         required: false
         type: string
         default: ''
@@ -74,7 +85,9 @@ jobs:
           BUILD_TARGET_PROFILES: ${{ inputs.build-profiles != '' && inputs.build-profiles || inputs.profile }}
           GITHUB_TOKEN: ${{ github.token }}
           PACKAGE_VERSION: ${{ inputs.package-version }}
+          UPSTREAM_TAG: ${{ inputs.upstream-tag }}
           UPSTREAM_REF: ${{ inputs.upstream-ref }}
+          DOTNET_MAJOR: ${{ inputs.dotnet-major }}
           LEGACY_BLAZOR_DISABLE_TERSER: ${{ inputs.disable-terser && 'true' || '' }}
           SIGNALR_LOGGING: ${{ inputs.signalr-logging }}
 

@@ -12,7 +12,8 @@ jobs:
   resolve-build-metadata:
     runs-on: ubuntu-latest
     outputs:
-      package-version: ${{ steps.preview-version.outputs.version }}
+      package-version: ${{ steps.daily-package-version.outputs.version }}
+      dotnet-major: ${{ steps.preview-version.outputs.major }}
       upstream-main-sha: ${{ steps.upstream.outputs.sha }}
     steps:
       # setup environment
@@ -35,6 +36,11 @@ jobs:
         env:
           BUILD_CHANNEL: preview
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Resolve daily package version
+        id: daily-package-version
+        run: |
+          VERSION="0.$(date -u +'%Y.%m%d')"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
       # Record the upstream main commit used for this daily build.
       - name: Resolve upstream main commit
         id: upstream
@@ -54,6 +60,7 @@ jobs:
       channel: preview
       profile: ${{ matrix.profile }}
       package-version: ${{ needs.resolve-build-metadata.outputs.package-version }}
+      dotnet-major: ${{ needs.resolve-build-metadata.outputs.dotnet-major }}
       upstream-ref: main
       disable-terser: true
       signalr-logging: Trace

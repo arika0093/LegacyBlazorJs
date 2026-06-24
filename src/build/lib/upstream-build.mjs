@@ -63,6 +63,7 @@ async function resolveBuildIdentity({
   githubToken,
   packageVersion,
   targetFramework,
+  upstreamTag,
 }) {
   if (tag) {
     const parsed = parseAspNetTag(tag);
@@ -97,7 +98,7 @@ async function resolveBuildIdentity({
       prerelease: parsed?.prerelease ?? (resolvedPackageVersion.includes('-')
         ? resolvedPackageVersion.split('-').slice(1).join('-')
         : null),
-      tag: null,
+      tag: upstreamTag?.trim() || null,
       targetFramework: resolveTargetFramework(resolvedPackageVersion, targetFramework),
       upstreamRef: ref,
       version: resolvedPackageVersion,
@@ -168,6 +169,7 @@ export async function buildUpstream({
   githubToken = process.env.GITHUB_TOKEN,
   packageVersion = process.env.PACKAGE_VERSION,
   targetFramework = process.env.LEGACY_BLAZOR_TARGET_FRAMEWORK,
+  upstreamTag = process.env.UPSTREAM_TAG,
 } = {}) {
   const build = await resolveBuildIdentity({
     major,
@@ -179,6 +181,7 @@ export async function buildUpstream({
     githubToken,
     packageVersion,
     targetFramework,
+    upstreamTag,
   });
 
   const distDir = path.join(rootDir, 'dist', sanitizePathSegment(build.upstreamRef));

@@ -14,7 +14,9 @@ To be specific, the process is as follows:
     * At this time, by inserting a transformation plugin via Babel, it is converted for older browsers such as ES2015.
 6. The generated JS files are packaged together into `LegacyBlazorJs`.
 7. Smoke tests are performed (using an old Chromium), and then the package is released.
-    * It is released with the same version as the upstream.
+    * Weekly releases append this repository's commit height to the upstream version.
+    * The commit height counts only changes under `src/`, `dotnet/src/`, `config/`, and `package.json`, excluding Markdown files.
+    * e.g. `10.0.9`(upstream) -> `10.0.9.123`(LegacyBlazorJs)
 
 Since many modern APIs are missing in older browsers, syntax transformation by Babel alone is not sufficient.  
 Therefore, the following Polyfills and Patches are applied.
