@@ -1,21 +1,37 @@
 import { legacyCommonjsPlugin } from './commonjs.mjs';
+import { legacyAbortControllerPolyfillPlugin } from './abort-controller.mjs';
+import { legacyAttachShadowPolyfillPlugin } from './attach-shadow.mjs';
 import { legacyWhatwgFetchPlugin } from './whatwg-fetch.mjs';
 import { legacyCoreJsPolyfillPlugin } from './corejs-polyfill.mjs';
-import { legacyWebApiPolyfillPlugin } from './web-api-polyfill.mjs';
+import { legacyCurrentScriptPolyfillPlugin } from './current-script.mjs';
+import { legacyCustomElementsPolyfillPlugin } from './custom-elements.mjs';
 import { legacyDynamicImportPlugin } from './dynamic-import.mjs';
+import { legacyDomApiShimsPolyfillPlugin } from './dom-api-shims.mjs';
 import { legacyBabelPlugin } from './babel.mjs';
 import { legacyIE11FixesPlugin } from './ie11-fixes.mjs';
 import { legacyES5FixesPlugin } from './es5-fixes.mjs';
+import { legacyMutationObserverPolyfillPlugin } from './mutation-observer.mjs';
+import { legacyPlatformDomPolyfillPlugin } from './platform-dom.mjs';
+import { legacySendBeaconPolyfillPlugin } from './send-beacon.mjs';
+import { legacyTemplatePolyfillPlugin } from './template-polyfill.mjs';
 
 /**
  * Get all legacy Blazor plugins for Rollup
  */
-export function legacyBlazorPlugins(targets, profile = process.env.LEGACY_BLAZOR_TARGET_PROFILE ?? '') {
+export function legacyBlazorPlugins(targets) {
   return [
     legacyCommonjsPlugin(),
     // Prepend non-ECMAScript Web API polyfills before any entry code runs
     legacyWhatwgFetchPlugin(),
-    legacyWebApiPolyfillPlugin(targets, profile),
+    legacyMutationObserverPolyfillPlugin(targets),
+    legacyPlatformDomPolyfillPlugin(targets),
+    legacyTemplatePolyfillPlugin(targets),
+    legacyCustomElementsPolyfillPlugin(targets),
+    legacyAbortControllerPolyfillPlugin(targets),
+    legacyCurrentScriptPolyfillPlugin(targets),
+    legacySendBeaconPolyfillPlugin(targets),
+    legacyAttachShadowPolyfillPlugin(targets),
+    legacyDomApiShimsPolyfillPlugin(targets),
     // Convert syntax and features to be compatible with legacy environments, based on specified targets
     legacyBabelPlugin(targets),
 

@@ -10,15 +10,6 @@ const traverse = traverseModule.default ?? traverseModule;
 const generate = generatorModule.default ?? generatorModule;
 
 export const LEGACY_DYNAMIC_IMPORT_HELPER_NAME = '__legacyDynamicImport';
-export const LEGACY_DYNAMIC_IMPORT_HELPER_SOURCE = 
-`function ${LEGACY_DYNAMIC_IMPORT_HELPER_NAME}(u) {
-  try {
-    return Function("u", "return import(u)")(u);
-  }
-  catch (e) {
-    throw new Error("Dynamic import is not supported in this environment:: ".concat(u));
-  }
-}`
 export const WHATWG_FETCH_VIRTUAL_MODULE_ID = 'legacy-blazor-whatwg-fetch';
 
 function parseSource(source, filename) {
@@ -29,8 +20,8 @@ function parseSource(source, filename) {
   });
 }
 
-function createHelperDeclaration() {
-  return parseSource(LEGACY_DYNAMIC_IMPORT_HELPER_SOURCE, 'legacy-dynamic-import-helper.js').program.body[0];
+function createHelperDeclaration(helperSource) {
+  return parseSource(helperSource, 'legacy-dynamic-import-helper.js').program.body[0];
 }
 
 function findInsertionIndex(statements) {
@@ -54,9 +45,21 @@ function hasHelperDeclaration(statements) {
       && t.isIdentifier(statement.id, { name: LEGACY_DYNAMIC_IMPORT_HELPER_NAME }));
 }
 
-export function transformLegacyDynamicImport(source, filename = 'chunk.js') {
+export function transformLegacyDynamicImport(source, options = {}) {
   if (!/\bimport\s*\(/.test(source)) {
     return source;
+  }
+
+  const resolvedOptions = typeof options === 'string'
+    ? { filename: options }
+    : options;
+  const {
+    filename = 'chunk.js',
+    helperSource,
+  } = resolvedOptions;
+
+  if (!helperSource) {
+    throw new Error('Dynamic import helper source is required.');
   }
 
   const ast = parseSource(source, filename);
@@ -88,7 +91,7 @@ export function transformLegacyDynamicImport(source, filename = 'chunk.js') {
   }
 
   if (!hasHelperDeclaration(ast.program.body)) {
-    ast.program.body.splice(findInsertionIndex(ast.program.body), 0, createHelperDeclaration());
+    ast.program.body.splice(findInsertionIndex(ast.program.body), 0, createHelperDeclaration(helperSource));
   }
 
   return generate(ast, { comments: true }, source).code;

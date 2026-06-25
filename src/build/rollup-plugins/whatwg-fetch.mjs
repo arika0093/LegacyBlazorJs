@@ -1,42 +1,15 @@
-import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
+import { readPackageSourceFile } from '../lib/polyfill-files.mjs';
 import { injectWhatwgFetchPolyfillImport } from '../lib/legacy-output.mjs';
-
-const require = createRequire(import.meta.url);
+import { createSourceBackedImportInjectorPlugin } from './helpers.mjs';
 
 /**
  * Inject whatwg-fetch polyfill for IE11 fetch() support
  */
 export function legacyWhatwgFetchPlugin() {
-  const whatwgFetchPath = require.resolve('whatwg-fetch/fetch.js');
-  const VIRTUAL_ID = 'legacy-blazor-whatwg-fetch';
-  const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-whatwg-fetch';
-
-  let polyfillSource = null;
-
-  return {
+  return createSourceBackedImportInjectorPlugin({
     name: 'legacy-whatwg-fetch',
-    async buildStart() {
-      polyfillSource = await readFile(whatwgFetchPath, 'utf8');
-    },
-    resolveId(source) {
-      if (source === VIRTUAL_ID) {
-        return RESOLVED_VIRTUAL_ID;
-      }
-      return null;
-    },
-    load(id) {
-      if (id === RESOLVED_VIRTUAL_ID) {
-        return polyfillSource;
-      }
-      return null;
-    },
-    transform(code, id) {
-      if (id === RESOLVED_VIRTUAL_ID) {
-        return null;
-      }
-      const transformed = injectWhatwgFetchPolyfillImport(code, VIRTUAL_ID, id);
-      return transformed === code ? null : { code: transformed, map: null };
-    }
-  };
+    moduleId: 'legacy-blazor-whatwg-fetch',
+    loadSource: () => readPackageSourceFile('whatwg-fetch/fetch.js'),
+    injectImport: (code, id) => injectWhatwgFetchPolyfillImport(code, 'legacy-blazor-whatwg-fetch', id),
+  });
 }
