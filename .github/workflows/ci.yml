@@ -16,15 +16,47 @@ on:
         type: boolean
         default: true
   schedule:
-    # Run weekly on Wednesdays at 7:23 UTC (16:23 JST)
-    - cron: '23 7 * * 3'
+    # The .NET patch releases are released on the second Tuesday of every month,
+    # and at that time, Preview releases are also published.
+    # but we cannot specify that directly,
+    # so we run it every Wednesday and make that determination inside the workflow.
+    # see: https://dotnet.microsoft.com/en-us/platform/support/policy
+    - cron: '23 4 * * 3' # every Wednesday at 04:23 UTC
 
 permissions:
   contents: write
 
 jobs:
+  # If this is a scheduled run, check if it is running on the day
+  # after the second Tuesday of the month, and skip if not.
+  # If this is not a scheduled run, always run.
+  check-schedule:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - name: Check if scheduled run is on the next day after the second Tuesday of the month
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            # Get the current date in UTC
+            CURRENT_DATE=$(date -u +%Y-%m-%d)
+            # Get the second Tuesday of the current month in UTC
+            SECOND_TUESDAY=$(date -u -d "$(date -u +%Y-%m-01) +1 month" +%Y-%m-01)
+            SECOND_TUESDAY=$(date -u -d "$SECOND_TUESDAY +$(( (8 - $(date -u -d "$SECOND_TUESDAY" +%u) + 2) % 7 )) days" +%Y-%m-%d)
+            # Get the next day after the second Tuesday
+            NEXT_DAY_AFTER_SECOND_TUESDAY=$(date -u -d "$SECOND_TUESDAY +1 day" +%Y-%m-%d)
+            if [[ "$CURRENT_DATE" != "$NEXT_DAY_AFTER_SECOND_TUESDAY" ]]; then
+              echo "This scheduled run is not on the next day after the second Tuesday of the month. Skipping."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
   resolve-builds:
     runs-on: ubuntu-latest
+    if: ${{ needs.check-schedule.outputs.skip != 'true' }}
     outputs:
       builds: ${{ steps.builds.outputs.builds }}
       target-profiles: ${{ steps.builds.outputs.target-profiles }}
