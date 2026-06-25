@@ -4,7 +4,7 @@
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/ci.yml?event=schedule&style=flat-square&label=Monthly%20Release)](#monthly-release-builds) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/upstream-build.yml?event=schedule&style=flat-square&label=Daily%20Build)](#daily-main-build) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/smoke-test.yml?branch=main&style=flat-square&label=Testing)
 
 
-Rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
+Rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets.
 
 ## Overview
 ### Motivation
@@ -63,6 +63,19 @@ Then, replace the official script in your Blazor Web App's `Components/App.razor
 > We recommend using `blazor.server.js`, which has a smaller file size.
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
+
+### from npm packages
+
+Install the [npm package](https://www.npmjs.com/package/legacy-blazor-js) `legacy-blazor-js`.
+The published version matches the NuGet package version for the same release line.
+
+```bash
+npm install legacy-blazor-js
+```
+
+Then copy the required files from `node_modules/legacy-blazor-js/dist/` into your application's static assets and load them as scripts.
+The package contents are the same generated JavaScript files that are shipped in the NuGet package and GitHub release archive.
+In CI and manual release flows, `npm/dist/` is populated from each matching `dist/<version>/` build output in turn, then `npm/package.json` is versioned dynamically before publish.
 
 ### from GitHub Release
 

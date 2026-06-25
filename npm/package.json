@@ -1,0 +1,21 @@
+{
+    "name": "legacy-blazor-js",
+    "description": "Browser-targeted builds of the official ASP.NET Core blazor.web.js.",
+    "license": "MIT",
+    "homepage": "https://github.com/arika0093/LegacyBlazorJs",
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/arika0093/LegacyBlazorJs.git"
+    },
+    "bugs": {
+      "url": "https://github.com/arika0093/LegacyBlazorJs/issues"
+    },
+    "files": [
+      "dist",
+      "README.md"
+    ],
+    "publishConfig": {
+      "access": "public",
+      "registry": "https://registry.npmjs.org/"
+    }
+}
