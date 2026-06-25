@@ -1,7 +1,7 @@
 # LegacyBlazorJs
 
 [![Current](https://img.shields.io/nuget/v/LegacyBlazorJs?logo=nuget&label=current&style=flat-square)](https://www.nuget.org/packages/LegacyBlazorJs) [![Preview](https://img.shields.io/nuget/vpre/LegacyBlazorJs?logo=nuget&label=preview&style=flat-square)](https://www.nuget.org/packages/LegacyBlazorJs)  
-[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/ci.yml?event=schedule&style=flat-square&label=Weekly%20Release)](#weekly-release-builds) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/upstream-build.yml?event=schedule&style=flat-square&label=Daily%20Build)](#daily-main-build) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/smoke-test.yml?branch=main&style=flat-square&label=Testing)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/ci.yml?event=schedule&style=flat-square&label=Monthly%20Release)](#monthly-release-builds) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/upstream-build.yml?event=schedule&style=flat-square&label=Daily%20Build)](#daily-main-build) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/smoke-test.yml?branch=main&style=flat-square&label=Testing)
 
 
 Rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
@@ -114,14 +114,14 @@ The profile definitions are in [config/targets.json](config/targets.json).
 3. Confirmed to work. Since regular testing is not performed, it may stop working at some point.
 
 ## Build status
-### Weekly release builds
+### Monthly release builds
 
-<!-- start:weekly-release-builds -->
+<!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Message |
 |--------|--------|------|---------|
 | ✅ | [#26](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28085798051) | 2026-06-24 | No updates |
 | ❌ | [#24](https://github.com/arika0093/LegacyBlazorJs/actions/runs/27942781392) | 2026-06-22 | Error in update-readme |
-<!-- end:weekly-release-builds -->
+<!-- end:monthly-release-builds -->
 
 ### Daily main build
 

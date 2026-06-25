@@ -283,7 +283,7 @@ jobs:
           --source https://api.nuget.org/v3/index.json
           --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
 
-  # Update the README build status table with the latest weekly run results.
+  # Update the README build status table with the latest monthly run results.
   update-readme:
     needs: [assemble-release-artifacts]
     if: ${{ always() && github.event_name == 'schedule' }}
@@ -304,7 +304,7 @@ jobs:
       - name: Commit and push README changes
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          commit_message: "docs: update build status tables [weekly]"
+          commit_message: "docs: update build status tables [monthly]"
           file_pattern: "README.md"
           commit_user_name: "github-actions[bot]"
           commit_user_email: "github-actions[bot]@users.noreply.github.com"

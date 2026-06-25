@@ -25,14 +25,14 @@ At a high level, the flow is:
    * The package version comes from the resolved upstream version, or from `PACKAGE_VERSION` when building from a non-tag ref such as `main`.
    * The target framework is inferred from the .NET major unless `LEGACY_BLAZOR_TARGET_FRAMEWORK` is set.
 10. In CI, profile builds are produced independently, then merged back together and repacked into one NuGet package per build channel.
-11. Smoke tests run against selected profiles, and release publication is performed only in the weekly workflow.
+11. Smoke tests run against selected profiles, and release publication is performed only in the monthly workflow.
 
 ## Build and CI structure
 
 There are currently three main automation paths:
 
 * [ci.yml](../.github/workflows/ci.yml)
-  * Weekly build/release workflow.
+  * Monthly build/release workflow.
   * Resolves the configured channels, builds each profile separately, optionally runs compatibility tests, merges the artifacts, repacks the final NuGet packages, and can publish GitHub releases and NuGet packages on manual runs.
 * [smoke-test.yml](../.github/workflows/smoke-test.yml)
   * Runs on pushes, pull requests, and manual dispatch.

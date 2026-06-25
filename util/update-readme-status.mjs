@@ -120,7 +120,7 @@ async function resolveReleaseTag(run, githubToken) {
   }
 }
 
-async function resolveWeeklyMessage(run, runConclusion, githubToken) {
+async function resolveMonthlyMessage(run, runConclusion, githubToken) {
   if (runConclusion === 'success') {
     const releaseTag = await resolveReleaseTag(run, githubToken);
     if (releaseTag) {
@@ -176,13 +176,13 @@ async function resolveUpstreamMainHash(run, githubToken) {
   return fetchCommitShortHash('main', githubToken);
 }
 
-async function buildWeeklyRows(runs, githubToken) {
+async function buildMonthlyRows(runs, githubToken) {
   const rows = [];
   for (const run of runs) {
     const conclusion = await resolveEffectiveConclusion(run, githubToken);
     const runLink = `[#${run.run_number}](${run.html_url})`;
     const date = formatDate(run.run_started_at || run.created_at);
-    const message = await resolveWeeklyMessage(run, conclusion, githubToken);
+    const message = await resolveMonthlyMessage(run, conclusion, githubToken);
     rows.push(`| ${STATUS_EMOJI[conclusion] ?? '❓'} | ${runLink} | ${date} | ${message} |`);
   }
   return rows.join('\n');
@@ -216,24 +216,24 @@ function replaceSection(content, marker, table) {
 
 async function main() {
   const githubToken = process.env.GITHUB_TOKEN;
-  const [weeklyRuns, dailyRuns] = await Promise.all([
+  const [monthlyRuns, dailyRuns] = await Promise.all([
     fetchWorkflowRuns('ci.yml', githubToken),
     fetchWorkflowRuns('upstream-build.yml', githubToken),
   ]);
 
-  const weeklyTableHeader = '| Result | Run ID | Date | Message |\n|--------|--------|------|---------|';
+  const monthlyTableHeader = '| Result | Run ID | Date | Message |\n|--------|--------|------|---------|';
   const dailyTableHeader = '| Result | Run ID | Date | Message | Upstream main hash |\n|--------|--------|------|---------|--------------------|';
 
-  const weeklyTable = weeklyRuns.length > 0
-    ? `${weeklyTableHeader}\n${await buildWeeklyRows(weeklyRuns, githubToken)}`
-    : `${weeklyTableHeader}\n| - | - | - | No recent scheduled runs |`;
+  const monthlyTable = monthlyRuns.length > 0
+    ? `${monthlyTableHeader}\n${await buildMonthlyRows(monthlyRuns, githubToken)}`
+    : `${monthlyTableHeader}\n| - | - | - | No recent scheduled runs |`;
 
   const dailyTable = dailyRuns.length > 0
     ? `${dailyTableHeader}\n${await buildDailyRows(dailyRuns, githubToken)}`
     : `${dailyTableHeader}\n| - | - | - | No recent scheduled runs | - |`;
 
   let readme = await readFile(README_PATH, 'utf8');
-  readme = replaceSection(readme, 'weekly-release-builds', weeklyTable);
+  readme = replaceSection(readme, 'monthly-release-builds', monthlyTable);
   readme = replaceSection(readme, 'daily-main-build', dailyTable);
   await writeFile(README_PATH, readme, 'utf8');
 
