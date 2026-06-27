@@ -200,7 +200,7 @@ jobs:
 
   release-github:
     needs: [assemble-release-artifacts]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_github }}
+    if: ${{ github.event_name == 'schedule' || inputs.publish_nuget }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -252,10 +252,10 @@ jobs:
           done
         env:
           GITHUB_TOKEN: ${{ github.token }}
-
+          
   release-nuget:
     needs: [assemble-release-artifacts]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_nuget }}
+    if: ${{ github.event_name == 'schedule' || inputs.publish_nuget }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
