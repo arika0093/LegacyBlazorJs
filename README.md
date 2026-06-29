@@ -60,6 +60,13 @@ Then, replace the official script in your Blazor Web App's `Components/App.razor
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
 
+By omitting the `Target` specification, the loader checks the ECMAScript level available in the browser. 
+If ES2024 is available it falls back to the official `/_framework/blazor.web.js`; otherwise it selects the highest LegacyBlazorJs target.
+
+```html
+<LegacyBlazorJs.AutoLoader />
+```
+
 ### from JsDelivr CDN
 
 You can also use the compiled JavaScript files from the JsDelivr CDN.  
