@@ -106,8 +106,8 @@ The versions listed below are available.
 | `es5`     | Chrome 23+, IE 11 | `blazor.server` only works. |
 | `es2015`  | Chrome 49+ | |
 | `es2017`  | Chrome 58+ | |
-| `es2018`  | Chrome 64+ | |
-| `es2020`  | Chrome 80+ | Default for .NET 8 |
+| `es2018`  | Chrome 64+ | [dynamic import](https://caniuse.com/es6-module-dynamic-import) only available in this version and later. |
+| `es2020`  | Chrome 80+ | |
 | `es2022`  | Chrome 94+ | Default for .NET 9 |
 
 The profile definitions are in [config/targets.json](config/targets.json).
