@@ -6,10 +6,7 @@
 <section class="content-card">
     <p class="eyebrow">Navigation sample</p>
     <h1>Redirect demo</h1>
-    <p>
-        This route waits briefly, then navigates to the requested destination.
-        Use it as a base for login callbacks, handoff pages, or route normalization.
-    </p>
+    <p>This page waits briefly, then redirects.</p>
     <p>Redirect target: <code>@targetPath</code></p>
     <p>If nothing happens, <a href="@targetPath">continue manually</a>.</p>
 </section>
@@ -18,11 +15,11 @@
     [SupplyParameterFromQuery(Name = "target")]
     public string? Target { get; set; }
 
-    private string targetPath = "/counter";
+    private string targetPath = "/redirect-target";
 
     protected override void OnParametersSet()
     {
-        targetPath = string.IsNullOrWhiteSpace(Target) ? "/counter" : Target;
+        targetPath = string.IsNullOrWhiteSpace(Target) ? "/redirect-target" : Target;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

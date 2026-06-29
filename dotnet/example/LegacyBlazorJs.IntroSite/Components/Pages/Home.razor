@@ -4,73 +4,100 @@
 <PageTitle>LegacyBlazorJs Intro Site</PageTitle>
 
 <section class="hero">
-    <div>
-        <p class="eyebrow">Blazor Server on modern .NET, with wider browser reach</p>
-        <h1>LegacyBlazorJs introduction site</h1>
+    <div class="hero-copy">
+        <p class="eyebrow">Production-style demo for Azure container hosting</p>
+        <h1>Ship a Blazor Server app with a Next.js-like landing page.</h1>
         <p class="lead">
-            This sample runs on .NET 10, uses the latest stable LegacyBlazorJs package,
-            and swaps the default Blazor script for a compatibility-focused server build.
+            This sample runs on <code>net10.0</code>, uses <code>LegacyBlazorJs 10.0.9</code>,
+            and swaps in <code>blazor.server.es2015.js</code> for broader browser compatibility.
         </p>
+        <div class="hero-actions">
+            <button class="primary-action" @onclick="IncrementCount">Try the counter</button>
+            <button class="secondary-action" @onclick="OpenRedirectDemo">Open redirect demo</button>
+        </div>
     </div>
-    <div class="hero-card">
-        <h2>Runtime snapshot</h2>
-        <dl class="facts">
-            <div>
-                <dt>Target Framework</dt>
-                <dd><code>net10.0</code></dd>
-            </div>
-            <div>
-                <dt>NuGet Package</dt>
-                <dd><code>LegacyBlazorJs 10.0.9</code></dd>
-            </div>
-            <div>
-                <dt>Script</dt>
-                <dd><code>blazor.server.es2015.js</code></dd>
-            </div>
-        </dl>
+    <div class="hero-panel">
+        <div class="terminal-card">
+            <span class="terminal-dot"></span>
+            <span class="terminal-dot"></span>
+            <span class="terminal-dot"></span>
+            <pre>package: LegacyBlazorJs 10.0.9
+runtime:  .NET 10 / Blazor Server
+script:   blazor.server.es2015.js
+host:     Azure container-ready</pre>
+        </div>
     </div>
+</section>
+
+<section class="grid-two">
+    <article class="feature feature-wide">
+        <p class="eyebrow">Overview</p>
+        <h2>Why this sample exists</h2>
+        <p>
+            LegacyBlazorJs rebuilds the Blazor browser runtime so server-rendered apps can work on
+            older JavaScript environments than the stock runtime targets.
+        </p>
+        <p>
+            The sample keeps everything important on the front page: product introduction, a live interactive
+            counter, and a button-driven redirect flow that can be adapted for sign-in or handoff pages.
+        </p>
+    </article>
+
+    <article class="feature">
+        <p class="eyebrow">Counter</p>
+        <h2>Interactive on the landing page</h2>
+        <p class="counter-value" role="status">@currentCount</p>
+        <p>The value updates over SignalR, so this confirms interactive Blazor Server behavior is active.</p>
+        <div class="button-row">
+            <button class="primary-action" @onclick="IncrementCount">Increment</button>
+            <button class="ghost-action" @onclick="ResetCount">Reset</button>
+        </div>
+    </article>
 </section>
 
 <section class="feature-grid">
     <article class="feature">
-        <h2>Project overview</h2>
+        <p class="eyebrow">Routing</p>
+        <h2>Redirect trigger</h2>
         <p>
-            LegacyBlazorJs rebuilds Blazor's browser runtime so a Blazor Server app can target
-            older JavaScript environments than the stock runtime supports.
+            Use the button below to move through a redirect page and land on a minimal destination route.
         </p>
+        <button class="secondary-action" @onclick="OpenRedirectDemo">Go to redirect flow</button>
+    </article>
+
+    <article class="feature">
+        <p class="eyebrow">Container</p>
+        <h2>Azure-ready defaults</h2>
         <p>
-            This example keeps the UI intentionally small: a landing page, an interactive counter,
-            and a redirect sample suitable for containerized hosting.
+            The sample publishes as a container and listens on port <code>8080</code>, which aligns with Azure
+            container-hosted ingress configuration.
         </p>
     </article>
 
     <article class="feature">
-        <h2>Interactive counter</h2>
+        <p class="eyebrow">Script swap</p>
+        <h2>Compatibility-focused runtime</h2>
         <p>
-            Server interactivity is enabled with <code>AddInteractiveServerComponents</code>.
-            Open the counter page to verify event binding and live UI updates.
+            Instead of the default Blazor script, the app loads the LegacyBlazorJs server build from package content.
         </p>
-        <button class="primary-action" @onclick="OpenCounter">Open counter sample</button>
     </article>
-
-    <article class="feature">
-        <h2>Redirect sample</h2>
-        <p>
-            Programmatic navigation is useful for sign-in flows, post-submit transitions,
-            and legacy route shims. This sample redirects from a dedicated route back to the counter page.
-        </p>
-        <button class="secondary-action" @onclick="OpenRedirectDemo">Try redirect sample</button>
-    </article>
-    </section>
+</section>
 
 @code {
-    private void OpenCounter()
+    private int currentCount;
+
+    private void IncrementCount()
     {
-        Navigation.NavigateTo("/counter");
+        currentCount++;
+    }
+
+    private void ResetCount()
+    {
+        currentCount = 0;
     }
 
     private void OpenRedirectDemo()
     {
-        Navigation.NavigateTo("/redirect-demo?target=%2Fcounter");
+        Navigation.NavigateTo("/redirect-demo?target=%2Fredirect-target");
     }
 }
