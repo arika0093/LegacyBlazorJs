@@ -1,7 +1,41 @@
 (function () {
-  var officialBlazorJsPath = "/_framework/blazor.web.js";
+  var officialBlazorJsPath = "_framework/blazor.web.js";
   var assetPrefix = "_content/LegacyBlazorJs/blazor.server.";
   var fallbackTarget = "es5";
+
+  function resolveBaseUri() {
+    var baseUri = document.baseURI;
+    var baseElement;
+    var hashIndex;
+    var queryIndex;
+
+    if (!baseUri) {
+      baseElement = document.getElementsByTagName("base")[0];
+      baseUri = baseElement && baseElement.href
+        ? baseElement.href
+        : window.location.href;
+    }
+
+    hashIndex = baseUri.indexOf("#");
+    if (hashIndex >= 0) {
+      baseUri = baseUri.substring(0, hashIndex);
+    }
+
+    queryIndex = baseUri.indexOf("?");
+    if (queryIndex >= 0) {
+      baseUri = baseUri.substring(0, queryIndex);
+    }
+
+    if (baseUri.charAt(baseUri.length - 1) !== "/") {
+      baseUri = baseUri.substring(0, baseUri.lastIndexOf("/") + 1);
+    }
+
+    return baseUri;
+  }
+
+  function toBaseAwarePath(relativePath) {
+    return resolveBaseUri() + relativePath;
+  }
 
   function resolvePath(path) {
     var value = window;
@@ -14,8 +48,8 @@
     return value;
   }
 
-  function hasFunction(path) {
-    return typeof resolvePath(path) === "function";
+  function hasFeature(path) {
+    return resolvePath(path) !== undefined;
   }
 
   function supportsSyntax(source) {
@@ -32,7 +66,7 @@
       return false;
     }
     for (index = 0; index < profile.features.length; index++) {
-      if (!hasFunction(profile.features[index])) {
+      if (!hasFeature(profile.features[index])) {
         return false;
       }
     }
@@ -74,12 +108,12 @@
       profile = profiles[index];
       if (supportsProfile(profile)) {
         if(profile.use_official) {
-          return officialBlazorJsPath;
+          return toBaseAwarePath(officialBlazorJsPath);
         }
-        return assetPrefix + profile.name + ".js";
+        return toBaseAwarePath(assetPrefix + profile.name + ".js");
       }
     }
-    return assetPrefix + fallbackTarget + ".js";
+    return toBaseAwarePath(assetPrefix + fallbackTarget + ".js");
   }
 
   var script = document.createElement("script");
