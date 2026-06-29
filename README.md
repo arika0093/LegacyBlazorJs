@@ -64,6 +64,23 @@ Then, replace the official script in your Blazor Web App's `Components/App.razor
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
 
+### from JsDelivr CDN
+
+You can also use the compiled JavaScript files from the JsDelivr CDN.  
+for example, if you want to use the `es5` version, you can load it as follows:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/arika0093/LegacyBlazorJs@release/dist/v10.0.9.51/blazor.server.es5.js"></script>
+```
+
+To check the list of files, please refer to [here](https://cdn.jsdelivr.net/gh/arika0093/LegacyBlazorJs@release/dist/).
+
+
+> [!WARNING]
+> The CDN is provided for testing purposes only.  
+> Please download the files and use them in production environments.
+
+
 ### from GitHub Release
 
 You can also download and use the compiled JavaScript files from GitHub Releases, which are uploaded there.
