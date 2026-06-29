@@ -6,62 +6,18 @@
     <p class="eyebrow">LegacyBlazorJs</p>
     <h1>Blazor Server for older browsers</h1>
     <p class="lead">
-        LegacyBlazorJs rebuilds the official ASP.NET Core Blazor JavaScript runtime for multiple
-        language targets, so a Blazor Server app can keep working on browsers that are no longer
-        covered by modern evergreen support policies.
+        LegacyBlazorJs rebuilds the official ASP.NET Core
+        <a href="https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS">Blazor JavaScript runtime</a> for multiple
+        language targets, so a Blazor Server app can keep working on older browsers.
     </p>
     <p>
         This intro site itself loads the <code>blazor.server.es5.js</code> profile, so the <a href="#interactive">interactive examples</a>
         below are intended to remain usable even on Internet Explorer 11.
     </p>
     <p>
-        Go interactive sample
-    </p>
-    <p>
-        Please refer to the <a href="https://github.com/arika0093/LegacyBlazorJs">GitHub</a> for details.
-    </p>
-</section>
-
-<section class="content-card">
-    <p class="eyebrow">Overview</p>
-    <h2>What this project does</h2>
-    <p>
-        ASP.NET Core officially targets evergreen browsers. Starting with newer .NET releases, the
-        built-in Blazor runtime also assumes more recent JavaScript features. This project rebuilds
-        <code>blazor.web.js</code> and <code>blazor.server.js</code> into profiles ranging from ES5 to ES2022.
-    </p>
-    <p>
-        The main goal is practical compatibility for enterprise environments where browser upgrades
-        are slow or constrained. The primary focus is Blazor Server. WebAssembly is not supported.
-    </p>
-</section>
-
-<section class="content-card">
-    <p class="eyebrow">Targets</p>
-    <h2>Compatibility goals</h2>
-    <ul class="simple-list">
-        <li>Chrome 23 and later through the ES5 build.</li>
-        <li>Internet Explorer 11, as far as the required platform APIs allow.</li>
-        <li>Newer Chrome-based browsers through newer profile builds such as ES2015, ES2017, and ES2022.</li>
-    </ul>
-    <p>
-        In environments without dynamic import support, some third-party libraries may still be limited.
-        Even so, a minimal Blazor Server page can often be delivered successfully.
-    </p>
-</section>
-
-<section class="content-card">
-    <p class="eyebrow">How To Use</p>
-    <h2>Install and replace the script</h2>
-    <p>
-        Install the NuGet package in your Blazor Web App, then replace the default framework script
-        with the profile that matches your browser target.
-    </p>
-    <pre><code>dotnet add package LegacyBlazorJs</code></pre>
-    <pre><code>&lt;script src="_content/LegacyBlazorJs/blazor.server.es2015.js"&gt;&lt;/script&gt;</code></pre>
-    <p>
-        If you do not need WebAssembly features, prefer <code>blazor.server.*.js</code>. It is smaller
-        and is the recommended choice for legacy browser support.
+        Please refer to the
+        <a href="https://github.com/arika0093/LegacyBlazorJs">GitHub repository</a>
+        for source, automation status, and detailed documentation.
     </p>
 </section>
 
@@ -69,11 +25,11 @@
     <article class="feature">
         <p class="eyebrow">Counter</p>
         <h2>Interactive counter</h2>
-        <p class="counter-value" role="status" translate="no">
-            @currentCount
-        </p>
         <p>
             This counter is rendered through Blazor Server and is intended to keep working on older browsers too.
+        </p>
+        <p class="counter-value" role="status" translate="no">
+            @currentCount
         </p>
         <div class="button-row">
             <button class="primary-action" @onclick="IncrementCount">Increment</button>
