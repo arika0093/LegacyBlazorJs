@@ -1,0 +1,38 @@
+@page "/redirect-demo"
+@inject NavigationManager Navigation
+
+<PageTitle>Redirect Demo</PageTitle>
+
+<section class="content-card">
+    <p class="eyebrow">Navigation sample</p>
+    <h1>Redirect demo</h1>
+    <p>
+        This route waits briefly, then navigates to the requested destination.
+        Use it as a base for login callbacks, handoff pages, or route normalization.
+    </p>
+    <p>Redirect target: <code>@targetPath</code></p>
+    <p>If nothing happens, <a href="@targetPath">continue manually</a>.</p>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "target")]
+    public string? Target { get; set; }
+
+    private string targetPath = "/counter";
+
+    protected override void OnParametersSet()
+    {
+        targetPath = string.IsNullOrWhiteSpace(Target) ? "/counter" : Target;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await Task.Delay(1500);
+        Navigation.NavigateTo(targetPath);
+    }
+}

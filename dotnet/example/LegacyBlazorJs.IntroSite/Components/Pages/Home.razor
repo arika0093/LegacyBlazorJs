@@ -1,0 +1,76 @@
+@page "/"
+@inject NavigationManager Navigation
+
+<PageTitle>LegacyBlazorJs Intro Site</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Blazor Server on modern .NET, with wider browser reach</p>
+        <h1>LegacyBlazorJs introduction site</h1>
+        <p class="lead">
+            This sample runs on .NET 10, uses the latest stable LegacyBlazorJs package,
+            and swaps the default Blazor script for a compatibility-focused server build.
+        </p>
+    </div>
+    <div class="hero-card">
+        <h2>Runtime snapshot</h2>
+        <dl class="facts">
+            <div>
+                <dt>Target Framework</dt>
+                <dd><code>net10.0</code></dd>
+            </div>
+            <div>
+                <dt>NuGet Package</dt>
+                <dd><code>LegacyBlazorJs 10.0.9</code></dd>
+            </div>
+            <div>
+                <dt>Script</dt>
+                <dd><code>blazor.server.es2015.js</code></dd>
+            </div>
+        </dl>
+    </div>
+</section>
+
+<section class="feature-grid">
+    <article class="feature">
+        <h2>Project overview</h2>
+        <p>
+            LegacyBlazorJs rebuilds Blazor's browser runtime so a Blazor Server app can target
+            older JavaScript environments than the stock runtime supports.
+        </p>
+        <p>
+            This example keeps the UI intentionally small: a landing page, an interactive counter,
+            and a redirect sample suitable for containerized hosting.
+        </p>
+    </article>
+
+    <article class="feature">
+        <h2>Interactive counter</h2>
+        <p>
+            Server interactivity is enabled with <code>AddInteractiveServerComponents</code>.
+            Open the counter page to verify event binding and live UI updates.
+        </p>
+        <button class="primary-action" @onclick="OpenCounter">Open counter sample</button>
+    </article>
+
+    <article class="feature">
+        <h2>Redirect sample</h2>
+        <p>
+            Programmatic navigation is useful for sign-in flows, post-submit transitions,
+            and legacy route shims. This sample redirects from a dedicated route back to the counter page.
+        </p>
+        <button class="secondary-action" @onclick="OpenRedirectDemo">Try redirect sample</button>
+    </article>
+    </section>
+
+@code {
+    private void OpenCounter()
+    {
+        Navigation.NavigateTo("/counter");
+    }
+
+    private void OpenRedirectDemo()
+    {
+        Navigation.NavigateTo("/redirect-demo?target=%2Fcounter");
+    }
+}
