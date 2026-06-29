@@ -1,0 +1,52 @@
+@switch (ResolvedTarget)
+{
+    case AutoLoaderTarget.Es5:
+        <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es5.js"]"></script>
+        break;
+    case AutoLoaderTarget.Es2015:
+        <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es2015.js"]"></script>
+        break;
+    case AutoLoaderTarget.Es2017:
+        <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es2017.js"]"></script>
+        break;
+    case AutoLoaderTarget.Es2018:
+        <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es2018.js"]"></script>
+        break;
+    case AutoLoaderTarget.Es2020:
+        <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es2020.js"]"></script>
+        break;
+    case AutoLoaderTarget.Es2022:
+        <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es2022.js"]"></script>
+        break;
+}
+
+@code {
+    [Parameter]
+    public string? Target { get; set; }
+
+    // Converts the Target string to a strongly typed AutoLoaderTarget enum value.
+    private AutoLoaderTarget ResolvedTarget =>
+        (Target?.Trim().ToLowerInvariant()) switch
+        {
+            null or "" => AutoLoaderTarget.Es5,
+            "es5" => AutoLoaderTarget.Es5,
+            "es2015" => AutoLoaderTarget.Es2015,
+            "es2017" => AutoLoaderTarget.Es2017,
+            "es2018" => AutoLoaderTarget.Es2018,
+            "es2020" => AutoLoaderTarget.Es2020,
+            "es2022" => AutoLoaderTarget.Es2022,
+            _ => throw new InvalidOperationException($"Unsupported LegacyBlazorJs target '{Target}'.")
+        };
+
+    // The target profiles are defined in /config/targets.json.
+    // This enum is used to map the string values to a strongly typed value.
+    private enum AutoLoaderTarget
+    {
+        Es5,
+        Es2015,
+        Es2017,
+        Es2018,
+        Es2020,
+        Es2022
+    }
+}
