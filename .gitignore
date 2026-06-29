@@ -2,7 +2,7 @@ node_modules/
 .work/
 artifacts/
 dotnet/src/LegacyBlazorJs/wwwroot/*
-!dotnet/src/LegacyBlazorJs/wwwroot/.gitkeep
+!dotnet/src/LegacyBlazorJs/wwwroot/autoloader.js
 bin/
 obj/
 *.nupkg
