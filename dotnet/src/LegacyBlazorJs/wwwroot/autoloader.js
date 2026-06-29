@@ -90,7 +90,7 @@
       },
       {
         name: "es2018",
-        features: [["Promise"], ["Promise", "prototype", "finally"], ["Object", "fromEntries"]]
+        features: [["Promise"], ["Promise", "prototype", "finally"]]
       },
       {
         name: "es2017",
