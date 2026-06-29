@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="dotnet/example/LegacyBlazorJs.IntroSite/LegacyBlazorJs.IntroSite.csproj" />
+  <Project Path="dotnet/src/LegacyBlazorJs/LegacyBlazorJs.csproj" />
+</Solution>

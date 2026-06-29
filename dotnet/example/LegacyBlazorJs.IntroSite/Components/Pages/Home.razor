@@ -1,0 +1,68 @@
+@page "/"
+
+<PageTitle>LegacyBlazorJs Intro Site</PageTitle>
+
+<section class="hero content-card">
+    <p class="eyebrow">LegacyBlazorJs</p>
+    <h1>Blazor Server for older browsers</h1>
+    <p class="lead">
+        LegacyBlazorJs rebuilds the official ASP.NET Core
+        <a href="https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS">Blazor JavaScript runtime</a> for multiple
+        language targets, so a Blazor Server app can keep working on older browsers.
+    </p>
+    <p>
+        This intro site itself loads the <code>blazor.server.es5.js</code> profile, so the <a href="#interactive">interactive examples</a>
+        below are intended to remain usable even on Internet Explorer 11.
+    </p>
+    <p>
+        Please refer to the
+        <a href="https://github.com/arika0093/LegacyBlazorJs">GitHub repository</a>
+        for source, automation status, and detailed documentation.
+    </p>
+</section>
+
+<section class="feature-grid" id="interactive">
+    <article class="feature">
+        <p class="eyebrow">Counter</p>
+        <h2>Interactive counter</h2>
+        <p>
+            This counter is rendered through Blazor Server and is intended to keep working on older browsers too.
+        </p>
+        <p class="counter-value" role="status" translate="no">
+            @currentCount
+        </p>
+        <div class="button-row">
+            <button class="primary-action" @onclick="IncrementCount">Increment</button>
+            <button class="ghost-action" @onclick="ResetCount">Reset</button>
+        </div>
+    </article>
+
+    <article class="feature">
+        <p class="eyebrow">Redirect</p>
+        <h2>Interactive navigation</h2>
+        <p>
+            Client-side navigation via <code>NavigateTo</code> should also continue to work with the legacy profile.
+        </p>
+        <button class="secondary-action" @onclick="OpenRedirectDemo">Try Redirect</button>
+    </article>
+</section>
+
+@inject NavigationManager Navigation
+@code {
+    private int currentCount;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+
+    private void ResetCount()
+    {
+        currentCount = 0;
+    }
+
+    private void OpenRedirectDemo()
+    {
+        Navigation.NavigateTo("/redirect-target");
+    }
+}
