@@ -5,9 +5,13 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { run } from './lib/process.mjs';
 import { readSelectedTargets } from './lib/config.mjs';
+import { cleanGeneratedPackageAssets, copyStaticPackageAssets } from './lib/package-static-assets.mjs';
 import { runEsCheck } from './run-es-check.mjs';
 import { patchBlazorRegex } from './patches/patch-blazor-regex.mjs';
 import { patchSignalRLogging } from './patches/patch-signalr-logging.mjs';
+
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const packageWwwroot = path.join(rootDir, 'dotnet', 'src', 'LegacyBlazorJs', 'wwwroot');
 
 function resolveBabelTargets(profile) {
   return profile.intendedBrowsers;
@@ -205,8 +209,14 @@ export async function buildVariants({
   const originalTsconfig = await readFile(tsconfigPath, 'utf8');
   const originalBundlerConfig = await readFile(bundlerConfigPath, 'utf8');
 
-  await rm(output, { recursive: true, force: true });
-  await mkdir(output, { recursive: true });
+  if (path.resolve(output) === packageWwwroot) {
+    await cleanGeneratedPackageAssets(output);
+  } else {
+    await rm(output, { recursive: true, force: true });
+    await mkdir(output, { recursive: true });
+    await copyStaticPackageAssets(packageWwwroot, output);
+  }
+
   const files = {};
 
   try {

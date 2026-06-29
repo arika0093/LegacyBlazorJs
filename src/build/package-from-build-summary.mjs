@@ -2,6 +2,7 @@
 import { cp, mkdir, readdir, readFile, rm, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cleanGeneratedPackageAssets } from './lib/package-static-assets.mjs';
 import { run } from './lib/process.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -46,7 +47,7 @@ for (const file of await readdir(packagesDir)) {
 
 for (const build of summary.builds) {
   const sourceDir = path.join(distRoot, sanitizePathSegment(build.upstreamRef));
-  await rm(packageWwwroot, { recursive: true, force: true });
+  await cleanGeneratedPackageAssets(packageWwwroot);
   await cp(sourceDir, packageWwwroot, { recursive: true });
 
   await run('dotnet', [

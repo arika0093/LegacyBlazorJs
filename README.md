@@ -53,16 +53,19 @@ dotnet add package LegacyBlazorJs
 
 Then, replace the official script in your Blazor Web App's `Components/App.razor` with the required profile:
 
-```diff
-- <script src="@Assets["_framework/blazor.web.js"]"></script>
-+ <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es2015.js"]"></script>
+```html
+<!-- <script src="@Assets["_framework/blazor.web.js"]"></script> -->
+<LegacyBlazorJs.AutoLoader Target="es2015" />
 ```
 
-> [!TIP]
-> If you do not use WebAssembly features, there is no particular reason to use `blazor.web.js`.
-> We recommend using `blazor.server.js`, which has a smaller file size.
-
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
+
+By omitting the `Target` specification, the loader checks the ECMAScript level available in the browser. 
+If ES2024 is available it falls back to the official `/_framework/blazor.web.js`; otherwise it selects the highest LegacyBlazorJs target.
+
+```html
+<LegacyBlazorJs.AutoLoader />
+```
 
 ### from JsDelivr CDN
 
@@ -76,8 +79,12 @@ for example, if you want to use the `es5` version, you can load it as follows:
 To check the list of files, please refer to [here](https://cdn.jsdelivr.net/gh/arika0093/LegacyBlazorJs@release/dist/).
 
 
+> [!TIP]
+> If you do not use WebAssembly features, there is no particular reason to use `blazor.web.js`.
+> We recommend using `blazor.server.js`, which has a smaller file size.
+
 > [!WARNING]
-> The CDN is provided for testing purposes only.  
+> The CDN is provided for testing purposes only.
 > Please download the files and use them in production environments.
 
 

@@ -1,0 +1,15 @@
+@if (RequestedTarget is not null)
+{
+    @* Load the specified target if the Target parameter is provided. *@
+    <script src="@($"{AssetPrefix}{RequestedTarget}.js")"></script>
+}
+else if (AutoDetect)
+{
+    @* Load the detected target if auto-detection is enabled. *@
+    <script src="@AutoLoaderPath"></script>
+}
+else
+{
+    @* Fallback to ES5 if no target is specified and auto-detection is disabled. *@
+    <script src="@($"{AssetPrefix}{DefaultTarget}.js")"></script>
+}

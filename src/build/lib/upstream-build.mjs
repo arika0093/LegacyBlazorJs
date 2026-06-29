@@ -3,6 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { buildVariants } from '../build-variants.mjs';
+import { cleanGeneratedPackageAssets } from './package-static-assets.mjs';
 import { prepareNodeShim, retry, run } from './process.mjs';
 import {
   fetchLatestTagForMajor,
@@ -219,7 +220,7 @@ export async function buildUpstream({
       profiles: buildProfiles,
     });
 
-    await rm(packageWwwroot, { recursive: true, force: true });
+    await cleanGeneratedPackageAssets(packageWwwroot);
     await cp(distDir, packageWwwroot, { recursive: true });
 
     console.log('---------------------------------------');
