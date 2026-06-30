@@ -27,6 +27,10 @@ async function readPackageJson(packageJsonPath) {
   return JSON.parse(await readFile(packageJsonPath, 'utf8'));
 }
 
+function gitArgs(args) {
+  return ['-c', 'core.longpaths=true', ...args];
+}
+
 async function resolveNpmWorkspace(upstreamDir) {
   if (await hasPath(path.join(upstreamDir, 'package-lock.json'))) {
     return true;
@@ -136,13 +140,13 @@ async function checkoutUpstreamSource(upstreamDir, ref, repository) {
   console.log(` Clone upstream source: ${repository}@${ref}`);
 
   if (await hasPath(path.join(upstreamDir, '.git'))) {
-    await run('git', ['fetch', '--depth', '1', 'origin', ref], { cwd: upstreamDir });
-    await run('git', ['checkout', '--detach', 'FETCH_HEAD'], { cwd: upstreamDir });
+    await run('git', gitArgs(['fetch', '--depth', '1', 'origin', ref]), { cwd: upstreamDir });
+    await run('git', gitArgs(['checkout', '--detach', 'FETCH_HEAD']), { cwd: upstreamDir });
     return;
   }
 
   await rm(upstreamDir, { recursive: true, force: true });
-  await run('git', ['clone', '--depth', '1', '--branch', ref, '--', `https://github.com/${repository}.git`, upstreamDir], {
+  await run('git', gitArgs(['clone', '--depth', '1', '--branch', ref, '--', `https://github.com/${repository}.git`, upstreamDir]), {
     cwd: rootDir,
   });
 }
@@ -158,6 +162,10 @@ async function prebuildWorkspacePackages(upstreamDir, env) {
 
 function sanitizePathSegment(value) {
   return value.replace(/[^0-9A-Za-z._-]+/g, '-');
+}
+
+function resolveUpstreamWorkspaceDir(rootDirectory, upstreamRef) {
+  return path.join(rootDirectory, '.work', `u-${sanitizePathSegment(upstreamRef)}`);
 }
 
 export async function buildUpstream({
@@ -190,7 +198,7 @@ export async function buildUpstream({
 
   const distDir = path.join(rootDir, 'dist', sanitizePathSegment(build.upstreamRef));
   const packageWwwroot = path.join(rootDir, 'dotnet/src/LegacyBlazorJs/wwwroot');
-  const upstreamDir = path.join(rootDir, '.work', `aspnetcore-${sanitizePathSegment(build.upstreamRef)}`);
+  const upstreamDir = resolveUpstreamWorkspaceDir(rootDir, build.upstreamRef);
   const webJsDir = path.join(upstreamDir, 'src/Components/Web.JS');
   const { env, cleanup } = await prepareNodeShim(nodeBin);
 
