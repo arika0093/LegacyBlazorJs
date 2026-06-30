@@ -29,8 +29,7 @@ Our goal is to make this work on the following platforms:
 * And newer browsers. It should probably work on any Chrome-based browser.
 
 > [!NOTE]
-> In environments where dynamic imports are not available, third-party libraries probably won't work.  
-> However, It should be possible to prepare at least a minimal page if Blazor Server works.
+> In environments where dynamic imports are not available, third-party libraries probably won't work.
 
 ### Automation
 
@@ -39,6 +38,19 @@ The build, verification, and release processes are [automated](#build-status) an
 * Instant access to upstream updates and breaking changes.
 * Released versions should pass testing and therefore function correctly.
 * Updates continue even if I lose interest. (Sustainability!)
+
+## Compatibility testing
+### Online Environment
+In an online environment, you can connect to the demo site to check if it works.  
+https://legacy-blazor-js.app.eclairs.cc/
+
+### Offline Environment
+You can build and set up the [Test Project](./dotnet/example/LegacyBlazorJs.IntroSite/) to check if it works in an offline environment.  
+Alternatively, you can use the [Docker Image](https://github.com/users/arika0093/packages/container/package/legacyblazorjs-introsite).
+
+```bash
+docker run -d -p 8080:80 ghcr.io/arika0093/legacyblazorjs-introsite:main
+```
 
 ## How to use
 ### from NuGet packages
@@ -70,8 +82,8 @@ Or, you can load the file directly.
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
 
-By omitting the `Target` specification, the loader checks the ECMAScript level available in the browser. 
-If ES2024 is available it falls back to the official `/_framework/blazor.server.js`; otherwise it selects the highest LegacyBlazorJs target.
+By omitting the `Target` specification, the loader checks the ECMAScript level available in the browser.  
+If legacy features are available it falls back to the official `/_framework/blazor.server.js`; otherwise it selects the highest LegacyBlazorJs target.
 
 ```html
 <LegacyBlazorJs.Loader />
