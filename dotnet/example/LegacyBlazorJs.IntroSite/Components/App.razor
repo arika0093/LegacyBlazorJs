@@ -6,10 +6,11 @@
     <base href="/" />
     <title>LegacyBlazorJs</title>
     <link rel="stylesheet" href="app.css" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet />
 </head>
 <body>
-    <Routes @rendermode="InteractiveServer" />
-    <script src="_content/LegacyBlazorJs/blazor.server.es5.js"></script>
+    <Routes />
+    <script src="//cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
 </body>
 </html>

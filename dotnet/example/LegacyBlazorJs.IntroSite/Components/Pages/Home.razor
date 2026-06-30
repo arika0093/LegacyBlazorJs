@@ -1,18 +1,14 @@
 @page "/"
+@using System.Reflection
 
 <PageTitle>LegacyBlazorJs Intro Site</PageTitle>
 
 <section class="hero content-card">
-    <p class="eyebrow">LegacyBlazorJs</p>
     <h1>Blazor Server for older browsers</h1>
     <p class="lead">
         LegacyBlazorJs rebuilds the official ASP.NET Core
         <a href="https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS">Blazor JavaScript runtime</a> for multiple
         language targets, so a Blazor Server app can keep working on older browsers.
-    </p>
-    <p>
-        This intro site itself loads the <code>blazor.server.es5.js</code> profile, so the <a href="#interactive">interactive examples</a>
-        below are intended to remain usable even on Internet Explorer 11.
     </p>
     <p>
         Please refer to the
@@ -21,48 +17,61 @@
     </p>
 </section>
 
-<section class="feature-grid" id="interactive">
-    <article class="feature">
-        <p class="eyebrow">Counter</p>
-        <h2>Interactive counter</h2>
-        <p>
-            This counter is rendered through Blazor Server and is intended to keep working on older browsers too.
-        </p>
-        <p class="counter-value" role="status" translate="no">
-            @currentCount
-        </p>
-        <div class="button-row">
-            <button class="primary-action" @onclick="IncrementCount">Increment</button>
-            <button class="ghost-action" @onclick="ResetCount">Reset</button>
+<section class="version-selector content-card">
+    <p class="eyebrow">Runtime selector</p>
+    <h2>Choose the Blazor Server script</h2>
+    <p>Select the runtime to load according to the browser you are using.</p>
+    <form class="profile-form" method="get">
+        <div class="button-row profile-buttons" role="group" aria-label="Blazor Server runtime selector">
+            @foreach (var option in RuntimeOptions)
+            {
+                <button type="submit"
+                        class="@GetButtonClass(option)"
+                        name="runtime"
+                        value="@option.Value"
+                        aria-pressed="@IsSelected(option)">
+                    @option.Label
+                </button>
+            }
         </div>
-    </article>
-
-    <article class="feature">
-        <p class="eyebrow">Redirect</p>
-        <h2>Interactive navigation</h2>
-        <p>
-            Client-side navigation via <code>NavigateTo</code> should also continue to work with the legacy profile.
-        </p>
-        <button class="secondary-action" @onclick="OpenRedirectDemo">Try Redirect</button>
-    </article>
+    </form>
+    <p class="profile-note">
+        The selected runtime is loaded from <code>@SelectedRuntime.ScriptPath</code>.
+    </p>
 </section>
 
-@inject NavigationManager Navigation
+<Interactive />
+<script src="@SelectedRuntime.ScriptPath"></script>
+
 @code {
-    private int currentCount;
+    [SupplyParameterFromQuery(Name = "runtime")]
+    public string? Runtime { get; set; }
 
-    private void IncrementCount()
-    {
-        currentCount++;
-    }
+    private RuntimeOption SelectedRuntime => ResolveRuntime(Runtime);
 
-    private void ResetCount()
-    {
-        currentCount = 0;
-    }
+    private static IReadOnlyList<RuntimeOption> RuntimeOptions { get; } =
+    [
+        CreateLegacyRuntime("es5"),
+        CreateLegacyRuntime("es2015"),
+        CreateLegacyRuntime("es2017"),
+        CreateLegacyRuntime("es2018"),
+        CreateLegacyRuntime("es2020"),
+        CreateLegacyRuntime("es2022"),
+        new("native", "Native", "blazor.server.js", "_framework/blazor.server.js")
+    ];
 
-    private void OpenRedirectDemo()
-    {
-        Navigation.NavigateTo("/redirect-target");
-    }
+    private static RuntimeOption CreateLegacyRuntime(string target) =>
+        new(target, target.ToUpperInvariant(), $"blazor.server.{target}.js", $"_content/LegacyBlazorJs/blazor.server.{target}.js");
+
+    private static RuntimeOption ResolveRuntime(string? runtime) =>
+        RuntimeOptions.FirstOrDefault(option => string.Equals(option.Value, runtime, StringComparison.OrdinalIgnoreCase))
+        ?? RuntimeOptions[0];
+
+    private bool IsSelected(RuntimeOption option) =>
+        string.Equals(option.Value, SelectedRuntime.Value, StringComparison.Ordinal);
+
+    private string GetButtonClass(RuntimeOption option) =>
+        IsSelected(option) ? "primary-action" : "ghost-action";
+
+    private sealed record RuntimeOption(string Value, string Label, string ScriptName, string ScriptPath);
 }

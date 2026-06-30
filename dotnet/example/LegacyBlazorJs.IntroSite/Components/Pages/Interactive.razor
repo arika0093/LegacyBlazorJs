@@ -1,0 +1,47 @@
+@rendermode InteractiveServer
+
+<section class="feature-grid" id="interactive">
+    <article class="feature">
+        <p class="eyebrow">Counter</p>
+        <h2>Interactive counter</h2>
+        <p>
+            This counter is rendered through Blazor Server and is intended to keep working on older browsers too.
+        </p>
+        <p class="counter-value" role="status" translate="no">
+            @currentCount
+        </p>
+        <div class="button-row">
+            <button class="primary-action" @onclick="IncrementCount">Increment</button>
+            <button class="ghost-action" @onclick="ResetCount">Reset</button>
+        </div>
+    </article>
+
+    <article class="feature">
+        <p class="eyebrow">Redirect</p>
+        <h2>Interactive navigation</h2>
+        <p>
+            Client-side navigation via <code>NavigateTo</code> should also continue to work with the legacy profile.
+        </p>
+        <button class="secondary-action" @onclick="OpenRedirectDemo">Try Redirect</button>
+    </article>
+</section>
+
+@inject NavigationManager Navigation
+@code {
+    private int currentCount;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+
+    private void ResetCount()
+    {
+        currentCount = 0;
+    }
+
+    private void OpenRedirectDemo()
+    {
+        Navigation.NavigateTo("/redirect-target");
+    }
+}

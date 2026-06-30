@@ -1,11 +1,19 @@
 @inherits LayoutComponentBase
-
 <div class="shell">
-    <header class="site-header">
-        <a class="brand" href="/">LegacyBlazorJs</a>
-    </header>
-
-    <main class="site-main">
-        @Body
-    </main>
+    <div class="shell-body">
+        <main class="site-main">
+            @Body
+        </main>
+    </div>
+    <div class="shell-footer">
+        <p>
+            Copyright &copy; 2026- <a href="https://eclairs.cc">arika0093</a>. All rights reserved. /
+            Running on .NET: @GetDotNetVersion(), LegacyBlazorJs: @GetLegacyBlazorJsVersion()
+        </p>
+    </div>
 </div>
+
+@code {
+    private string GetDotNetVersion() => System.Environment.Version.ToString();
+    private string GetLegacyBlazorJsVersion() => "10.0.9.51";
+}
