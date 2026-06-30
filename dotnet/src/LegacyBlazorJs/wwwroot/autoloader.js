@@ -1,5 +1,5 @@
 (function () {
-  var officialBlazorJsPath = "_framework/blazor.web.js";
+  var officialBlazorJsPath = "_framework/blazor.server.js";
   var assetPrefix = "_content/LegacyBlazorJs/blazor.server.";
   var fallbackTarget = "es5";
 

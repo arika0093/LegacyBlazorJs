@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace LegacyBlazorJs;
 
-public sealed partial class AutoLoader : ComponentBase
+public sealed partial class Loader : ComponentBase
 {
     /// <summary>
     /// Whether to automatically detect the target to load in the browser. The default value is true.
@@ -18,7 +18,7 @@ public sealed partial class AutoLoader : ComponentBase
     public string? Target { get; set; }
 
     // The path to the autoloader script, which is used to detect the target in the browser.
-    private const string AutoLoaderPath = "_content/LegacyBlazorJs/autoloader.js";
+    private const string LoaderPath = "_content/LegacyBlazorJs/autoloader.js";
 
     // The default target to load if neither the Target parameter nor auto-detection is specified.
     private const string DefaultTarget = "es5";
