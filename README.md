@@ -46,7 +46,6 @@ https://legacy-blazor-js.app.eclairs.cc/
 
 ### Offline Environment
 You can build and set up the [Test Project](./dotnet/example/LegacyBlazorJs.IntroSite/) to check if it works in an offline environment.  
-The projects under [`dotnet/`](./dotnet/) now default to `net10.0` and the local `artifacts/packages` feed, so after building a package you can restore and run them without placeholder replacement.  
 Alternatively, you can use the [Docker Image](https://github.com/users/arika0093/packages/container/package/legacyblazorjs-introsite).
 
 ```bash
@@ -73,7 +72,7 @@ Then, replace the official script in your Blazor Web App's `Components/App.razor
 
 Or, you can load the file directly.
 
-```html
+```razor
 <script src="@Assets["_content/LegacyBlazorJs/blazor.server.es2015.js"]"></script>
 ```
 
