@@ -1,6 +1,9 @@
 node_modules/
 .work/
-artifacts/
+artifacts/*
+!artifacts/packages/
+artifacts/packages/*
+!artifacts/packages/.gitkeep
 dotnet/src/LegacyBlazorJs/wwwroot/*
 !dotnet/src/LegacyBlazorJs/wwwroot/autoloader.js
 bin/
