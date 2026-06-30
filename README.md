@@ -112,7 +112,7 @@ You can also download and use the compiled JavaScript files from GitHub Releases
 
 The procedure is as follows:
 
-1. Download the latest js files from [`Release/LegacyBlazorJs.x.y.z.zip`](https://github.com/arika0093/LegacyBlazorJs/releases).
+1. Download the latest `LegacyBlazorJs.(version).zip` file from [Release](https://github.com/arika0093/LegacyBlazorJs/releases).
 2. Unzip the files and copy the necessary JavaScript files to wwwroot.
 3. Load those JavaScript files as scripts in App.razor.
 
