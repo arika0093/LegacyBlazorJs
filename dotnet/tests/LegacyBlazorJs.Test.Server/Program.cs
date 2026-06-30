@@ -1,4 +1,4 @@
-using BlazorServerApp.Components;
+using LegacyBlazorJs.Test.Server.Components;
 using Microsoft.AspNetCore.Routing;
 using System.Reflection;
 

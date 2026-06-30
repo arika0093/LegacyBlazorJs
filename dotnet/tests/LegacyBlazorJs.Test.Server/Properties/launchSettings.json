@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "BlazorServerApp": {
+    "LegacyBlazorJs.Test.Server": {
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {

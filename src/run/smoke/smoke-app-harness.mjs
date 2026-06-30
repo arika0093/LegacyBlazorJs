@@ -1,4 +1,4 @@
-import { access, cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -6,7 +6,6 @@ import { setTimeout as delay } from 'node:timers/promises';
 import {
   blazorServerAppTemplateDirectory,
   blazorWasmAppTemplateDirectory,
-  packageSourceDirectory,
 } from './repository.mjs';
 import { CapturedProcess } from './captured-process.mjs';
 import { resolveScriptProfile } from './package-version.mjs';
@@ -14,6 +13,9 @@ import { requestText, runChecked } from './process-utils.mjs';
 import { createId, getAvailablePort, removeDirectory } from './shared.mjs';
 
 const SERVER_READY_TIMEOUT_MS = 120_000;
+const DEFAULT_TARGET_FRAMEWORK = 'net10.0';
+const DEFAULT_GLOBAL_PACKAGES_FOLDER = '.nuget/packages';
+const DEFAULT_WORKSPACE_PACKAGE_SOURCE = '../../artifacts/packages';
 
 export class SmokeAppHarness {
   static async create(root, profile, packageVersion, hostingModel, logger) {
@@ -82,9 +84,11 @@ export class SmokeAppHarness {
     this.#serverProcess = CapturedProcess.start('dotnet', [
       'run',
       '--project', this.#projectPath,
-      '--urls', this.#baseUri,
       '--no-launch-profile',
       '--no-restore',
+      ...this.#getDotnetPropertyArgs(),
+      '--',
+      '--urls', this.#baseUri,
     ], {
       cwd: this.#rootDirectory,
       env: {
@@ -130,11 +134,14 @@ export class SmokeAppHarness {
 
   async #initialize() {
     this.#logger.info(`Preparing project '${this.#projectPath}'.`);
-    await this.#replaceProjectPlaceholders();
     await this.#copyNuGetConfig();
 
     this.#logger.info(`Restoring .NET dependencies for '${this.#projectPath}'.`);
-    await runChecked('dotnet', ['restore', this.#projectPath], { cwd: this.#rootDirectory });
+    await runChecked('dotnet', [
+      'restore',
+      this.#projectPath,
+      ...this.#getDotnetPropertyArgs(),
+    ], { cwd: this.#rootDirectory });
 
     const scriptHostPath = getScriptHostPath(this.#rootDirectory, this.#hostingModel);
     const scriptName = this.#hostingModel === 'Server'
@@ -144,25 +151,6 @@ export class SmokeAppHarness {
     await replaceSingleToken(scriptHostPath, '__BLAZOR_SCRIPT_NAME__', scriptName);
   }
 
-  async #replaceProjectPlaceholders() {
-    const projectFiles = await findFiles(this.#rootDirectory, filePath => filePath.endsWith('.csproj'));
-    const nugetConfigFiles = await findFiles(this.#rootDirectory, filePath => filePath.endsWith('NuGet.config'));
-    await Promise.all([...projectFiles, ...nugetConfigFiles].map(async filePath => {
-      let contents = await readFile(filePath, 'utf8');
-      const updated = contents
-        .replaceAll('__TARGET_FRAMEWORK__', this.#targetFramework)
-        .replaceAll('__ASPNETCORE_VERSION__', this.#packageVersion)
-        .replaceAll('__PACKAGE_VERSION__', this.#packageVersion)
-        .replaceAll('__NUGET_PACKAGES_FOLDER__', getGlobalPackagesFolder(this.#rootDirectory))
-        .replaceAll('__PACKAGE_SOURCE__', packageSourceDirectory.replaceAll('\\', '/'));
-
-      if (updated !== contents) {
-        contents = updated;
-        await writeFile(filePath, contents);
-      }
-    }));
-  }
-
   async #copyNuGetConfig() {
     const sourcePath = path.join(this.#rootDirectory, 'NuGet.config');
     if (await hasPath(sourcePath)) {
@@ -170,6 +158,14 @@ export class SmokeAppHarness {
     }
 
     await writeNuGetConfig(this.#rootDirectory);
+  }
+
+  #getDotnetPropertyArgs() {
+    return [
+      `-p:LegacyBlazorTestTargetFramework=${this.#targetFramework}`,
+      `-p:LegacyBlazorPackageVersion=${this.#packageVersion}`,
+      `-p:AspNetCorePackageVersion=${this.#packageVersion}`,
+    ];
   }
 
   async #disposeServer() {
@@ -189,12 +185,8 @@ export class SmokeAppHarness {
 
 async function writeNuGetConfig(directory) {
   const nugetConfigPath = path.join(directory, 'NuGet.config');
-  const contents = `<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <config>\n    <add key="globalPackagesFolder" value="${getGlobalPackagesFolder(directory)}" />\n  </config>\n  <packageSources>\n    <clear />\n    <add key="local" value="${packageSourceDirectory.replaceAll('\\', '/')}" />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />\n  </packageSources>\n</configuration>\n`;
+  const contents = `<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <config>\n    <add key="globalPackagesFolder" value="${DEFAULT_GLOBAL_PACKAGES_FOLDER}" />\n  </config>\n  <packageSources>\n    <clear />\n    <add key="local" value="${DEFAULT_WORKSPACE_PACKAGE_SOURCE}" />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />\n  </packageSources>\n</configuration>\n`;
   await writeFile(nugetConfigPath, contents);
-}
-
-function getGlobalPackagesFolder(directory) {
-  return path.join(directory, '.nuget', 'packages').replaceAll('\\', '/');
 }
 
 async function hasPath(filePath) {
@@ -214,24 +206,6 @@ async function replaceSingleToken(filePath, token, replacement) {
   }
 
   await writeFile(filePath, updated);
-}
-
-async function findFiles(rootDirectory, predicate) {
-  const result = [];
-  const entries = await readdir(rootDirectory, { withFileTypes: true });
-  for (const entry of entries) {
-    const entryPath = path.join(rootDirectory, entry.name);
-    if (entry.isDirectory()) {
-      result.push(...await findFiles(entryPath, predicate));
-      continue;
-    }
-
-    if (predicate(entryPath)) {
-      result.push(entryPath);
-    }
-  }
-
-  return result;
 }
 
 function getTemplateDirectory(hostingModel) {
@@ -259,15 +233,19 @@ function getScriptHostPath(appDirectory, hostingModel) {
 function getProjectPath(appDirectory, hostingModel) {
   switch (hostingModel) {
     case 'Server':
-      return path.join(appDirectory, 'BlazorServerApp.csproj');
+      return path.join(appDirectory, 'LegacyBlazorJs.Test.Server.csproj');
     case 'WebAssembly':
-      return path.join(appDirectory, 'BlazorWasmApp.csproj');
+      return path.join(appDirectory, 'LegacyBlazorJs.Test.Wasm.csproj');
     default:
       throw new Error(`Unsupported hosting model '${hostingModel}'.`);
   }
 }
 
 function resolveTargetFrameworkMoniker(packageVersion, explicitMajor) {
+  if (!packageVersion?.trim()) {
+    return DEFAULT_TARGET_FRAMEWORK;
+  }
+
   const numericExplicitMajor = Number(explicitMajor);
   if (Number.isFinite(numericExplicitMajor) && numericExplicitMajor > 0) {
     return `net${numericExplicitMajor}.0`;
