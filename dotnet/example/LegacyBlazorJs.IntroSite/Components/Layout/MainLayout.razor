@@ -14,6 +14,44 @@
 </div>
 
 @code {
+    private static readonly Lazy<string> LegacyBlazorJsVersion = new(ResolveLegacyBlazorJsVersion);
+
     private string GetDotNetVersion() => System.Environment.Version.ToString();
-    private string GetLegacyBlazorJsVersion() => "10.0.9.51";
+    private string GetLegacyBlazorJsVersion() => LegacyBlazorJsVersion.Value;
+
+    // dynamically resolve the version of the LegacyBlazorJs package from the dependency manifest files, so that we can display it in the footer.
+    private static string ResolveLegacyBlazorJsVersion()
+    {
+        var depsFiles = ((string?)AppContext.GetData("APP_CONTEXT_DEPS_FILES"))?
+            .Split([';', System.IO.Path.PathSeparator], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            ?? throw new InvalidOperationException("Could not locate dependency manifest files.");
+
+        foreach (var depsFile in depsFiles)
+        {
+            using var depsStream = System.IO.File.OpenRead(depsFile);
+            using var depsDocument = System.Text.Json.JsonDocument.Parse(depsStream);
+
+            if (!depsDocument.RootElement.TryGetProperty("libraries", out var libraries))
+            {
+                continue;
+            }
+
+            foreach (var library in libraries.EnumerateObject())
+            {
+                const string packageName = "LegacyBlazorJs";
+                var separatorIndex = library.Name.LastIndexOf('/');
+                if (separatorIndex <= 0)
+                {
+                    continue;
+                }
+
+                if (library.Name[..separatorIndex].Equals(packageName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return library.Name[(separatorIndex + 1)..];
+                }
+            }
+        }
+
+        throw new InvalidOperationException("Could not resolve the LegacyBlazorJs package version from the dependency manifest.");
+    }
 }
