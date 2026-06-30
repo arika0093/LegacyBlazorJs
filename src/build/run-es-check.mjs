@@ -10,7 +10,8 @@ import { run } from './lib/process.mjs';
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const defaultOutputDir = path.join(rootDir, 'dotnet', 'src', 'LegacyBlazorJs', 'wwwroot');
 const require = createRequire(import.meta.url);
-const esCheckCliPath = path.join(path.dirname(require.resolve('es-check')), 'cli', 'index.js');
+const esCheckPackageRoot = path.dirname(require.resolve('es-check'));
+const esCheckCliPath = path.join(esCheckPackageRoot, 'cli', 'index.js');
 
 function resolveEsCheckTarget(profile) {
   return profile.ecma <= 5 ? 'es5' : `es${profile.ecma}`;
@@ -23,18 +24,19 @@ async function resolveProfileFiles(outputDir, profileName) {
   ];
 
   await Promise.all(files.map(filePath => access(filePath)));
-  return files;
+  return files.map(filePath => path.basename(filePath));
 }
 
 export async function runEsCheck({ outputDir = defaultOutputDir, targets } = {}) {
   const selectedTargets = targets ?? await readSelectedTargets();
+  const resolvedOutputDir = path.resolve(outputDir);
 
   for (const [profileName, profile] of Object.entries(selectedTargets)) {
     const target = resolveEsCheckTarget(profile);
-    const files = await resolveProfileFiles(outputDir, profileName);
+    const files = await resolveProfileFiles(resolvedOutputDir, profileName);
     console.log(`****** ES Check "${profileName}" (target: ${target}) ******`);
     await run(process.execPath, [esCheckCliPath, target, ...files], {
-      cwd: rootDir,
+      cwd: resolvedOutputDir,
     });
   }
 }

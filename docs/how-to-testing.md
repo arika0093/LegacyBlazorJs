@@ -22,6 +22,19 @@ node src/build/index.mjs
 export SKIP_PREBUILD=true
 ```
 
+On Windows PowerShell, use the equivalent syntax:
+
+```powershell
+$env:BUILD_TARGET_PROFILES = "es5"
+$env:BUILD_CHANNEL = "current"
+$env:SIGNALR_LOGGING = "Trace"
+$env:LEGACY_BLAZOR_DISABLE_TERSER = "true"
+$env:SKIP_PREBUILD = "true"
+node src/build/index.mjs
+```
+
+For the common ES5 debug build, `npm run build:quick` now works on Windows as well.
+
 Upon successful build, Javascript files will be generated in the following locations:
 * `dist/v(tag)`
 * `dotnet/src/LegacyBlazorJs/wwwroot`
