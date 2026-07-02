@@ -55,6 +55,7 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
   resolve-builds:
+    needs: [check-schedule]
     runs-on: ubuntu-latest
     if: ${{ needs.check-schedule.outputs.skip != 'true' }}
     outputs:
