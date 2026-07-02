@@ -3,6 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { buildVariants } from '../build-variants.mjs';
+import { resolveDistDirectory, sanitizePathSegment } from './dist-paths.mjs';
 import { cleanGeneratedPackageAssets } from './package-static-assets.mjs';
 import { prepareNodeShim, retry, run } from './process.mjs';
 import {
@@ -160,10 +161,6 @@ async function prebuildWorkspacePackages(upstreamDir, env) {
   await run('npm', ['run', 'build', '--workspace=src/SignalR/clients/ts/signalr-protocol-msgpack'], { cwd: upstreamDir, env });
 }
 
-function sanitizePathSegment(value) {
-  return value.replace(/[^0-9A-Za-z._-]+/g, '-');
-}
-
 function resolveUpstreamWorkspaceDir(rootDirectory, upstreamRef) {
   return path.join(rootDirectory, '.work', `u-${sanitizePathSegment(upstreamRef)}`);
 }
@@ -196,7 +193,7 @@ export async function buildUpstream({
     upstreamTag,
   });
 
-  const distDir = path.join(rootDir, 'dist', sanitizePathSegment(build.upstreamRef));
+  const distDir = resolveDistDirectory(path.join(rootDir, 'dist'), build.version);
   const packageWwwroot = path.join(rootDir, 'dotnet/src/LegacyBlazorJs/wwwroot');
   const upstreamDir = resolveUpstreamWorkspaceDir(rootDir, build.upstreamRef);
   const webJsDir = path.join(upstreamDir, 'src/Components/Web.JS');

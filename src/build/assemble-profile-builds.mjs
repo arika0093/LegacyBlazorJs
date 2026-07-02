@@ -3,15 +3,12 @@ import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { resolveDistDirectory } from './lib/dist-paths.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const sourceRoot = path.resolve(process.argv[2] ?? '.work/ci/builds');
 const distRoot = path.join(rootDir, 'dist');
 const packagesDir = path.join(rootDir, 'artifacts', 'packages');
-
-function sanitizePathSegment(value) {
-  return value.replace(/[^0-9A-Za-z._-]+/g, '-');
-}
 
 async function listArtifactDirectories(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -50,10 +47,10 @@ for (const artifactDirectory of artifactDirectories) {
   }
 
   const [build] = summary.builds;
-  const sourceDir = path.join(artifactDirectory, 'dist', sanitizePathSegment(build.upstreamRef));
+  const sourceDir = resolveDistDirectory(path.join(artifactDirectory, 'dist'), build.version);
   const manifestPath = path.join(sourceDir, 'build-manifest.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-  const targetDir = path.join(distRoot, sanitizePathSegment(build.upstreamRef));
+  const targetDir = resolveDistDirectory(distRoot, build.version);
   await mkdir(targetDir, { recursive: true });
 
   if (!mergedSummary) {
@@ -99,6 +96,6 @@ for (const artifactDirectory of artifactDirectories) {
 
 mergedManifest.files = mergedFiles;
 await writeFile(
-  path.join(distRoot, sanitizePathSegment(mergedBuild.upstreamRef), 'build-manifest.json'),
+  path.join(resolveDistDirectory(distRoot, mergedBuild.version), 'build-manifest.json'),
   `${JSON.stringify(mergedManifest, null, 2)}\n`);
 await writeFile(path.join(packagesDir, 'build-summary.json'), `${JSON.stringify(mergedSummary, null, 2)}\n`);

@@ -300,7 +300,13 @@ jobs:
       - name: Copy release bundle artifacts into dist
         run: |
           set -euo pipefail
-          mv -f .incoming/dist dist/
+          mkdir -p dist
+          shopt -s dotglob nullglob
+          for incoming_dir in .incoming/dist/*; do
+            target_dir="dist/$(basename "$incoming_dir")"
+            rm -rf "$target_dir"
+            mv "$incoming_dir" "$target_dir"
+          done
       - name: Commit and push release branch updates
         uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
         with:

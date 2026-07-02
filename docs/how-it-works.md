@@ -19,7 +19,7 @@ At a high level, the flow is:
    * This step can be skipped locally with `SKIP_PREBUILD=true`.
 5. Patch the upstream `Web.JS` sources before each profile build.
 6. Inject LegacyBlazorJs Rollup plugins into the upstream Rollup config and rebuild `Web.JS` once per target profile.
-7. Copy the generated `blazor.web.js` and `blazor.server.js` files into `dist/<upstreamRef>/` with profile-specific names such as `blazor.server.es2015.js`.
+7. Copy the generated `blazor.web.js` and `blazor.server.js` files into `dist/v<packageVersion>/` with profile-specific names such as `blazor.server.es2015.js`.
 8. Run `es-check` against the generated profile files to confirm the emitted syntax stays within each selected profile target.
 9. Copy the generated files into `dotnet/src/LegacyBlazorJs/wwwroot` and run `dotnet pack`.
    * The package version comes from the resolved upstream version, or from `PACKAGE_VERSION` when building from a non-tag ref such as `main`.

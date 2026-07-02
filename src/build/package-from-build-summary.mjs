@@ -2,6 +2,7 @@
 import { cp, mkdir, readdir, readFile, rm, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveDistDirectory } from './lib/dist-paths.mjs';
 import { cleanGeneratedPackageAssets } from './lib/package-static-assets.mjs';
 import { run } from './lib/process.mjs';
 
@@ -11,10 +12,6 @@ const summaryPath = path.join(packagesDir, 'build-summary.json');
 const distRoot = path.join(rootDir, 'dist');
 const packageWwwroot = path.join(rootDir, 'dotnet', 'src', 'LegacyBlazorJs', 'wwwroot');
 const packageProjectPath = path.join(rootDir, 'dotnet', 'src', 'LegacyBlazorJs', 'LegacyBlazorJs.csproj');
-
-function sanitizePathSegment(value) {
-  return value.replace(/[^0-9A-Za-z._-]+/g, '-');
-}
 
 function resolveTargetFramework(build) {
   if (build?.major && Number.isFinite(Number(build.major))) {
@@ -46,7 +43,7 @@ for (const file of await readdir(packagesDir)) {
 }
 
 for (const build of summary.builds) {
-  const sourceDir = path.join(distRoot, sanitizePathSegment(build.upstreamRef));
+  const sourceDir = resolveDistDirectory(distRoot, build.version);
   await cleanGeneratedPackageAssets(packageWwwroot);
   await cp(sourceDir, packageWwwroot, { recursive: true });
 

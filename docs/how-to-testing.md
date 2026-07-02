@@ -36,7 +36,7 @@ node src/build/index.mjs
 For the common ES5 debug build, `npm run build:quick` now works on Windows as well.
 
 Upon successful build, Javascript files will be generated in the following locations:
-* `dist/v(tag)`
+* `dist/v(packageVersion)`
 * `dotnet/src/LegacyBlazorJs/wwwroot`
 
 ## Testing
