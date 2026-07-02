@@ -47,7 +47,15 @@
 </section>
 
 <Interactive />
-<LegacyBlazorJs.Loader AutoDetect="@SelectedRuntime.IsAutoDetect" Target="@SelectedRuntime.Target" />
+
+@if(SelectedRuntime.UseNative)
+{
+    <script src="@SelectedRuntime.ScriptPath"></script>
+}
+else
+{
+    <LegacyBlazorJs.Loader AutoDetect="@SelectedRuntime.IsAutoDetect" Target="@SelectedRuntime.Target" />
+}
 
 @code {
     [SupplyParameterFromQuery(Name = "runtime")]
@@ -57,17 +65,36 @@
 
     private static IReadOnlyList<RuntimeOption> RuntimeOptions { get; } =
     [
-        new("auto", "Auto", null, null, true),
+        new()
+        {
+            Value = "auto",
+            Label = "Auto",
+            IsAutoDetect = true
+        },
         CreateLegacyRuntime("es5"),
         CreateLegacyRuntime("es2015"),
         CreateLegacyRuntime("es2017"),
         CreateLegacyRuntime("es2018"),
         CreateLegacyRuntime("es2020"),
-        CreateLegacyRuntime("es2022")
+        CreateLegacyRuntime("es2022"),
+        new()
+        {
+            Value = "native",
+            Label = "Native",
+            ScriptPath = "_framework/blazor.server.js",
+            UseNative = true
+        }
     ];
 
     private static RuntimeOption CreateLegacyRuntime(string target) =>
-        new(target, target.ToUpperInvariant(), target, $"_content/LegacyBlazorJs/blazor.server.{target}.js", false);
+        new(){
+            Value = target,
+            Label = target.ToUpperInvariant(),
+            Target = target,
+            ScriptPath = $"_content/LegacyBlazorJs/blazor.server.{target}.js",
+            IsAutoDetect = false,
+            UseNative = false
+        };
 
     private static RuntimeOption ResolveRuntime(string? runtime) =>
         RuntimeOptions.FirstOrDefault(option => string.Equals(option.Value, runtime, StringComparison.OrdinalIgnoreCase))
@@ -79,5 +106,13 @@
     private string GetButtonClass(RuntimeOption option) =>
         IsSelected(option) ? "primary-action" : "ghost-action";
 
-    private sealed record RuntimeOption(string Value, string Label, string? Target, string? ScriptPath, bool IsAutoDetect);
+    private sealed record RuntimeOption
+    {
+        public required string Value { get; init; }
+        public required string Label { get; init; }
+        public string? Target { get; init; }
+        public string? ScriptPath { get; init; }
+        public bool IsAutoDetect { get; init; } = false;
+        public bool UseNative { get; init; } = false;
+    }
 }
