@@ -180,7 +180,8 @@ export function withHiddenProductionServerSourcemap(configSource) {
     "environment === 'production' && (output === 'blazor.web' || output === 'blazor.webassembly' || output === 'blazor.server')");
 
   if (patched === configSource) {
-    throw new Error('Could not locate the upstream Web.JS production sourcemap condition.');
+    // in .NET 9, the blazor.server output is no longer included in the production sourcemap check, so we don't need to patch it.
+    return configSource;
   }
 
   return patched;
