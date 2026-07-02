@@ -174,6 +174,18 @@ export function withRollupLegacyPlugins(configSource) {
   return patched;
 }
 
+export function withHiddenProductionServerSourcemap(configSource) {
+  const patched = configSource.replace(
+    /environment === 'production' && \(output === 'blazor\.web' \|\| output === 'blazor\.webassembly'\)/u,
+    "environment === 'production' && (output === 'blazor.web' || output === 'blazor.webassembly' || output === 'blazor.server')");
+
+  if (patched === configSource) {
+    throw new Error('Could not locate the upstream Web.JS production sourcemap condition.');
+  }
+
+  return patched;
+}
+
 export async function buildVariants({
   sourceDir = path.resolve('src/Components/Web.JS'),
   output = path.resolve('dotnet/src/LegacyBlazorJs/wwwroot'),
@@ -204,10 +216,14 @@ export async function buildVariants({
   const bundlerConfigPath = await firstExisting([
     path.join(sourceDir, '../Shared.JS/rollup.config.mjs'),
   ]);
+  const webJsConfigPath = await firstExisting([
+    path.join(sourceDir, 'rollup.config.mjs'),
+  ]);
   const tsconfigPath = path.join(sourceDir, '../Shared.JS/tsconfig.json');
   const rollupLegacyPluginsPath = await writeRollupLegacyPluginsModule(bundlerConfigPath);
   const originalTsconfig = await readFile(tsconfigPath, 'utf8');
   const originalBundlerConfig = await readFile(bundlerConfigPath, 'utf8');
+  const originalWebJsConfig = await readFile(webJsConfigPath, 'utf8');
 
   if (path.resolve(output) === packageWwwroot) {
     await cleanGeneratedPackageAssets(output);
@@ -232,10 +248,12 @@ export async function buildVariants({
       if (process.env.LEGACY_BLAZOR_DISABLE_TERSER === 'true') {
         bundlerConfig = withOptionalRollupTerser(bundlerConfig);
       }
+      const webJsConfig = withHiddenProductionServerSourcemap(originalWebJsConfig);
 
       process.env.LEGACY_BLAZOR_BABEL_TARGETS = JSON.stringify(resolveBabelTargets(profile));
       process.env.LEGACY_BLAZOR_TARGET_PROFILE = name;
       await writeFile(bundlerConfigPath, bundlerConfig);
+      await writeFile(webJsConfigPath, webJsConfig);
       await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], { cwd: npmWorkspace.root });
       const { frameworkDir, webviewPath } = await resolveBuildOutputLayout(sourceDir);
 
@@ -258,6 +276,7 @@ export async function buildVariants({
   } finally {
     await writeFile(tsconfigPath, originalTsconfig);
     await writeFile(bundlerConfigPath, originalBundlerConfig);
+    await writeFile(webJsConfigPath, originalWebJsConfig);
     await unlink(rollupLegacyPluginsPath).catch(() => {});
     delete process.env.LEGACY_BLAZOR_BABEL_TARGETS;
     delete process.env.LEGACY_BLAZOR_TARGET_PROFILE;

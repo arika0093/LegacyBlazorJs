@@ -82,8 +82,8 @@ Or, you can load the file directly.
 
 The `es2015` part can be changed according to the browser target. Please refer to the [Included files](#included-files) section for details.
 
-By omitting the `Target` specification, the loader checks the ECMAScript level available in the browser.  
-If legacy features are available it falls back to the official `/_framework/blazor.server.js`; otherwise it selects the highest LegacyBlazorJs target.
+By omitting the `Target` specification, the loader checks the runtime syntax and features available in the browser.  
+If modern features are available it falls back to the official `/_framework/blazor.server.js`; otherwise it selects the highest LegacyBlazorJs target.
 
 ```html
 <LegacyBlazorJs.Loader />

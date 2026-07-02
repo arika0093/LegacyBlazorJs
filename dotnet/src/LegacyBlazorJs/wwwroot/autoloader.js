@@ -62,6 +62,7 @@
 
   function supportsProfile(profile) {
     var index;
+
     if (profile.syntax && !supportsSyntax(profile.syntax)) {
       return false;
     }
@@ -98,6 +99,7 @@
       },
       {
         name: "es2015",
+        syntax: "return (() => { class C extends Array { constructor(...args) { super(...args); } } var value = `${[1].find(item => item === 1)}`; return value === '1' && typeof new C().fill === 'function'; })();",
         features: [["Symbol"], ["Map"], ["Set"], ["Promise"]]
       }
     ];
