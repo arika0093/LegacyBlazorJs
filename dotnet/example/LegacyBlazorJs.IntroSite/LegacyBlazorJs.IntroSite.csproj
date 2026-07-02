@@ -7,6 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LegacyBlazorJs" Version="10.*" />
+    <PackageReference Include="LegacyBlazorJs" Version="10.0.9.61" />
   </ItemGroup>
 </Project>

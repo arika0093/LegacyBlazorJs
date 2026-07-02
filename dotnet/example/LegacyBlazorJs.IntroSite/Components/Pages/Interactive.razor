@@ -1,6 +1,22 @@
 @rendermode InteractiveServer
+@using Microsoft.JSInterop
 
 <section class="feature-grid" id="interactive">
+    <article class="feature">
+        <p class="eyebrow">Connection</p>
+        <h2>Interactive status</h2>
+        <p>
+            This status changes automatically after the Blazor interactive connection is established.
+        </p>
+        <p id="@ConnectionStatusElementId"
+           class="counter-value @GetConnectionStatusClass()"
+           data-connection-status="loading"
+           role="status"
+           translate="no">
+            @GetConnectionStatusText()
+        </p>
+    </article>
+
     <article class="feature">
         <p class="eyebrow">Counter</p>
         <h2>Interactive counter</h2>
@@ -26,9 +42,38 @@
     </article>
 </section>
 
+@inject IJSRuntime JS
 @inject NavigationManager Navigation
 @code {
+    private const string ConnectionStatusElementId = "interactive-connection-status";
+    private ConnectionStatus connectionStatus = ConnectionStatus.Loading;
     private int currentCount;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || connectionStatus is ConnectionStatus.Connected)
+        {
+            return;
+        }
+
+        connectionStatus = ConnectionStatus.Connected;
+        await JS.InvokeVoidAsync("LegacyBlazorJsIntroSite.interactiveStatus.markConnected", ConnectionStatusElementId);
+        StateHasChanged();
+    }
+
+    private string GetConnectionStatusText() => connectionStatus switch
+    {
+        ConnectionStatus.Connected => "Connected",
+        ConnectionStatus.Failed => "Failed",
+        _ => "Loading..."
+    };
+
+    private string GetConnectionStatusClass() => connectionStatus switch
+    {
+        ConnectionStatus.Connected => "connection-status connection-status-connected",
+        ConnectionStatus.Failed => "connection-status connection-status-failed",
+        _ => "connection-status connection-status-loading"
+    };
 
     private void IncrementCount()
     {
@@ -43,5 +88,12 @@
     private void OpenRedirectDemo()
     {
         Navigation.NavigateTo("/redirect-target", true);
+    }
+
+    private enum ConnectionStatus
+    {
+        Loading,
+        Connected,
+        Failed
     }
 }
