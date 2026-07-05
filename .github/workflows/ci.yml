@@ -285,33 +285,63 @@ jobs:
           --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
 
   commit-github:
-    needs: [assemble-release-artifacts]
+    needs: [resolve-builds, package-all]
     if: ${{ github.event_name == 'schedule' || inputs.publish_github }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build: ${{ fromJson(needs.resolve-builds.outputs.builds) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: release
           fetch-depth: 0
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: LegacyBlazorJs-release-bundle
-          path: .incoming
-      - name: Copy release bundle artifacts into dist
+      - name: Prepare release branch
+        env:
+          TARGET_BRANCH: release/v${{ matrix.build.version }}
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$TARGET_BRANCH"
+            git switch -C "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          else
+            git switch --orphan "$TARGET_BRANCH"
+            git rm -rf . >/dev/null 2>&1 || true
+            find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+            printf '%s\n\n%s\n' \
+              'This branch is separate from the main branch and is used to publish the generated JavaScript assets.' \
+              'This allows you to utilize CDN releases via jsDerivr.' > README.md
+            git add README.md
+            git commit -m "release: initialize $TARGET_BRANCH"
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: LegacyBlazorJs-release-${{ matrix.build.channel }}
+          path: .incoming
+      - name: Commit and push release branch updates
+        env:
+          TARGET_BRANCH: release/v${{ matrix.build.version }}
+        run: |
+          set -euo pipefail
+          rm -rf dist
           mkdir -p dist
           shopt -s dotglob nullglob
-          for incoming_dir in .incoming/dist/*; do
-            target_dir="dist/$(basename "$incoming_dir")"
-            rm -rf "$target_dir"
-            mv "$incoming_dir" "$target_dir"
-          done
-      - name: Commit and push release branch updates
-        uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
-        with:
-          commit_message: "release: update artifacts"
-          file_pattern: "dist/**"
+          incoming_dirs=(.incoming/dist/*)
+          if [ "${#incoming_dirs[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one version directory in .incoming/dist, found ${#incoming_dirs[@]}."
+            exit 1
+          fi
+          mv "${incoming_dirs[0]}"/* dist/
+          rm -rf .incoming
+          git add README.md dist
+          if git diff --cached --quiet; then
+            echo "No release artifact changes for $TARGET_BRANCH"
+            exit 0
+          fi
+          git commit -m "release: update artifacts for ${{ matrix.build.version }}"
+          git push origin "$TARGET_BRANCH"
 
   # Update the README build status table with the latest monthly run results.
   update-readme:
