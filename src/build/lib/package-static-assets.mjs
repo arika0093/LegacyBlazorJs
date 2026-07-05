@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm } from 'node:fs/promises';
+import { mkdir, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 export function isGeneratedPackageAsset(relativePath) {
@@ -21,16 +21,4 @@ export async function cleanGeneratedPackageAssets(directory) {
 
     await rm(path.join(directory, entry.name), { force: true });
   }
-}
-
-export async function copyStaticPackageAssets(sourceDirectory, destinationDirectory) {
-  await mkdir(destinationDirectory, { recursive: true });
-
-  await cp(sourceDirectory, destinationDirectory, {
-    recursive: true,
-    filter(sourcePath) {
-      const relativePath = path.relative(sourceDirectory, sourcePath);
-      return relativePath === '' || !isGeneratedPackageAsset(relativePath);
-    },
-  });
 }

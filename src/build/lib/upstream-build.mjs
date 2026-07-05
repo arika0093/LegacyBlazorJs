@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { buildVariants } from '../build-variants.mjs';
 import { resolveDistDirectory, sanitizePathSegment } from './dist-paths.mjs';
 import { cleanGeneratedPackageAssets } from './package-static-assets.mjs';
+import { writeStaticPackageAssets } from './static-package-assets.mjs';
 import { prepareNodeShim, retry, run } from './process.mjs';
 import {
   fetchLatestTagForMajor,
@@ -227,6 +228,7 @@ export async function buildUpstream({
 
     await cleanGeneratedPackageAssets(packageWwwroot);
     await cp(distDir, packageWwwroot, { recursive: true });
+    await writeStaticPackageAssets(packageWwwroot);
 
     console.log('---------------------------------------');
     console.log(' Pack the Razor class library with the selected upstream version');

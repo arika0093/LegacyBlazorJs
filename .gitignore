@@ -5,7 +5,6 @@ artifacts/*
 artifacts/packages/*
 !artifacts/packages/.gitkeep
 dotnet/src/LegacyBlazorJs/wwwroot/*
-!dotnet/src/LegacyBlazorJs/wwwroot/autoloader.js
 bin/
 obj/
 *.nupkg

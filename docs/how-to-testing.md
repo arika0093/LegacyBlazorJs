@@ -39,6 +39,8 @@ Upon successful build, Javascript files will be generated in the following locat
 * `dist/v(packageVersion)`
 * `dotnet/src/LegacyBlazorJs/wwwroot`
 
+The source for package-only static assets such as `autoloader.js` lives under `src/build/static-package-assets/`. The file under `dotnet/src/LegacyBlazorJs/wwwroot` is generated from that source as part of the build.
+
 ## Testing
 The quickest way is to create a Blazor Server app template and load the generated JS file using the `<script>` tag.  
 Open this in the browser you want to test and perform the necessary functionality checks.

@@ -39,12 +39,16 @@
 
   function resolvePath(path) {
     var value = window;
-    for (var index = 0; index < path.length; index++) {
+    var index;
+
+    for (index = 0; index < path.length; index++) {
       if (value == null || typeof value[path[index]] === "undefined") {
         return undefined;
       }
+
       value = value[path[index]];
     }
+
     return value;
   }
 
@@ -66,11 +70,13 @@
     if (profile.syntax && !supportsSyntax(profile.syntax)) {
       return false;
     }
+
     for (index = 0; index < profile.features.length; index++) {
       if (!hasFeature(profile.features[index])) {
         return false;
       }
     }
+
     return true;
   }
 
@@ -108,13 +114,17 @@
 
     for (index = 0; index < profiles.length; index++) {
       profile = profiles[index];
-      if (supportsProfile(profile)) {
-        if(profile.use_official) {
-          return toBaseAwarePath(officialBlazorJsPath);
-        }
-        return toBaseAwarePath(assetPrefix + profile.name + ".js");
+      if (!supportsProfile(profile)) {
+        continue;
       }
+
+      if (profile.use_official) {
+        return toBaseAwarePath(officialBlazorJsPath);
+      }
+
+      return toBaseAwarePath(assetPrefix + profile.name + ".js");
     }
+
     return toBaseAwarePath(assetPrefix + fallbackTarget + ".js");
   }
 

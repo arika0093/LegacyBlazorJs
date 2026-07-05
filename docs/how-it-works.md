@@ -21,7 +21,7 @@ At a high level, the flow is:
 6. Inject LegacyBlazorJs Rollup plugins into the upstream Rollup config and rebuild `Web.JS` once per target profile.
 7. Copy the generated `blazor.web.js` and `blazor.server.js` files into `dist/v<packageVersion>/` with profile-specific names such as `blazor.server.es2015.js`.
 8. Run `es-check` against the generated profile files to confirm the emitted syntax stays within each selected profile target.
-9. Copy the generated files into `dotnet/src/LegacyBlazorJs/wwwroot` and run `dotnet pack`.
+9. Copy the generated files into `dotnet/src/LegacyBlazorJs/wwwroot`, regenerate static package assets from `src/build/static-package-assets/`, and run `dotnet pack`.
    * The package version comes from the resolved upstream version, or from `PACKAGE_VERSION` when building from a non-tag ref such as `main`.
    * The target framework is inferred from the .NET major unless `LEGACY_BLAZOR_TARGET_FRAMEWORK` is set.
 10. In CI, profile builds are produced independently, then merged back together and repacked into one NuGet package per build channel.
@@ -72,6 +72,16 @@ The added processing currently does the following:
 * Apply extra ES5-specific fixes.
 
 For local debugging, Terser can also be disabled with `LEGACY_BLAZOR_DISABLE_TERSER=true`.
+
+## Static package assets
+
+Files that ship in the Razor Class Library but are not produced by the upstream `Web.JS` build are maintained under [src/build/static-package-assets](../src/build/static-package-assets/).
+
+Currently this includes:
+
+* [autoloader.js](../src/build/static-package-assets/autoloader.js)
+  * The checked-in copy under `dotnet/src/LegacyBlazorJs/wwwroot` is generated from this source during the build/package flow.
+  * JavaScript assets in this directory are minified with Terser unless `LEGACY_BLAZOR_DISABLE_TERSER=true` is set for debugging.
 
 ## Why WebAssembly is not supported
 

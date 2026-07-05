@@ -5,7 +5,8 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { run } from './lib/process.mjs';
 import { readSelectedTargets } from './lib/config.mjs';
-import { cleanGeneratedPackageAssets, copyStaticPackageAssets } from './lib/package-static-assets.mjs';
+import { cleanGeneratedPackageAssets } from './lib/package-static-assets.mjs';
+import { writeStaticPackageAssets } from './lib/static-package-assets.mjs';
 import { runEsCheck } from './run-es-check.mjs';
 import { patchBlazorRegex } from './patches/patch-blazor-regex.mjs';
 import { patchSignalRLogging } from './patches/patch-signalr-logging.mjs';
@@ -228,10 +229,11 @@ export async function buildVariants({
 
   if (path.resolve(output) === packageWwwroot) {
     await cleanGeneratedPackageAssets(output);
+    await writeStaticPackageAssets(output);
   } else {
     await rm(output, { recursive: true, force: true });
     await mkdir(output, { recursive: true });
-    await copyStaticPackageAssets(packageWwwroot, output);
+    await writeStaticPackageAssets(output);
   }
 
   const files = {};

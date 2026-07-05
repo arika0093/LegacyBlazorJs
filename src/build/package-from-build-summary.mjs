@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveDistDirectory } from './lib/dist-paths.mjs';
 import { cleanGeneratedPackageAssets } from './lib/package-static-assets.mjs';
+import { writeStaticPackageAssets } from './lib/static-package-assets.mjs';
 import { run } from './lib/process.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -46,6 +47,7 @@ for (const build of summary.builds) {
   const sourceDir = resolveDistDirectory(distRoot, build.version);
   await cleanGeneratedPackageAssets(packageWwwroot);
   await cp(sourceDir, packageWwwroot, { recursive: true });
+  await writeStaticPackageAssets(packageWwwroot);
 
   await run('dotnet', [
     'pack',
