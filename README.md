@@ -95,11 +95,8 @@ You can also use the compiled JavaScript files from the JsDelivr CDN.
 for example, if you want to use the `es5` version, you can load it as follows:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/arika0093/LegacyBlazorJs@release/dist/v10.0.9.51/blazor.server.es5.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/arika0093/LegacyBlazorJs@release/v10.0.9.61/dist/blazor.server.es5.js"></script>
 ```
-
-To check the list of files, please refer to [here](https://cdn.jsdelivr.net/gh/arika0093/LegacyBlazorJs@release/dist/).
-
 
 > [!WARNING]
 > The CDN is provided for testing purposes only.
