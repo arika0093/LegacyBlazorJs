@@ -158,6 +158,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Message |
 |--------|--------|------|---------|
+| ✅ | [#29](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28919940606) | 2026-07-08 | No updates |
 | ✅ | [#28](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28496832174) | 2026-07-01 | No updates |
 | ✅ | [#26](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28085798051) | 2026-06-24 | No updates |
 | ❌ | [#24](https://github.com/arika0093/LegacyBlazorJs/actions/runs/27942781392) | 2026-06-22 | Error in update-readme |
