@@ -111,10 +111,7 @@ async function resolveReleaseTag(run, githubToken) {
         return createdTime >= runTime - 60_000 && createdTime <= runTime + 10 * 60 * 60_000;
       })
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
-    if (release?.tag_name?.startsWith('v')) {
-      return release.tag_name.slice(1);
-    }
-    return null;
+    return release?.tag_name ?? null;
   } catch {
     return null;
   }
@@ -124,7 +121,7 @@ async function resolveMonthlyMessage(run, runConclusion, githubToken) {
   if (runConclusion === 'success') {
     const releaseTag = await resolveReleaseTag(run, githubToken);
     if (releaseTag) {
-      return `[v${releaseTag} released](https://github.com/${REPO}/releases/tag/v${releaseTag})`;
+      return `[${releaseTag} released](https://github.com/${REPO}/releases/tag/${releaseTag})`;
     }
     return 'No updates';
   }

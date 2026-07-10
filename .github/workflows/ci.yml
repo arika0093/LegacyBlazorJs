@@ -345,8 +345,8 @@ jobs:
 
   # Update the README build status table with the latest monthly run results.
   update-readme:
-    needs: [assemble-release-artifacts]
-    if: ${{ always() && github.event_name == 'schedule' }}
+    needs: [check-schedule, assemble-release-artifacts]
+    if: ${{ always() && github.event_name == 'schedule' && needs.check-schedule.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
