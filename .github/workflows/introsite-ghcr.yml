@@ -3,6 +3,8 @@ name: Publish IntroSite container
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     paths:
       - .github/workflows/introsite-ghcr.yml
       - dotnet/example/LegacyBlazorJs.IntroSite/**
