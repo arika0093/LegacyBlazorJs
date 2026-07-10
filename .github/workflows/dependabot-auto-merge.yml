@@ -44,7 +44,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Squash merge the Dependabot pull request
+      - name: Enable squash auto-merge for the Dependabot pull request
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
@@ -54,10 +54,7 @@ jobs:
             echo "Pull request modifies workflow files; skipping automatic merge."
             exit 0
           fi
-          # Try auto-merge first (required when branch protection is enabled).
-          # Fall back to an immediate merge on repositories without branch protection rules.
-          gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$PR_NUMBER" || \
-            gh pr merge --repo "$GITHUB_REPOSITORY" --squash "$PR_NUMBER"
+          gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$PR_NUMBER"
 
   # Close failed Dependabot PRs so broken update branches do not stay open indefinitely.
   close-failed-pr:
