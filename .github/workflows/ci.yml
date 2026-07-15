@@ -41,11 +41,12 @@ jobs:
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             # Get the current date in UTC
             CURRENT_DATE=$(date -u +%Y-%m-%d)
-            # Get the second Tuesday of the current month in UTC
-            SECOND_TUESDAY=$(date -u -d "$(date -u +%Y-%m-01) +1 month" +%Y-%m-01)
-            SECOND_TUESDAY=$(date -u -d "$SECOND_TUESDAY +$(( (8 - $(date -u -d "$SECOND_TUESDAY" +%u) + 2) % 7 )) days" +%Y-%m-%d)
-            # Get the next day after the second Tuesday
-            NEXT_DAY_AFTER_SECOND_TUESDAY=$(date -u -d "$SECOND_TUESDAY +1 day" +%Y-%m-%d)
+            # Get the first day of the current month, find the first Tuesday,
+            # then jump 8 days forward to land on the day after the second Tuesday.
+            FIRST_OF_MONTH=$(date -u +%Y-%m-01)
+            DOW=$(date -u -d "$FIRST_OF_MONTH" +%u)                     # 1=Mon, 7=Sun
+            DAYS_TO_FIRST_TUE=$(( (2 - DOW + 7) % 7 ))
+            NEXT_DAY_AFTER_SECOND_TUESDAY=$(date -u -d "$FIRST_OF_MONTH +$(( DAYS_TO_FIRST_TUE + 8 )) days" +%Y-%m-%d)
             if [[ "$CURRENT_DATE" != "$NEXT_DAY_AFTER_SECOND_TUESDAY" ]]; then
               echo "This scheduled run is not on the next day after the second Tuesday of the month. Skipping."
               echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -345,8 +346,8 @@ jobs:
 
   # Update the README build status table with the latest monthly run results.
   update-readme:
-    needs: [check-schedule, assemble-release-artifacts]
-    if: ${{ always() && github.event_name == 'schedule' && needs.check-schedule.outputs.skip != 'true' }}
+    needs: [check-schedule, assemble-release-artifacts, release-github]
+    if: ${{ always() && github.event_name == 'schedule' && needs.check-schedule.outputs.skip != 'true' && (needs.release-github.result == 'success' || needs.release-github.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
