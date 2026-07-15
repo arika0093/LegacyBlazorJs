@@ -156,12 +156,13 @@ The profile definitions are in [config/targets.json](config/targets.json).
 ### Monthly release builds
 
 <!-- start:monthly-release-builds -->
-| Result | Run ID | Date | Message |
-|--------|--------|------|---------|
-| ✅ | [#29](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28919940606) | 2026-07-08 | No updates |
-| ✅ | [#28](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28496832174) | 2026-07-01 | No updates |
-| ✅ | [#26](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28085798051) | 2026-06-24 | [11.0.0-preview.5.26302.115.51 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-preview.5.26302.115.51) |
-| ❌ | [#24](https://github.com/arika0093/LegacyBlazorJs/actions/runs/27942781392) | 2026-06-22 | Error in update-readme |
+| Result | Run ID | Date | Trigger | Message |
+|--------|--------|------|----------|---------|
+| ✅ | [#31](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29397483633) | 2026-07-15 | 🔧 Manual | [10.0.10.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.10.64), [11.0.0-preview.6.26359.118.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-preview.6.26359.118.64), [9.0.18.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.18.64) |
+| ✅ | [#30](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29391049535) | 2026-07-15 | 📅 Scheduled | [10.0.10.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.10.64), [11.0.0-preview.6.26359.118.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-preview.6.26359.118.64), [9.0.18.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.18.64) |
+| ✅ | [#29](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28919940606) | 2026-07-08 | 📅 Scheduled | No updates |
+| ✅ | [#28](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28496832174) | 2026-07-01 | 📅 Scheduled | [10.0.9.61 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.9.61), [11.0.0-preview.5.26302.115.61 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-preview.5.26302.115.61), [9.0.17.61 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.17.61) |
+| ✅ | [#27](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28086269265) | 2026-06-24 | 🔧 Manual | No updates |
 <!-- end:monthly-release-builds -->
 
 ### Daily main build
