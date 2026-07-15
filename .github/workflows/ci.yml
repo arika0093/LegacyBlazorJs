@@ -347,7 +347,7 @@ jobs:
   # Update the README build status table with the latest monthly run results.
   update-readme:
     needs: [check-schedule, assemble-release-artifacts, release-github]
-    if: ${{ always() && github.event_name == 'schedule' && needs.check-schedule.outputs.skip != 'true' && (needs.release-github.result == 'success' || needs.release-github.result == 'skipped') }}
+    if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.check-schedule.outputs.skip != 'true' && (needs.release-github.result == 'success' || needs.release-github.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
