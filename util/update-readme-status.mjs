@@ -100,28 +100,41 @@ async function fetchRunJobs(runId, githubToken) {
   }
 }
 
-async function resolveReleaseTag(run, githubToken) {
-  const url = `https://api.github.com/repos/${REPO}/releases?per_page=10`;
+async function resolveReleaseTags(run, githubToken, previousRun) {
+  const url = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
   try {
     const releases = await fetchJson(url, githubToken);
     const runTime = new Date(run.created_at).getTime();
-    const release = releases
+    // Look back to just after the previous scheduled run, so releases that
+    // were created between two scheduled runs (e.g. from a workflow_dispatch
+    // trigger) are still attributed to the next scheduled run row.
+    let lowerBound = runTime - 60_000;
+    if (previousRun) {
+      const prevTime = new Date(previousRun.created_at).getTime();
+      lowerBound = prevTime + 60_000;
+    }
+    const upperBound = runTime + 10 * 60 * 60_000;
+    const tags = releases
       .filter(r => {
         const createdTime = new Date(r.created_at).getTime();
-        return createdTime >= runTime - 60_000 && createdTime <= runTime + 10 * 60 * 60_000;
+        return createdTime > lowerBound && createdTime <= upperBound;
       })
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
-    return release?.tag_name ?? null;
+      .map(r => r.tag_name)
+      .filter(Boolean)
+      .sort();
+    return tags.length > 0 ? tags : null;
   } catch {
     return null;
   }
 }
 
-async function resolveMonthlyMessage(run, runConclusion, githubToken) {
+async function resolveMonthlyMessage(run, runConclusion, githubToken, previousRun) {
   if (runConclusion === 'success') {
-    const releaseTag = await resolveReleaseTag(run, githubToken);
-    if (releaseTag) {
-      return `[${releaseTag} released](https://github.com/${REPO}/releases/tag/${releaseTag})`;
+    const releaseTags = await resolveReleaseTags(run, githubToken, previousRun);
+    if (releaseTags?.length) {
+      return releaseTags
+        .map(tag => `[${tag} released](https://github.com/${REPO}/releases/tag/${tag})`)
+        .join(', ');
     }
     return 'No updates';
   }
@@ -175,11 +188,15 @@ async function resolveUpstreamMainHash(run, githubToken) {
 
 async function buildMonthlyRows(runs, githubToken) {
   const rows = [];
-  for (const run of runs) {
+  // runs are sorted newest-first by the GitHub API, so the previous (older)
+  // scheduled run for runs[i] is runs[i + 1].
+  for (let i = 0; i < runs.length; i++) {
+    const run = runs[i];
+    const previousRun = i + 1 < runs.length ? runs[i + 1] : null;
     const conclusion = await resolveEffectiveConclusion(run, githubToken);
     const runLink = `[#${run.run_number}](${run.html_url})`;
     const date = formatDate(run.run_started_at || run.created_at);
-    const message = await resolveMonthlyMessage(run, conclusion, githubToken);
+    const message = await resolveMonthlyMessage(run, conclusion, githubToken, previousRun);
     rows.push(`| ${STATUS_EMOJI[conclusion] ?? '❓'} | ${runLink} | ${date} | ${message} |`);
   }
   return rows.join('\n');
