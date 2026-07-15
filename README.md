@@ -156,11 +156,13 @@ The profile definitions are in [config/targets.json](config/targets.json).
 ### Monthly release builds
 
 <!-- start:monthly-release-builds -->
-| Result | Run ID | Date | Message |
-|--------|--------|------|---------|
-| ✅ | [#28](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28496832174) | 2026-07-01 | No updates |
-| ✅ | [#26](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28085798051) | 2026-06-24 | No updates |
-| ❌ | [#24](https://github.com/arika0093/LegacyBlazorJs/actions/runs/27942781392) | 2026-06-22 | Error in update-readme |
+| Result | Run ID | Date | Trigger | Message |
+|--------|--------|------|----------|---------|
+| ✅ | [#31](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29397483633) | 2026-07-15 | 🔧 Manual | [10.0.10.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.10.64), [11.0.0-preview.6.26359.118.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-preview.6.26359.118.64), [9.0.18.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.18.64) |
+| ✅ | [#30](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29391049535) | 2026-07-15 | 📅 Scheduled | [10.0.10.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.10.64), [11.0.0-preview.6.26359.118.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-preview.6.26359.118.64), [9.0.18.64 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.18.64) |
+| ✅ | [#29](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28919940606) | 2026-07-08 | 📅 Scheduled | No updates |
+| ✅ | [#28](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28496832174) | 2026-07-01 | 📅 Scheduled | [10.0.9.61 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.9.61), [11.0.0-preview.5.26302.115.61 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-preview.5.26302.115.61), [9.0.17.61 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.17.61) |
+| ✅ | [#27](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28086269265) | 2026-06-24 | 🔧 Manual | No updates |
 <!-- end:monthly-release-builds -->
 
 ### Daily main build
@@ -168,11 +170,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:daily-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
-| ✅ | [#26](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28718200931) | 2026-07-04 |  | [dfb0b04c](https://github.com/dotnet/aspnetcore/tree/dfb0b04c) |
-| ✅ | [#25](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28681381337) | 2026-07-03 |  | [db4dc2c3](https://github.com/dotnet/aspnetcore/tree/db4dc2c3) |
-| ✅ | [#24](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28618561610) | 2026-07-02 |  | [8ef91a5c](https://github.com/dotnet/aspnetcore/tree/8ef91a5c) |
-| ✅ | [#23](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28545455315) | 2026-07-01 |  | [d37becd8](https://github.com/dotnet/aspnetcore/tree/d37becd8) |
-| ✅ | [#22](https://github.com/arika0093/LegacyBlazorJs/actions/runs/28473588569) | 2026-06-30 |  | [360e42ce](https://github.com/dotnet/aspnetcore/tree/360e42ce) |
+| ✅ | [#43](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29364570114) | 2026-07-14 |  | [cf0ae5e8](https://github.com/dotnet/aspnetcore/tree/cf0ae5e8) |
+| ✅ | [#41](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29281268033) | 2026-07-13 |  | [56722f81](https://github.com/dotnet/aspnetcore/tree/56722f81) |
+| ✅ | [#40](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29207114824) | 2026-07-12 |  | [f82669ac](https://github.com/dotnet/aspnetcore/tree/f82669ac) |
+| ✅ | [#39](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29166465452) | 2026-07-11 |  | [c4d061a5](https://github.com/dotnet/aspnetcore/tree/c4d061a5) |
+| ✅ | [#38](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29120502533) | 2026-07-10 |  | [c4d061a5](https://github.com/dotnet/aspnetcore/tree/c4d061a5) |
 <!-- end:daily-main-build -->
 
 ## Development guide

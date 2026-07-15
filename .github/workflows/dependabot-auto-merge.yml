@@ -1,3 +1,4 @@
+
 name: Auto-merge or close Dependabot npm updates
 
 on:
@@ -10,6 +11,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  workflows: write
 
 jobs:
   # Resolve the pull request number for the Dependabot workflow run.
@@ -44,7 +46,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Enable squash auto-merge
+      - name: Enable squash auto-merge for the Dependabot pull request
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
