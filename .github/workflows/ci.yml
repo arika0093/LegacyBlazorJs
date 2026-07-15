@@ -19,36 +19,36 @@ on:
     # The .NET patch releases are released on the second Tuesday of every month,
     # and at that time, Preview releases are also published.
     # but we cannot specify that directly,
-    # so we run it every Wednesday and make that determination inside the workflow.
+    # so we run it every Tuesday and make that determination inside the workflow.
     # see: https://dotnet.microsoft.com/en-us/platform/support/policy
-    - cron: '23 4 * * 3' # every Wednesday at 04:23 UTC
+    - cron: '46 22 * * 2' # every Tuesday at 22:46 UTC
 
 permissions:
   contents: write
 
 jobs:
-  # If this is a scheduled run, check if it is running on the day
-  # after the second Tuesday of the month, and skip if not.
+  # If this is a scheduled run, check if it is running on the
+  # second Tuesday of the month, and skip if not.
   # If this is not a scheduled run, always run.
   check-schedule:
     runs-on: ubuntu-latest
     outputs:
       skip: ${{ steps.check.outputs.skip }}
     steps:
-      - name: Check if scheduled run is on the next day after the second Tuesday of the month
+      - name: Check if scheduled run is on the second Tuesday of the month
         id: check
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             # Get the current date in UTC
             CURRENT_DATE=$(date -u +%Y-%m-%d)
             # Get the first day of the current month, find the first Tuesday,
-            # then jump 8 days forward to land on the day after the second Tuesday.
+            # then jump 7 days forward to land on the second Tuesday.
             FIRST_OF_MONTH=$(date -u +%Y-%m-01)
             DOW=$(date -u -d "$FIRST_OF_MONTH" +%u)                     # 1=Mon, 7=Sun
             DAYS_TO_FIRST_TUE=$(( (2 - DOW + 7) % 7 ))
-            NEXT_DAY_AFTER_SECOND_TUESDAY=$(date -u -d "$FIRST_OF_MONTH +$(( DAYS_TO_FIRST_TUE + 8 )) days" +%Y-%m-%d)
-            if [[ "$CURRENT_DATE" != "$NEXT_DAY_AFTER_SECOND_TUESDAY" ]]; then
-              echo "This scheduled run is not on the next day after the second Tuesday of the month. Skipping."
+            SECOND_TUESDAY=$(date -u -d "$FIRST_OF_MONTH +$(( DAYS_TO_FIRST_TUE + 7 )) days" +%Y-%m-%d)
+            if [[ "$CURRENT_DATE" != "$SECOND_TUESDAY" ]]; then
+              echo "This scheduled run is not on the second Tuesday of the month. Skipping."
               echo "skip=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
