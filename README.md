@@ -170,11 +170,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:daily-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
+| ✅ | [#50](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29701928014) | 2026-07-19 |  | [d516a8d1](https://github.com/dotnet/aspnetcore/tree/d516a8d1) |
 | ✅ | [#49](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29659070178) | 2026-07-18 |  | [d516a8d1](https://github.com/dotnet/aspnetcore/tree/d516a8d1) |
 | ✅ | [#48](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29610080245) | 2026-07-17 |  | [512f3138](https://github.com/dotnet/aspnetcore/tree/512f3138) |
 | ❌ | [#47](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29530705504) | 2026-07-16 | Error in smoke-test (es2015) / test-compat | [6a0d7ae4](https://github.com/dotnet/aspnetcore/tree/6a0d7ae4) |
 | ✅ | [#46](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29447156964) | 2026-07-15 |  | [d89ecc42](https://github.com/dotnet/aspnetcore/tree/d89ecc42) |
-| ✅ | [#43](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29364570114) | 2026-07-14 |  | [cf0ae5e8](https://github.com/dotnet/aspnetcore/tree/cf0ae5e8) |
 <!-- end:daily-main-build -->
 
 ## Development guide
