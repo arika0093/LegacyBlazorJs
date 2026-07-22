@@ -117,7 +117,7 @@ async function fetchRunJobs(runId, githubToken) {
   }
 }
 
-async function resolveReleaseTags(run, githubToken, previousRun) {
+async function resolveReleaseTags(run, githubToken, previousRun, nextRun) {
   const url = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
   try {
     const releases = await fetchJson(url, githubToken);
@@ -130,7 +130,11 @@ async function resolveReleaseTags(run, githubToken, previousRun) {
       const prevTime = new Date(previousRun.created_at).getTime();
       lowerBound = prevTime + 60_000;
     }
-    const upperBound = runTime + 10 * 60 * 60_000;
+    // Cap the upper bound at the next (newer) run's start time so releases
+    // created by a subsequent run are not attributed to this run.
+    const upperBound = nextRun
+      ? new Date(nextRun.created_at).getTime()
+      : runTime + 10 * 60 * 60_000;
     const tags = releases
       .filter(r => {
         const createdTime = new Date(r.created_at).getTime();
