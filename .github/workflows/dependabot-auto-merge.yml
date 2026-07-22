@@ -50,7 +50,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
         run: |
-          gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$PR_NUMBER"
+          # Prefer --auto so the PR waits for any remaining required checks or
+          # reviews before merging. When the smoke-test has already passed and
+          # the PR is directly mergeable (mergeStateStatus CLEAN), GitHub rejects
+          # the enablePullRequestAutoMerge mutation with "Branch does not have
+          # required protected branch rules"; in that case squash-merge now so
+          # the PR is not left fully-green-but-unprocessed. Other --auto failures
+          # (e.g. unsatisfied reviews) are surfaced so the job keeps failing.
+          err="$(gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$PR_NUMBER" 2>&1 >/dev/null)" || true
+          if [ -z "$err" ]; then
+            echo "Auto-merge enabled for PR #$PR_NUMBER."
+            exit 0
+          fi
+          echo "$err" >&2
+          case "$err" in
+            *"Branch does not have required protected branch rules"*)
+              echo "PR is already mergeable; performing direct squash merge." >&2
+              gh pr merge --repo "$GITHUB_REPOSITORY" --squash "$PR_NUMBER"
+              ;;
+            *)
+              exit 1
+              ;;
+          esac
 
   # Close failed Dependabot PRs so broken update branches do not stay open indefinitely.
   close-failed-pr:
