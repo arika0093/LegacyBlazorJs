@@ -33,7 +33,7 @@
     "es-check": "^9.6.4",
     "mutation-observer": "^1.0.3",
     "terser": "^5.48.0",
-    "undici": "^8.5.0",
+    "undici": "^8.8.0",
     "whatwg-fetch": "^3.6.20"
   }
 }
