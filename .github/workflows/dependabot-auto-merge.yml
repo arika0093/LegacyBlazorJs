@@ -11,7 +11,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  workflows: write
 
 jobs:
   # Resolve the pull request number for the Dependabot workflow run.
