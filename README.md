@@ -170,11 +170,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:daily-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
+| ✅ | [#76](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30577999052) | 2026-07-30 |  | [747d2cdb](https://github.com/dotnet/aspnetcore/tree/747d2cdb) |
 | ✅ | [#75](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30487341832) | 2026-07-29 |  | [2e05e269](https://github.com/dotnet/aspnetcore/tree/2e05e269) |
 | ✅ | [#74](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30395164415) | 2026-07-28 |  | [3aac446c](https://github.com/dotnet/aspnetcore/tree/3aac446c) |
 | ✅ | [#71](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30301519541) | 2026-07-27 |  | [b13fa461](https://github.com/dotnet/aspnetcore/tree/b13fa461) |
 | ✅ | [#70](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30218348367) | 2026-07-26 |  | [6058c72b](https://github.com/dotnet/aspnetcore/tree/6058c72b) |
-| ✅ | [#69](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30172997566) | 2026-07-25 |  | [6058c72b](https://github.com/dotnet/aspnetcore/tree/6058c72b) |
 <!-- end:daily-main-build -->
 
 ## Development guide
