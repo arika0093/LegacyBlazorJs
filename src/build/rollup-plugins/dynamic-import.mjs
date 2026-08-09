@@ -6,10 +6,11 @@ import {
 } from '../lib/targets.mjs';
 import { createRenderChunkTransformPlugin } from './helpers.mjs';
 
-// Dynamic import is available in Chrome 64 and later. The configured profiles
-// map ES2017 and earlier to Chrome versions before that support boundary.
+// Although Chrome supports dynamic import from version 64, import() is an
+// ES2020 syntax feature. Keep rewriting it through the ES2018 profile so the
+// output passes the profile's ES syntax validation.
 export function needsLegacyDynamicImportTransform(targets) {
-  return isAnyInternetExplorerTarget(targets) || isChromeTargetBefore(targets, 64);
+  return isAnyInternetExplorerTarget(targets) || isChromeTargetBefore(targets, 80);
 }
 
 /**

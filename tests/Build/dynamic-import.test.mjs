@@ -4,11 +4,11 @@ import test from 'node:test';
 import { withReservedLegacyDynamicImportName } from '../../src/build/build-variants.mjs';
 import { needsLegacyDynamicImportTransform } from '../../src/build/rollup-plugins/dynamic-import.mjs';
 
-test('legacy dynamic-import transform is limited to ES2017 and earlier profiles', () => {
+test('legacy dynamic-import transform is retained through the ES2018 profile', () => {
   assert.equal(needsLegacyDynamicImportTransform({ chrome: '23', ie: '11' }), true);
   assert.equal(needsLegacyDynamicImportTransform({ chrome: '49' }), true);
   assert.equal(needsLegacyDynamicImportTransform({ chrome: '58' }), true);
-  assert.equal(needsLegacyDynamicImportTransform({ chrome: '64' }), false);
+  assert.equal(needsLegacyDynamicImportTransform({ chrome: '64' }), true);
   assert.equal(needsLegacyDynamicImportTransform({ chrome: '80' }), false);
 });
 
