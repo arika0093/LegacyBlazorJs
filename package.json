@@ -10,6 +10,7 @@
     "build": "node src/build/index.mjs",
     "build:quick": "node src/run/with-env.mjs LEGACY_BLAZOR_DISABLE_TERSER=true SKIP_PREBUILD=true BUILD_CHANNEL=current BUILD_TARGET_PROFILES=es5 -- node src/build/index.mjs",
     "build:quick-prev": "node src/run/with-env.mjs LEGACY_BLAZOR_DISABLE_TERSER=true SKIP_PREBUILD=true BUILD_CHANNEL=preview BUILD_TARGET_PROFILES=es5 -- node src/build/index.mjs",
+    "test:build": "node --test tests/Build/*.test.mjs",
     "test:smoke": "node --test tests/ChromeSmokeTest/smoke.test.mjs",
     "test:compat": "node src/run/run-compat-tests.mjs",
     "readme:compat": "node src/run/update-readme-compat.mjs",
