@@ -10,6 +10,7 @@ import { writeStaticPackageAssets } from './lib/static-package-assets.mjs';
 import { runEsCheck } from './run-es-check.mjs';
 import { patchBlazorRegex } from './patches/patch-blazor-regex.mjs';
 import { patchSignalRLogging } from './patches/patch-signalr-logging.mjs';
+import { needsLegacyDynamicImportTransform } from './rollup-plugins/dynamic-import.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const packageWwwroot = path.join(rootDir, 'dotnet', 'src', 'LegacyBlazorJs', 'wwwroot');
@@ -175,6 +176,23 @@ export function withRollupLegacyPlugins(configSource) {
   return patched;
 }
 
+export function withReservedLegacyDynamicImportName(configSource) {
+  const terserCall = findRollupTerserCall(configSource);
+  if (/\breserved\s*:\s*\[[^\]]*__legacyDynamicImport/u.test(terserCall.source)) {
+    return configSource;
+  }
+
+  const reservedTerserCall = terserCall.source.replace(
+    /mangle:\s*true(\s*,)/u,
+    "mangle: { reserved: ['__legacyDynamicImport'] }$1");
+
+  if (reservedTerserCall === terserCall.source) {
+    throw new Error('Could not reserve __legacyDynamicImport in the upstream Rollup Terser configuration.');
+  }
+
+  return `${configSource.slice(0, terserCall.start)}${reservedTerserCall}${configSource.slice(terserCall.end)}`;
+}
+
 export function withHiddenProductionServerSourcemap(configSource) {
   const patched = configSource.replace(
     /environment === 'production' && \(output === 'blazor\.web' \|\| output === 'blazor\.webassembly'\)/u,
@@ -248,6 +266,9 @@ export async function buildVariants({
       }
 
       let bundlerConfig = withRollupLegacyPlugins(ecmaPatchedBundlerConfig);
+      if (needsLegacyDynamicImportTransform(profile.intendedBrowsers)) {
+        bundlerConfig = withReservedLegacyDynamicImportName(bundlerConfig);
+      }
       if (process.env.LEGACY_BLAZOR_DISABLE_TERSER === 'true') {
         bundlerConfig = withOptionalRollupTerser(bundlerConfig);
       }

@@ -57,6 +57,8 @@ jobs:
           path: .
 
       - run: npm ci --ignore-scripts
+      - name: Run build tests
+        run: npm run test:build
       - name: Select old Chromium for smoke test
         run: node src/run/export-browser-env.mjs ${{ inputs.profile }}
       - name: Run smoke test (${{ inputs.channel }}, ${{ inputs.profile }}, Blazor ${{ inputs.hosting-model }})

@@ -41,7 +41,7 @@ export function legacyBlazorPlugins(targets) {
     // Prepend only the core-js modules required for the current browser target
     legacyCoreJsPolyfillPlugin(targets),
     // handle dynamic imports in a way compatible with legacy environments
-    legacyDynamicImportPlugin(),
+    legacyDynamicImportPlugin(targets),
     // Apply IE11-specific fixes
     legacyIE11FixesPlugin(targets),
     // Apply ES5-specific fixes
