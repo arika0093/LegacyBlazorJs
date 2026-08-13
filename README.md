@@ -158,7 +158,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Trigger | Message |
 |--------|--------|------|----------|---------|
-| ✅ | [#36](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31701781781) | 2026-08-13 | 🔧 Manual | No updates |
+| 🚫 | [#36](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31701781781) | 2026-08-13 | 🔧 Manual | Error |
 | 🚫 | [#35](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31544844280) | 2026-08-11 | 📅 Scheduled | Error |
 | ✅ | [#34](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30958937419) | 2026-08-04 | 📅 Scheduled | No updates |
 | ✅ | [#33](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30406970704) | 2026-07-28 | 📅 Scheduled | No updates |
@@ -170,11 +170,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:daily-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
+| ✅ | [#97](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31738653737) | 2026-08-13 |  | [1a4a8309](https://github.com/dotnet/aspnetcore/tree/1a4a8309) |
 | ✅ | [#96](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31635722465) | 2026-08-12 |  | [7a1c5c1f](https://github.com/dotnet/aspnetcore/tree/7a1c5c1f) |
 | ✅ | [#95](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31530951645) | 2026-08-11 |  | [a55bb8b0](https://github.com/dotnet/aspnetcore/tree/a55bb8b0) |
 | ✅ | [#90](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31426939399) | 2026-08-10 |  | [66eb32df](https://github.com/dotnet/aspnetcore/tree/66eb32df) |
 | ✅ | [#89](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31332868717) | 2026-08-09 |  | [97251a56](https://github.com/dotnet/aspnetcore/tree/97251a56) |
-| ✅ | [#86](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31275540968) | 2026-08-08 |  | [97251a56](https://github.com/dotnet/aspnetcore/tree/97251a56) |
 <!-- end:daily-main-build -->
 
 ## Development guide
