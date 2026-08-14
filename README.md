@@ -158,11 +158,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Trigger | Message |
 |--------|--------|------|----------|---------|
+| ❌ | [#37](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31846656269) | 2026-08-14 | 🔧 Manual | Error in build-all (current, 10, stable, v10.0.11, 10.0.11, 10.0.11.73, es2020) / build |
 | 🚫 | [#36](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31701781781) | 2026-08-13 | 🔧 Manual | Error |
 | 🚫 | [#35](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31544844280) | 2026-08-11 | 📅 Scheduled | Error |
 | ✅ | [#34](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30958937419) | 2026-08-04 | 📅 Scheduled | No updates |
 | ✅ | [#33](https://github.com/arika0093/LegacyBlazorJs/actions/runs/30406970704) | 2026-07-28 | 📅 Scheduled | No updates |
-| ✅ | [#32](https://github.com/arika0093/LegacyBlazorJs/actions/runs/29876023056) | 2026-07-21 | 📅 Scheduled | No updates |
 <!-- end:monthly-release-builds -->
 
 ### Daily main build
