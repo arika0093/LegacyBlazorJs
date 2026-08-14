@@ -28,7 +28,10 @@ export function needsLegacyBlazorPlugins(targets) {
  */
 export function legacyBlazorPlugins(targets) {
   if (!needsLegacyBlazorPlugins(targets)) {
-    return [];
+    // Modern profiles still need Babel to lower syntax emitted by upstream
+    // TypeScript to the profile's ECMAScript target. The remaining plugins
+    // are polyfills or legacy transforms and must not be included here.
+    return [legacyBabelPlugin(targets)];
   }
 
   return [
