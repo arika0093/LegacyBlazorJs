@@ -1,4 +1,5 @@
 node_modules/
+dotnet/
 .work/
 artifacts/*
 !artifacts/packages/
