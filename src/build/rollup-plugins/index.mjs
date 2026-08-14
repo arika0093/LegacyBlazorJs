@@ -14,11 +14,23 @@ import { legacyMutationObserverPolyfillPlugin } from './mutation-observer.mjs';
 import { legacyPlatformDomPolyfillPlugin } from './platform-dom.mjs';
 import { legacySendBeaconPolyfillPlugin } from './send-beacon.mjs';
 import { legacyTemplatePolyfillPlugin } from './template-polyfill.mjs';
+import {
+  isAnyInternetExplorerTarget,
+  isChromeTargetBefore,
+} from '../lib/targets.mjs';
+
+export function needsLegacyBlazorPlugins(targets) {
+  return isAnyInternetExplorerTarget(targets) || isChromeTargetBefore(targets, 80);
+}
 
 /**
  * Get all legacy Blazor plugins for Rollup
  */
 export function legacyBlazorPlugins(targets) {
+  if (!needsLegacyBlazorPlugins(targets)) {
+    return [];
+  }
+
   return [
     legacyCommonjsPlugin(),
     // Prepend non-ECMAScript Web API polyfills before any entry code runs

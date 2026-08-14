@@ -2,6 +2,10 @@ import path from 'node:path';
 import process from 'node:process';
 import { createRequire } from 'node:module';
 import { createEntryChunkPrependPlugin } from './helpers.mjs';
+import {
+  isAnyInternetExplorerTarget,
+  isChromeTargetBefore,
+} from '../lib/targets.mjs';
 
 const VIRTUAL_ID = 'legacy-blazor-corejs-polyfill';
 const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-corejs-polyfill';
@@ -9,6 +13,10 @@ const RESOLVED_VIRTUAL_ID = '\0legacy-blazor-corejs-polyfill';
 export const polyfillModules = [
   'core-js/actual',
 ];
+
+export function needsCoreJsPolyfill(targets) {
+  return isAnyInternetExplorerTarget(targets) || isChromeTargetBefore(targets, 80);
+}
 
 function createCoreJsVirtualEntryPlugin() {
   return {
@@ -83,9 +91,10 @@ async function buildCoreJsPolyfillSource() {
 /**
  * Build core-js separately, then prepend that final ES5-safe output to every entry chunk.
  */
-export function legacyCoreJsPolyfillPlugin() {
+export function legacyCoreJsPolyfillPlugin(targets) {
   return createEntryChunkPrependPlugin({
     name: 'legacy-corejs-polyfill',
+    isEnabled: () => needsCoreJsPolyfill(targets),
     loadSource: buildCoreJsPolyfillSource,
   });
 }
