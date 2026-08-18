@@ -33,7 +33,7 @@
     "core-js": "^3.50.0",
     "es-check": "^9.6.4",
     "mutation-observer": "^1.0.3",
-    "terser": "^5.49.2",
+    "terser": "^5.50.0",
     "undici": "^8.10.0",
     "whatwg-fetch": "^3.6.20"
   }
