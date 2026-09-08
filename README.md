@@ -158,11 +158,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Trigger | Message |
 |--------|--------|------|----------|---------|
+| ✅ | [#42](https://github.com/arika0093/LegacyBlazorJs/actions/runs/34287642610) | 2026-09-08 | 📅 Scheduled | [10.0.12.77 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.12.77), [11.0.0-rc.1.26425.128.77 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-rc.1.26425.128.77), [9.0.20.77 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.20.77) |
 | ✅ | [#41](https://github.com/arika0093/LegacyBlazorJs/actions/runs/33568017435) | 2026-09-01 | 📅 Scheduled | No updates |
 | ✅ | [#40](https://github.com/arika0093/LegacyBlazorJs/actions/runs/32908333938) | 2026-08-25 | 📅 Scheduled | No updates |
 | ✅ | [#39](https://github.com/arika0093/LegacyBlazorJs/actions/runs/32194700908) | 2026-08-18 | 📅 Scheduled | No updates |
-| ✅ | [#38](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31848128345) | 2026-08-14 | 🔧 Manual | [10.0.11.74 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.11.74), [11.0.0-preview.7.26381.103.74 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-preview.7.26381.103.74), [9.0.19.74 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.19.74) |
-| ❌ | [#37](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31846656269) | 2026-08-14 | 🔧 Manual | Error in build-all (current, 10, stable, v10.0.11, 10.0.11, 10.0.11.73, es2020) / build |
+| ✅ | [#38](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31848128345) | 2026-08-14 | 🔧 Manual | No updates |
 <!-- end:monthly-release-builds -->
 
 ### Daily main build
