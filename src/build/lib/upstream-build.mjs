@@ -157,9 +157,27 @@ async function prebuildWorkspacePackages(upstreamDir, env) {
   console.log('---------------------------------------');
   console.log(' Build required packages (JSInterop, SignalR, and related packages)');
   await retry(3, 15_000, () => run('npm', ['install', '--ignore-scripts'], { cwd: upstreamDir, env }));
-  await run('npm', ['run', 'build', '--workspace=src/JSInterop/Microsoft.JSInterop.JS/src'], { cwd: upstreamDir, env });
+
+  // JSInterop moved under Components/Web.JS in the upstream npm workspace.
+  // Keep the former path as a fallback so tagged releases using the previous
+  // layout remain buildable.
+  const jsInteropWorkspace = await firstExistingWorkspace(upstreamDir, [
+    'src/Components/Web.JS/JSInterop',
+    'src/JSInterop/Microsoft.JSInterop.JS/src',
+  ]);
+  await run('npm', ['run', 'build', `--workspace=${jsInteropWorkspace}`], { cwd: upstreamDir, env });
   await run('npm', ['run', 'build', '--workspace=src/SignalR/clients/ts/signalr'], { cwd: upstreamDir, env });
   await run('npm', ['run', 'build', '--workspace=src/SignalR/clients/ts/signalr-protocol-msgpack'], { cwd: upstreamDir, env });
+}
+
+async function firstExistingWorkspace(upstreamDir, workspacePaths) {
+  for (const workspacePath of workspacePaths) {
+    if (await hasPath(path.join(upstreamDir, workspacePath, 'package.json'))) {
+      return workspacePath;
+    }
+  }
+
+  throw new Error(`Could not locate the upstream JSInterop workspace. Expected one of:\n${workspacePaths.join('\n')}`);
 }
 
 function resolveUpstreamWorkspaceDir(rootDirectory, upstreamRef) {
