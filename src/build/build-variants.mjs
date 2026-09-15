@@ -67,7 +67,13 @@ async function resolveBuildOutputLayout(sourceDir) {
   return { frameworkDir, webviewPath };
 }
 
-async function resolveNpmWorkspace(sourceDir) {
+export async function resolveNpmWorkspace(sourceDir) {
+  const sourcePackage = JSON.parse(await readFile(path.join(sourceDir, 'package.json'), 'utf8'));
+  const workspaceName = typeof sourcePackage.name === 'string' ? sourcePackage.name.trim() : '';
+  if (!workspaceName) {
+    throw new Error(`The npm workspace at '${sourceDir}' does not define a package name.`);
+  }
+
   let current = path.resolve(sourceDir);
   for (let depth = 0; depth < 5; depth += 1) {
     const parent = path.dirname(current);
@@ -79,7 +85,7 @@ async function resolveNpmWorkspace(sourceDir) {
     try {
       const rootPackage = JSON.parse(await readFile(path.join(current, 'package.json'), 'utf8'));
       if (Array.isArray(rootPackage.workspaces) && rootPackage.workspaces.length > 0) {
-        return { root: current, workspacePath: path.relative(current, sourceDir) };
+        return { root: current, workspaceName };
       }
     } catch {
       // Continue walking up.
@@ -278,7 +284,7 @@ export async function buildVariants({
       process.env.LEGACY_BLAZOR_TARGET_PROFILE = name;
       await writeFile(bundlerConfigPath, bundlerConfig);
       await writeFile(webJsConfigPath, webJsConfig);
-      await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspacePath}`], { cwd: npmWorkspace.root });
+      await run('npm', ['run', 'build:production', `--workspace=${npmWorkspace.workspaceName}`], { cwd: npmWorkspace.root });
       const { frameworkDir, webviewPath } = await resolveBuildOutputLayout(sourceDir);
 
       // NOTE: WebAssembly and WebView are not currently supported, so there is no need to copy the output.
