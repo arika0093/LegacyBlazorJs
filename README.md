@@ -16,10 +16,6 @@ Unfortunately, .NET 9 and later target ES2022, and there have been [reports](htt
 
 This project aims to make Blazor Server available on older browsers by rebuilding the Blazor JavaScript runtime, blazor.web.js, to support multiple versions from ES5 to ES2022.
 
-> [!WARNING]
-> This project is focused on Blazor Server only. WebAssembly is not supported.  
-> More details are in the [here](./docs/how-it-works.md#why-webassembly-is-not-supported) section.
-
 ### Goals
 
 Our goal is to make this work on the following platforms:
@@ -27,9 +23,6 @@ Our goal is to make this work on the following platforms:
 * Chrome 23+ (This is the first Chrome to support [ES5](https://caniuse.com/es5))
 * Internet Explorer 11 (As much as possible. Testing is insufficient, but it works for now)
 * And newer browsers. It should probably work on any Chrome-based browser.
-
-> [!NOTE]
-> In environments where dynamic imports are not available, third-party libraries probably won't work.
 
 ### Automation
 
@@ -176,6 +169,16 @@ The profile definitions are in [config/targets.json](config/targets.json).
 | ❌ | [#134](https://github.com/arika0093/LegacyBlazorJs/actions/runs/34778748561) | 2026-09-13 | Error in build (es2015) / build | [cd17eacb](https://github.com/dotnet/aspnetcore/tree/cd17eacb) |
 | ❌ | [#133](https://github.com/arika0093/LegacyBlazorJs/actions/runs/34715182236) | 2026-09-12 | Error in build (es2015) / build | [cd17eacb](https://github.com/dotnet/aspnetcore/tree/cd17eacb) |
 <!-- end:daily-main-build -->
+
+## Note
+
+> [!WARNING]
+> This project is focused on Blazor Server only. WebAssembly is not supported.  
+> More details are in the [here](./docs/how-it-works.md#why-webassembly-is-not-supported) section.
+
+> [!NOTE]
+> In environments where dynamic imports are not available(`~es2017`), third-party libraries probably won't work.
+
 
 ## Development guide
 
