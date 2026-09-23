@@ -151,11 +151,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Trigger | Message |
 |--------|--------|------|----------|---------|
+| ✅ | [#44](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35794233025) | 2026-09-22 | 📅 Scheduled | No updates |
 | ✅ | [#43](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35032694659) | 2026-09-15 | 📅 Scheduled | No updates |
 | ✅ | [#42](https://github.com/arika0093/LegacyBlazorJs/actions/runs/34287642610) | 2026-09-08 | 📅 Scheduled | [10.0.12.77 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.12.77), [11.0.0-rc.1.26425.128.77 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-rc.1.26425.128.77), [9.0.20.77 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.20.77) |
 | ✅ | [#41](https://github.com/arika0093/LegacyBlazorJs/actions/runs/33568017435) | 2026-09-01 | 📅 Scheduled | No updates |
 | ✅ | [#40](https://github.com/arika0093/LegacyBlazorJs/actions/runs/32908333938) | 2026-08-25 | 📅 Scheduled | No updates |
-| ✅ | [#39](https://github.com/arika0093/LegacyBlazorJs/actions/runs/32194700908) | 2026-08-18 | 📅 Scheduled | No updates |
 <!-- end:monthly-release-builds -->
 
 ### Daily main build
@@ -163,11 +163,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:daily-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
+| ✅ | [#153](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35911648075) | 2026-09-23 |  | [6234e730](https://github.com/dotnet/aspnetcore/tree/6234e730) |
 | ✅ | [#152](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35776046893) | 2026-09-22 |  | [7cc41c50](https://github.com/dotnet/aspnetcore/tree/7cc41c50) |
 | ✅ | [#146](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35647015020) | 2026-09-21 |  | [8d321a88](https://github.com/dotnet/aspnetcore/tree/8d321a88) |
 | ✅ | [#145](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35533452150) | 2026-09-20 |  | [1fcd7ef3](https://github.com/dotnet/aspnetcore/tree/1fcd7ef3) |
 | ✅ | [#144](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35465420359) | 2026-09-19 |  | [1fcd7ef3](https://github.com/dotnet/aspnetcore/tree/1fcd7ef3) |
-| ✅ | [#143](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35387860345) | 2026-09-18 |  | [75fa6625](https://github.com/dotnet/aspnetcore/tree/75fa6625) |
 <!-- end:daily-main-build -->
 
 ## Note
