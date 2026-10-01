@@ -163,11 +163,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:daily-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
-| ❌ | [#134](https://github.com/arika0093/LegacyBlazorJs/actions/runs/34778748561) | 2026-09-13 | Error in build (es2015) / build | [b2374cd2](https://github.com/dotnet/aspnetcore/tree/b2374cd2) |
-| ❌ | [#133](https://github.com/arika0093/LegacyBlazorJs/actions/runs/34715182236) | 2026-09-12 | Error in build (es2015) / build | [b2374cd2](https://github.com/dotnet/aspnetcore/tree/b2374cd2) |
-| ❌ | [#132](https://github.com/arika0093/LegacyBlazorJs/actions/runs/34640711937) | 2026-09-11 | Error in build (es2015) / build | [a34f442f](https://github.com/dotnet/aspnetcore/tree/a34f442f) |
-| ✅ | [#109](https://github.com/arika0093/LegacyBlazorJs/actions/runs/32594883986) | 2026-08-22 |  | [cc2dd468](https://github.com/dotnet/aspnetcore/tree/cc2dd468) |
-| ✅ | [#108](https://github.com/arika0093/LegacyBlazorJs/actions/runs/32520539561) | 2026-08-21 |  | [e072299d](https://github.com/dotnet/aspnetcore/tree/e072299d) |
+| ✅ | [#163](https://github.com/arika0093/LegacyBlazorJs/actions/runs/36916872016) | 2026-10-01 |  | [96b1f9ff](https://github.com/dotnet/aspnetcore/tree/96b1f9ff) |
+| ✅ | [#162](https://github.com/arika0093/LegacyBlazorJs/actions/runs/36768064756) | 2026-09-30 |  | [eccb9bcc](https://github.com/dotnet/aspnetcore/tree/eccb9bcc) |
+| ✅ | [#161](https://github.com/arika0093/LegacyBlazorJs/actions/runs/36621806009) | 2026-09-29 |  | [cfa866bc](https://github.com/dotnet/aspnetcore/tree/cfa866bc) |
+| ✅ | [#158](https://github.com/arika0093/LegacyBlazorJs/actions/runs/36474696952) | 2026-09-28 |  | [bf676af7](https://github.com/dotnet/aspnetcore/tree/bf676af7) |
+| ✅ | [#157](https://github.com/arika0093/LegacyBlazorJs/actions/runs/36345636776) | 2026-09-27 |  | [c7cef3bf](https://github.com/dotnet/aspnetcore/tree/c7cef3bf) |
 <!-- end:daily-main-build -->
 
 ## Note
