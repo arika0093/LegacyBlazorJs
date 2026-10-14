@@ -153,7 +153,7 @@ jobs:
       - name: Pack final package (${{ matrix.build.channel }})
         run: node src/build/package-from-build-summary.mjs
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: LegacyBlazorJs-release-${{ matrix.build.channel }}
           path: |
@@ -192,7 +192,7 @@ jobs:
           mapfile -t summaries < <(find .work/release -type f -path '*/artifacts/packages/build-summary.json' | sort)
           node src/build/merge-build-summaries.mjs "${summaries[@]}"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: LegacyBlazorJs-release-bundle
           path: |
