@@ -1,0 +1,142 @@
+name: Scheduled autofix with opencode
+
+# Automatically fix scheduled (`schedule` event) failures of the regular
+# automation workflows by running `opencode run` headlessly and pushing
+# a fix commit DIRECTLY to `main`.
+#
+# Required setup:
+# - `vars.OPENCODE_MODEL`: model in `provider/model` format (required).
+#   Intended for OpenCode Go, e.g. `opencode-go/<model>`.
+# - `secrets.OPENCODE_GO_API_KEY`: API key for the model provider (required).
+#
+# Duplicate launches are suppressed by the guard step below (another autofix
+# active, stale failure, or a fix already landed) plus the concurrency group.
+#
+# Covered workflows:
+# - Weekly build and testing (upstream-build.yml, weekly Monday schedule)
+# - Build and publish latest ASP.NET Core tags to NuGet (ci.yml, 2nd-Tuesday schedule)
+
+on:
+  workflow_run:
+    workflows:
+      - Weekly build and testing
+      - Build and publish latest ASP.NET Core tags to NuGet
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      failed_run_id:
+        description: Failed run ID to fix (when run manually)
+        required: false
+        type: string
+      workflow_name:
+        description: Failed workflow name (when run manually)
+        required: false
+        default: Weekly build and testing
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: scheduled-autofix
+  cancel-in-progress: false
+
+jobs:
+  autofix:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'failure' &&
+        github.event.workflow_run.event == 'schedule') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: latest
+
+      - name: Guard against duplicate autofix
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FAILED_RUN_ID: ${{ github.event.workflow_run.id || inputs.failed_run_id }}
+          FAILED_WORKFLOW: ${{ github.event.workflow_run.name || inputs.workflow_name }}
+          FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Another autofix run already active (excluding this one).
+          ACTIVE="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow scheduled-autofix.yml --status in_progress --json databaseId --jq "[.[] | select(.databaseId != ${{ github.run_id }})] | length")"
+          if [ "${ACTIVE:-0}" != "0" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Another autofix run is already in progress. Skipping."
+            exit 0
+          fi
+          # Stale failure: a newer completed scheduled run exists for the same workflow.
+          if [ -n "$FAILED_RUN_ID" ] && [ -n "$FAILED_WORKFLOW" ]; then
+            LATEST="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$FAILED_WORKFLOW" --branch main --event schedule --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+            if [ -n "$LATEST" ] && [ "$LATEST" != "$FAILED_RUN_ID" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Run $FAILED_RUN_ID is superseded by newer run $LATEST. Skipping."
+              exit 0
+            fi
+          fi
+          # A real fix already landed on main after the failed commit
+          # (bot README status commits don't count).
+          if [ -n "$FAILED_SHA" ]; then
+            git fetch origin main --quiet
+            AHEAD="$(git rev-list --count "${FAILED_SHA}..origin/main" 2>/dev/null || echo 0)"
+            if [ "${AHEAD:-0}" != "0" ]; then
+              NONBOT="$(git log "${FAILED_SHA}..origin/main" --format=%s | grep -v -c '^docs: update build status tables' || true)"
+              if [ "${NONBOT:-0}" != "0" ]; then
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                echo "A fix already landed on main after $FAILED_SHA. Skipping."
+                exit 0
+              fi
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Run opencode autofix (push directly to main)
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
+        run: |
+          if [ -z "$OPENCODE_MODEL" ]; then
+            echo "::error::Repository variable OPENCODE_MODEL is not set (expected provider/model, e.g. an OpenCode Go model)."
+            exit 1
+          fi
+          if [ -z "$OPENCODE_GO_API_KEY" ]; then
+            echo "::error::Secret OPENCODE_GO_API_KEY is not set."
+            exit 1
+          fi
+
+          npm i -g opencode-ai
+          opencode --version
+
+          PROMPT="$(cat <<'PROMPT_EOF'
+          Scheduled CI failure in arika0093/LegacyBlazorJs. Push the fix DIRECTLY to `main` (no PR).
+          NEVER trigger or re-run any workflow (`gh run rerun`, `gh workflow run` are forbidden).
+
+          - Workflow: ${{ github.event.workflow_run.name || inputs.workflow_name }}
+          - Run ID: ${{ github.event.workflow_run.id || inputs.failed_run_id }} / Number: ${{ github.event.workflow_run.run_number }}
+          - URL: ${{ github.event.workflow_run.html_url }} / SHA: ${{ github.event.workflow_run.head_sha }}
+
+          1. Identify the cause: `gh run view <RUN_ID> --repo arika0093/LegacyBlazorJs --log-failed`, then inspect the repo.
+          2. Fix the root cause (minimal diff) and push DIRECTLY to `main`: commit as `github-actions[bot]` with message `fix: auto-fix <workflow> scheduled failure (<run number>)`, then `git push origin HEAD:main` (`pull --rebase` and retry once on reject). NEVER publish (`gh release`, `dotnet nuget push`), NEVER push tags, NEVER edit bot-managed README tables or `release/*` branches.
+          3. Repeat 1-2 until the cause is resolved (max ~3 attempts, verify with the cheapest relevant local checks). If it is flaky infra with no repo change needed, push nothing.
+
+          Log a short summary at the end: cause, files changed, verification, pushed SHA (or why not).
+          PROMPT_EOF
+          )"
+
+          opencode run --auto --model "$OPENCODE_MODEL" "$PROMPT"
