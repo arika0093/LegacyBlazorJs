@@ -14,16 +14,20 @@ const PATCH_MARKER = 'LegacyBlazorJs: skip legacy-unsupported Hot Reload initial
 const INITIALIZER_IMPORT_PATTERN =
   /if\s*\(\s*!asset\.moduleExports\s*\)\s*\{\s*adjustedPath\s*=\s*adjustPath\(asset\.name!\);\s*asset\.moduleExports\s*=\s*await\s+import\((?:\s*\/\*\s*webpackIgnore:\s*true\s*\*\/\s*)?adjustedPath\);\s*\}/u;
 
+// .NET 9 shape: the initializer entry is a plain path string, e.g.
+//   async function importAndInvokeInitializer(jsInitializer: JSInitializer, path: string): Promise<void> {
+//     const adjustedPath = adjustPath(path);
+//     const initializer = await import(/* webpackIgnore: true */ adjustedPath) as ...;
+const LEGACY_V9_IMPORT_PATTERN =
+  /const\s+adjustedPath\s*=\s*adjustPath\(path\);\s*const\s+initializer\s*=\s*await\s+import\((?:\s*\/\*\s*webpackIgnore:\s*true\s*\*\/\s*)?adjustedPath\)([^;]*);/u;
+
 export function applyJsInitializersPatch(source) {
   if (source.includes(PATCH_MARKER)) {
     return { code: source, applied: false };
   }
 
-  if (!INITIALIZER_IMPORT_PATTERN.test(source)) {
-    return { code: source, applied: false };
-  }
-
-  const replacement = `if (!asset.moduleExports) {
+  if (INITIALIZER_IMPORT_PATTERN.test(source)) {
+    const replacement = `if (!asset.moduleExports) {
         adjustedPath = adjustPath(asset.name!);
         try {
           // ${PATCH_MARKER}
@@ -36,7 +40,26 @@ export function applyJsInitializersPatch(source) {
         }
       }`;
 
-  return { code: source.replace(INITIALIZER_IMPORT_PATTERN, replacement), applied: true };
+    return { code: source.replace(INITIALIZER_IMPORT_PATTERN, replacement), applied: true };
+  }
+
+  if (LEGACY_V9_IMPORT_PATTERN.test(source)) {
+    const replacement = `const adjustedPath = adjustPath(path);
+      let initializer;
+      try {
+        // ${PATCH_MARKER}
+        initializer = await import(/* webpackIgnore: true */ adjustedPath)$1;
+      } catch (e) {
+        if (/DotNetWatch|hot[-_]?reload/i.test(adjustedPath || path || '')) {
+          return;
+        }
+        throw e;
+      }`;
+
+    return { code: source.replace(LEGACY_V9_IMPORT_PATTERN, replacement), applied: true };
+  }
+
+  return { code: source, applied: false };
 }
 
 export async function patchJsInitializers(filePath) {
