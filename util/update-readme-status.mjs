@@ -224,7 +224,7 @@ async function buildMonthlyRows(runs, githubToken) {
   return rows.join('\n');
 }
 
-async function buildDailyRows(runs, githubToken) {
+async function buildWeeklyRows(runs, githubToken) {
   const rows = [];
   for (const run of runs) {
     const conclusion = await resolveEffectiveConclusion(run, githubToken);
@@ -252,25 +252,25 @@ function replaceSection(content, marker, table) {
 
 async function main() {
   const githubToken = process.env.GITHUB_TOKEN;
-  const [monthlyRuns, dailyRuns] = await Promise.all([
+  const [monthlyRuns, weeklyRuns] = await Promise.all([
     fetchWorkflowRuns('ci.yml', githubToken, ['schedule', 'workflow_dispatch']),
     fetchWorkflowRuns('upstream-build.yml', githubToken),
   ]);
 
   const monthlyTableHeader = '| Result | Run ID | Date | Trigger | Message |\n|--------|--------|------|----------|---------|';
-  const dailyTableHeader = '| Result | Run ID | Date | Message | Upstream main hash |\n|--------|--------|------|---------|--------------------|';
+  const weeklyTableHeader = '| Result | Run ID | Date | Message | Upstream main hash |\n|--------|--------|------|---------|--------------------|';
 
   const monthlyTable = monthlyRuns.length > 0
     ? `${monthlyTableHeader}\n${await buildMonthlyRows(monthlyRuns, githubToken)}`
     : `${monthlyTableHeader}\n| - | - | - | - | No recent runs |`;
 
-  const dailyTable = dailyRuns.length > 0
-    ? `${dailyTableHeader}\n${await buildDailyRows(dailyRuns, githubToken)}`
-    : `${dailyTableHeader}\n| - | - | - | No recent scheduled runs | - |`;
+  const weeklyTable = weeklyRuns.length > 0
+    ? `${weeklyTableHeader}\n${await buildWeeklyRows(weeklyRuns, githubToken)}`
+    : `${weeklyTableHeader}\n| - | - | - | No recent scheduled runs | - |`;
 
   let readme = await readFile(README_PATH, 'utf8');
   readme = replaceSection(readme, 'monthly-release-builds', monthlyTable);
-  readme = replaceSection(readme, 'daily-main-build', dailyTable);
+  readme = replaceSection(readme, 'weekly-main-build', weeklyTable);
   await writeFile(README_PATH, readme, 'utf8');
 
   console.log('README build status sections updated.');

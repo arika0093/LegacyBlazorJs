@@ -38,7 +38,7 @@ There are currently three main automation paths:
   * Runs on pushes, pull requests, and manual dispatch.
   * Builds selected profiles (`es5`, `es2015`) and runs the Windows smoke test workflow against them.
 * [upstream-build.yml](../.github/workflows/upstream-build.yml)
-  * Daily upstream-main regression check.
+  * Weekly upstream-main regression check.
   * Builds `main` from `dotnet/aspnetcore`, assigns a date-based package version, and runs smoke tests to detect upstream layout or behavior changes early.
 
 ## Pre-patches

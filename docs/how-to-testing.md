@@ -64,7 +64,7 @@ Note that older Linux versions may lack shared libraries, potentially preventing
 ## Debug
 ### Setup
 To debug efficiently, it is preferable to disable minification and use the built artifact with signalr output set to trace level.  
-In addition to running it in your local environment, you can also use the [upstream-build](https://github.com/arika0093/LegacyBlazorJs/actions/workflows/upstream-build.yml) (which runs daily) of this repository, as it uploads artifacts with those options applied.
+In addition to running it in your local environment, you can also use the [upstream-build](https://github.com/arika0093/LegacyBlazorJs/actions/workflows/upstream-build.yml) (which runs weekly) of this repository, as it uploads artifacts with those options applied.
 
 ### Points to Note
 

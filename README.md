@@ -1,7 +1,7 @@
 # LegacyBlazorJs
 
 [![Current](https://img.shields.io/nuget/v/LegacyBlazorJs?logo=nuget&label=current&style=flat-square)](https://www.nuget.org/packages/LegacyBlazorJs) [![Preview](https://img.shields.io/nuget/vpre/LegacyBlazorJs?logo=nuget&label=preview&style=flat-square)](https://www.nuget.org/packages/LegacyBlazorJs)  
-[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/ci.yml?event=schedule&style=flat-square&label=Monthly%20Release)](#monthly-release-builds) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/upstream-build.yml?event=schedule&style=flat-square&label=Daily%20Build)](#daily-main-build) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/smoke-test.yml?branch=main&style=flat-square&label=Testing)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/ci.yml?event=schedule&style=flat-square&label=Monthly%20Release)](#monthly-release-builds) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/upstream-build.yml?event=schedule&style=flat-square&label=Weekly%20Build)](#weekly-main-build) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/arika0093/LegacyBlazorJs/smoke-test.yml?branch=main&style=flat-square&label=Testing)
 
 
 Rebuilds the official ASP.NET Core [blazor.web.js](https://github.com/dotnet/aspnetcore/tree/main/src/Components/Web.JS) for multiple JavaScript language targets and publishes the results as a Razor Class Library NuGet package.
@@ -158,9 +158,9 @@ The profile definitions are in [config/targets.json](config/targets.json).
 | ✅ | [#43](https://github.com/arika0093/LegacyBlazorJs/actions/runs/35032694659) | 2026-09-15 | 📅 Scheduled | No updates |
 <!-- end:monthly-release-builds -->
 
-### Daily main build
+### Weekly main build
 
-<!-- start:daily-main-build -->
+<!-- start:weekly-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
 | ❌ | [#186](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39339249744) | 2026-10-19 | Error in smoke-test (es5) / test-compat | [c7a1c5c9](https://github.com/dotnet/aspnetcore/tree/c7a1c5c9) |
@@ -168,7 +168,7 @@ The profile definitions are in [config/targets.json](config/targets.json).
 | ❌ | [#184](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39072171423) | 2026-10-17 | Error in smoke-test (es5) / test-compat | [c09e2b89](https://github.com/dotnet/aspnetcore/tree/c09e2b89) |
 | ❌ | [#183](https://github.com/arika0093/LegacyBlazorJs/actions/runs/38974196975) | 2026-10-16 | Error in smoke-test (es2015) / test-compat | [a135adba](https://github.com/dotnet/aspnetcore/tree/a135adba) |
 | ❌ | [#182](https://github.com/arika0093/LegacyBlazorJs/actions/runs/38818608184) | 2026-10-15 | Error in smoke-test (es5) / test-compat | [1e4a69d0](https://github.com/dotnet/aspnetcore/tree/1e4a69d0) |
-<!-- end:daily-main-build -->
+<!-- end:weekly-main-build -->
 
 ## Note
 

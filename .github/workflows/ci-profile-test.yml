@@ -20,7 +20,7 @@ on:
       package-version:
         required: true
         type: string
-      # Optional .NET major used when the package version is synthetic (for example, daily date-based builds).
+      # Optional .NET major used when the package version is synthetic (for example, weekly date-based builds).
       dotnet-major:
         required: false
         type: string

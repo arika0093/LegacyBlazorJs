@@ -1,9 +1,9 @@
-name: Daily build and testing
+name: Weekly build and testing
 
 on:
   schedule:
-    # Run at 19:46 UTC (04:46 JST) everyday.
-    - cron: '46 19 * * *'
+    # Run at 19:46 UTC (04:46 JST) every Monday.
+    - cron: '46 19 * * 1'
   pull_request:
   workflow_dispatch:
 
@@ -14,7 +14,7 @@ jobs:
   resolve-build-metadata:
     runs-on: ubuntu-latest
     outputs:
-      package-version: ${{ steps.daily-package-version.outputs.version }}
+      package-version: ${{ steps.weekly-package-version.outputs.version }}
       dotnet-major: ${{ steps.preview-version.outputs.major }}
       upstream-main-sha: ${{ steps.upstream.outputs.sha }}
     steps:
@@ -38,12 +38,12 @@ jobs:
         env:
           BUILD_CHANNEL: preview
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Resolve daily package version
-        id: daily-package-version
+      - name: Resolve weekly package version
+        id: weekly-package-version
         run: |
           VERSION="0.$(date -u +'%Y.%m%d')"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-      # Record the upstream main commit used for this daily build.
+      # Record the upstream main commit used for this weekly build.
       - name: Resolve upstream main commit
         id: upstream
         run: |
@@ -81,7 +81,7 @@ jobs:
       package-version: ${{ needs.resolve-build-metadata.outputs.package-version }}
       dotnet-major: ${{ needs.resolve-build-metadata.outputs.dotnet-major }}
 
-  # Update the README build status table with the latest daily run results.
+  # Update the README build status table with the latest weekly run results.
   update-readme:
     needs: [smoke-test]
     if: ${{ always() && github.event_name == 'schedule' }}
@@ -102,7 +102,7 @@ jobs:
       - name: Commit and push README changes
         uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
         with:
-          commit_message: "docs: update build status tables [daily]"
+          commit_message: "docs: update build status tables [weekly]"
           file_pattern: "README.md"
           commit_user_name: "github-actions[bot]"
           commit_user_email: "github-actions[bot]@users.noreply.github.com"
