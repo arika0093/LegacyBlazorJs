@@ -502,7 +502,7 @@ export class BrowserHarness {
             height: rect.height
           } : null,
           centerHitTag: hit ? hit.tagName : null,
-          scripts,
+          scripts: scripts,
           htmlSnippet: document.body ? document.body.innerHTML.slice(0, 1500) : null
         };
       })()

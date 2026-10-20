@@ -9,6 +9,7 @@ import { cleanGeneratedPackageAssets } from './lib/package-static-assets.mjs';
 import { writeStaticPackageAssets } from './lib/static-package-assets.mjs';
 import { runEsCheck } from './run-es-check.mjs';
 import { patchBlazorRegex } from './patches/patch-blazor-regex.mjs';
+import { patchJsInitializers } from './patches/patch-js-initializers.mjs';
 import { patchSignalRLogging } from './patches/patch-signalr-logging.mjs';
 import { needsLegacyDynamicImportTransform } from './rollup-plugins/dynamic-import.mjs';
 
@@ -235,6 +236,7 @@ export async function buildVariants({
   }
 
   await patchBlazorRegex(path.join(sourceDir, 'src/Services/ComponentDescriptorDiscovery.ts'));
+  await patchJsInitializers(path.join(sourceDir, 'src/JSInitializers/JSInitializers.ts'));
   await patchSignalRLogging(path.join(sourceDir, 'src/Platform/Circuits/CircuitStartOptions.ts'));
 
   const targets = await readSelectedTargets();
