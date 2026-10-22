@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       failed_run_id:
-        description: Failed run ID to fix (when run manually)
+        description: Failed run ID to fix (empty = latest failed run of the workflow below)
         required: false
         type: string
       workflow_name:
@@ -67,10 +67,35 @@ jobs:
         id: guard
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FAILED_RUN_ID: ${{ github.event.workflow_run.id || inputs.failed_run_id }}
-          FAILED_WORKFLOW: ${{ github.event.workflow_run.name || inputs.workflow_name }}
-          FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_WORKFLOW: ${{ github.event.workflow_run.name }}
+          EVENT_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_RUN_ID: ${{ inputs.failed_run_id }}
+          INPUT_WORKFLOW: ${{ inputs.workflow_name }}
         run: |
+          # Resolve target run/workflow/SHA: automatic trigger uses the
+          # workflow_run payload, manual trigger uses workflow_dispatch inputs.
+          # (Resolved in shell so a null workflow_run payload safely falls back
+          # to empty instead of erroring on property access.)
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            FAILED_RUN_ID="$EVENT_RUN_ID"
+            FAILED_WORKFLOW="$EVENT_WORKFLOW"
+            FAILED_SHA="$EVENT_SHA"
+          else
+            FAILED_RUN_ID="$INPUT_RUN_ID"
+            FAILED_WORKFLOW="${INPUT_WORKFLOW:-Weekly build and testing}"
+            FAILED_SHA=""
+          fi
+          # When no run ID was given manually, default to the latest failed run
+          # of the selected workflow on main so the prompt always has a target.
+          if [ -z "$FAILED_RUN_ID" ] && [ -n "$FAILED_WORKFLOW" ]; then
+            FAILED_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$FAILED_WORKFLOW" --branch main --status failure --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+            echo "Resolved latest failed run: ${FAILED_RUN_ID:-<none found>}"
+          fi
+          echo "failed_run_id=${FAILED_RUN_ID}" >> "$GITHUB_OUTPUT"
+          echo "failed_workflow=${FAILED_WORKFLOW}" >> "$GITHUB_OUTPUT"
+          echo "failed_sha=${FAILED_SHA}" >> "$GITHUB_OUTPUT"
           # Another autofix run already active (excluding this one).
           ACTIVE="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow scheduled-autofix.yml --status in_progress --json databaseId --jq "[.[] | select(.databaseId != ${{ github.run_id }})] | length")"
           if [ "${ACTIVE:-0}" != "0" ]; then
@@ -79,7 +104,9 @@ jobs:
             exit 0
           fi
           # Stale failure: a newer completed scheduled run exists for the same workflow.
-          if [ -n "$FAILED_RUN_ID" ] && [ -n "$FAILED_WORKFLOW" ]; then
+          # Only applies to automatic (schedule-failure) triggers; a manual dispatch
+          # explicitly targets the given run, so never mark it stale here.
+          if [ "$EVENT_NAME" = "workflow_run" ] && [ -n "$FAILED_RUN_ID" ] && [ -n "$FAILED_WORKFLOW" ]; then
             LATEST="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$FAILED_WORKFLOW" --branch main --event schedule --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
             if [ -n "$LATEST" ] && [ "$LATEST" != "$FAILED_RUN_ID" ]; then
               echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -110,6 +137,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
           OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
+          EVENT_NAME: ${{ github.event_name }}
+          FAILED_RUN_ID: ${{ steps.guard.outputs.failed_run_id }}
+          FAILED_WORKFLOW: ${{ steps.guard.outputs.failed_workflow }}
+          FAILED_SHA: ${{ steps.guard.outputs.failed_sha }}
+          FAILED_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          FAILED_RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
           if [ -z "$OPENCODE_MODEL" ]; then
             echo "::error::Repository variable OPENCODE_MODEL is not set (expected provider/model, e.g. an OpenCode Go model)."
@@ -119,20 +152,30 @@ jobs:
             echo "::error::Secret OPENCODE_GO_API_KEY is not set."
             exit 1
           fi
+          if [ -z "$FAILED_RUN_ID" ]; then
+            echo "::error::No failed run found for workflow '${FAILED_WORKFLOW:-<unknown>}'. Pass failed_run_id explicitly."
+            exit 1
+          fi
 
           npm i -g opencode-ai
           opencode --version
 
-          PROMPT="$(cat <<'PROMPT_EOF'
-          Scheduled CI failure in arika0093/LegacyBlazorJs. Push the fix DIRECTLY to `main` (no PR).
-          NEVER trigger or re-run any workflow (`gh run rerun`, `gh workflow run` are forbidden).
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            TRIGGER_LINE="Scheduled CI failure in arika0093/LegacyBlazorJs (automatic trigger)."
+          else
+            TRIGGER_LINE="Manually requested autofix in arika0093/LegacyBlazorJs (workflow_dispatch)."
+          fi
 
-          - Workflow: ${{ github.event.workflow_run.name || inputs.workflow_name }}
-          - Run ID: ${{ github.event.workflow_run.id || inputs.failed_run_id }} / Number: ${{ github.event.workflow_run.run_number }}
-          - URL: ${{ github.event.workflow_run.html_url }} / SHA: ${{ github.event.workflow_run.head_sha }}
+          PROMPT="$(cat <<PROMPT_EOF
+          ${TRIGGER_LINE} Push the fix DIRECTLY to \`main\` (no PR).
+          NEVER trigger or re-run any workflow (\`gh run rerun\`, \`gh workflow run\` are forbidden).
 
-          1. Identify the cause: `gh run view <RUN_ID> --repo arika0093/LegacyBlazorJs --log-failed`, then inspect the repo.
-          2. Fix the root cause (minimal diff) and push DIRECTLY to `main`: commit as `github-actions[bot]` with message `fix: auto-fix <workflow> scheduled failure (<run number>)`, then `git push origin HEAD:main` (`pull --rebase` and retry once on reject). NEVER publish (`gh release`, `dotnet nuget push`), NEVER push tags, NEVER edit bot-managed README tables or `release/*` branches.
+          - Workflow: ${FAILED_WORKFLOW}
+          - Run ID: ${FAILED_RUN_ID} / Number: ${FAILED_RUN_NUMBER} / SHA: ${FAILED_SHA}
+          - URL: ${FAILED_RUN_URL}
+
+          1. Identify the cause: \`gh run view ${FAILED_RUN_ID} --repo arika0093/LegacyBlazorJs --log-failed\`, then inspect the repo.
+          2. Fix the root cause (minimal diff) and push DIRECTLY to \`main\`: commit as \`github-actions[bot]\` with message \`fix: auto-fix <workflow> scheduled failure (<run number>)\`, then \`git push origin HEAD:main\` (\`pull --rebase\` and retry once on reject). NEVER publish (\`gh release\`, \`dotnet nuget push\`), NEVER push tags, NEVER edit bot-managed README tables or \`release/*\` branches.
           3. Repeat 1-2 until the cause is resolved (max ~3 attempts, verify with the cheapest relevant local checks). If it is flaky infra with no repo change needed, push nothing.
 
           Log a short summary at the end: cause, files changed, verification, pushed SHA (or why not).
