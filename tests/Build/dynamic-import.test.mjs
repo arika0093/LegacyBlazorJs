@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { withReservedLegacyDynamicImportName } from '../../src/build/build-variants.mjs';
 import { needsCoreJsPolyfill } from '../../src/build/rollup-plugins/corejs-polyfill.mjs';
@@ -43,4 +46,20 @@ test('keeps Babel syntax lowering for modern target profiles', () => {
   const plugins = legacyBlazorPlugins({ chrome: '80' });
 
   assert.deepEqual(plugins.map(plugin => plugin.name), ['babel']);
+});
+
+test('legacy dynamic-import helper rejects asynchronously so await try/catch can handle it', async () => {
+  const helperPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    'src',
+    'build',
+    'polyfills',
+    'dynamic-import-helper.js',
+  );
+  const helperSource = await readFile(helperPath, 'utf8');
+
+  assert.match(helperSource, /Promise\.reject/u);
+  assert.doesNotMatch(helperSource, /catch\s*\([^)]*\)\s*\{\s*throw new Error/u);
 });

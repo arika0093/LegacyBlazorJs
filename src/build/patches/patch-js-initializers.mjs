@@ -5,10 +5,17 @@ import process from 'node:process';
 // Upstream loads every JS initializer (including the dev-only
 // dotnet-watch Hot Reload module) via `await import(...)` with no error
 // handling. The legacy build rewrites dynamic imports to
-// `__legacyDynamicImport`, which always throws in old browsers, so the
+// `__legacyDynamicImport`, which always fails in old browsers, so the
 // Hot Reload initializer rejects `Promise.all` and prevents Blazor from
 // attaching event handlers. Hot Reload is dev-only and must be skipped in
 // legacy browsers instead of breaking startup.
+//
+// The skip is done BOTH before the import and in a catch handler: the
+// pre-import check is load-bearing because Babel lowers `await` to a
+// regenerator state machine where a *synchronous* throw of the import
+// helper is evaluated outside the `try` range, so only async rejections
+// reach `catch`. (The helper returns a rejected promise, but belt and
+// suspenders avoids depending on that.)
 const PATCH_MARKER = 'LegacyBlazorJs: skip legacy-unsupported Hot Reload initializer.';
 
 const INITIALIZER_IMPORT_PATTERN =
@@ -29,8 +36,11 @@ export function applyJsInitializersPatch(source) {
   if (INITIALIZER_IMPORT_PATTERN.test(source)) {
     const replacement = `if (!asset.moduleExports) {
         adjustedPath = adjustPath(asset.name!);
-        try {
+        if (/DotNetWatch|hot[-_]?reload/i.test(adjustedPath || (asset && asset.name) || '')) {
           // ${PATCH_MARKER}
+          return;
+        }
+        try {
           asset.moduleExports = await import(/* webpackIgnore: true */ adjustedPath);
         } catch (e) {
           if (/DotNetWatch|hot[-_]?reload/i.test(adjustedPath || (asset && asset.name) || '')) {
@@ -45,9 +55,12 @@ export function applyJsInitializersPatch(source) {
 
   if (LEGACY_V9_IMPORT_PATTERN.test(source)) {
     const replacement = `const adjustedPath = adjustPath(path);
+      if (/DotNetWatch|hot[-_]?reload/i.test(adjustedPath || path || '')) {
+        // ${PATCH_MARKER}
+        return;
+      }
       let initializer;
       try {
-        // ${PATCH_MARKER}
         initializer = await import(/* webpackIgnore: true */ adjustedPath)$1;
       } catch (e) {
         if (/DotNetWatch|hot[-_]?reload/i.test(adjustedPath || path || '')) {

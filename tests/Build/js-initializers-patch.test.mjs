@@ -18,6 +18,12 @@ test('skips Hot Reload initializer imports that legacy browsers cannot load', ()
   assert.match(code, /LegacyBlazorJs: skip legacy-unsupported Hot Reload initializer\./u);
   assert.match(code, /DotNetWatch\|hot\[-_\]\?reload/u);
   assert.match(code, /try \{/u);
+  // Pre-import guard: a synchronous helper throw escapes Babel's regenerator
+  // try-range, so the DotNetWatch check must also run before the import.
+  assert.match(
+    code,
+    /if \(\/DotNetWatch\|hot\[-_\]\?reload\/i\.test\(adjustedPath[\s\S]*?\)\) \{\s*\/\/ LegacyBlazorJs: skip legacy-unsupported Hot Reload initializer\.\s*return;\s*\}\s*try \{/u,
+  );
 });
 
 test('patch is idempotent', () => {
@@ -51,6 +57,10 @@ test('skips Hot Reload imports in the .NET 9 initializer shape', () => {
   assert.match(code, /LegacyBlazorJs: skip legacy-unsupported Hot Reload initializer\./u);
   assert.match(code, /let initializer;/u);
   assert.match(code, /DotNetWatch\|hot\[-_\]\?reload/u);
+  assert.match(
+    code,
+    /if \(\/DotNetWatch\|hot\[-_\]\?reload\/i\.test\(adjustedPath[\s\S]*?\)\) \{\s*\/\/ LegacyBlazorJs: skip legacy-unsupported Hot Reload initializer\.\s*return;\s*\}/u,
+  );
 
   const second = applyJsInitializersPatch(code);
   assert.equal(second.applied, false);
