@@ -151,11 +151,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Trigger | Message |
 |--------|--------|------|----------|---------|
+| ❌ | [#51](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39808362048) | 2026-10-22 | 🔧 Manual | Error in test-compat (net9, 9, stable, v9.0.21, 9.0.21, 9.0.21.86, es5) / test-compat |
 | ❌ | [#49](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39453983542) | 2026-10-20 | 🔧 Manual | Error in test-compat (current, 10, stable, v10.0.13, 10.0.13, 10.0.13.85, es2015) / test-compat |
 | 🚫 | [#48](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39446859445) | 2026-10-20 | 🔧 Manual | Error in test-compat (net9, 9, stable, v9.0.21, 9.0.21, 9.0.21.84, es2015) / test-compat |
-| ✅ | [#47](https://github.com/arika0093/LegacyBlazorJs/actions/runs/38495453313) | 2026-10-14 | 📅 Scheduled | No updates |
-| ✅ | [#46](https://github.com/arika0093/LegacyBlazorJs/actions/runs/37542885534) | 2026-10-06 | 📅 Scheduled | No updates |
-| ✅ | [#45](https://github.com/arika0093/LegacyBlazorJs/actions/runs/36641641345) | 2026-09-29 | 📅 Scheduled | No updates |
+| ✅ | [#38](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31848128345) | 2026-08-14 | 🔧 Manual | No updates |
+| ❌ | [#37](https://github.com/arika0093/LegacyBlazorJs/actions/runs/31846656269) | 2026-08-14 | 🔧 Manual | Error in build-all (current, 10, stable, v10.0.11, 10.0.11, 10.0.11.73, es2020) / build |
 <!-- end:monthly-release-builds -->
 
 ### Weekly main build
