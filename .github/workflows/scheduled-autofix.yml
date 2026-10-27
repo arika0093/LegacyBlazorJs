@@ -157,7 +157,7 @@ jobs:
             exit 1
           fi
 
-          npm i -g opencode-ai
+          npm i -g opencode-ai --allow-scripts=opencode-ai
           opencode --version
 
           if [ "$EVENT_NAME" = "workflow_run" ]; then
