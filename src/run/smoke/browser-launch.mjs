@@ -56,7 +56,7 @@ export function buildBrowserArguments(profileDirectory, remoteDebuggingPort, ver
     }
   }
 
-  if (platform === 'linux') {
+  if (platform === 'linux' || platform === 'win32') {
     argumentsList.push('--no-sandbox');
   }
 
