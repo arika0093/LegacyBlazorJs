@@ -96,6 +96,23 @@ jobs:
           echo "failed_run_id=${FAILED_RUN_ID}" >> "$GITHUB_OUTPUT"
           echo "failed_workflow=${FAILED_WORKFLOW}" >> "$GITHUB_OUTPUT"
           echo "failed_sha=${FAILED_SHA}" >> "$GITHUB_OUTPUT"
+          # Resolve run number / URL / SHA for manual dispatches (the
+          # workflow_run payload is null there, so the caller passes empty).
+          FAILED_RUN_NUMBER=""
+          FAILED_RUN_URL=""
+          if [ -n "$FAILED_RUN_ID" ]; then
+            META="$(gh run view "$FAILED_RUN_ID" --repo "$GITHUB_REPOSITORY" --json number,url,headSha 2>/dev/null || true)"
+            if [ -n "$META" ]; then
+              FAILED_RUN_NUMBER="$(printf '%s' "$META" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).number??'')}catch{}})")"
+              FAILED_RUN_URL="$(printf '%s' "$META" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).url??'')}catch{}})")"
+              if [ -z "$FAILED_SHA" ]; then
+                FAILED_SHA="$(printf '%s' "$META" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).headSha??'')}catch{}})")"
+                echo "failed_sha=${FAILED_SHA}" >> "$GITHUB_OUTPUT"
+              fi
+            fi
+          fi
+          echo "failed_run_number=${FAILED_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "failed_run_url=${FAILED_RUN_URL}" >> "$GITHUB_OUTPUT"
           # Another autofix run already active (excluding this one).
           ACTIVE="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow scheduled-autofix.yml --status in_progress --json databaseId --jq "[.[] | select(.databaseId != ${{ github.run_id }})] | length")"
           if [ "${ACTIVE:-0}" != "0" ]; then
@@ -115,8 +132,10 @@ jobs:
             fi
           fi
           # A real fix already landed on main after the failed commit
-          # (bot README status commits don't count).
-          if [ -n "$FAILED_SHA" ]; then
+          # (bot README status commits don't count). Only applies to
+          # automatic triggers; a manual dispatch explicitly targets the
+          # given run, so always run there.
+          if [ "$EVENT_NAME" = "workflow_run" ] && [ -n "$FAILED_SHA" ]; then
             git fetch origin main --quiet
             AHEAD="$(git rev-list --count "${FAILED_SHA}..origin/main" 2>/dev/null || echo 0)"
             if [ "${AHEAD:-0}" != "0" ]; then
@@ -141,8 +160,8 @@ jobs:
           FAILED_RUN_ID: ${{ steps.guard.outputs.failed_run_id }}
           FAILED_WORKFLOW: ${{ steps.guard.outputs.failed_workflow }}
           FAILED_SHA: ${{ steps.guard.outputs.failed_sha }}
-          FAILED_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
-          FAILED_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          FAILED_RUN_NUMBER: ${{ steps.guard.outputs.failed_run_number || github.event.workflow_run.run_number }}
+          FAILED_RUN_URL: ${{ steps.guard.outputs.failed_run_url || github.event.workflow_run.html_url }}
         run: |
           if [ -z "$OPENCODE_MODEL" ]; then
             echo "::error::Repository variable OPENCODE_MODEL is not set (expected provider/model, e.g. an OpenCode Go model)."
@@ -157,13 +176,27 @@ jobs:
             exit 1
           fi
 
+          # opencode authenticates via ~/.local/share/opencode/auth.json
+          # (created by `/connect` interactively). The secret alone is NOT
+          # picked up, so `opencode run` fails with an opaque UnknownError
+          # unless we materialize the file headlessly here.
+          mkdir -p ~/.local/share/opencode
+          OPENCODE_GO_API_KEY="$OPENCODE_GO_API_KEY" node -e "const fs=require('fs'),path=require('path'),os=require('os');const f=path.join(os.homedir(),'.local','share','opencode','auth.json');let cur={};try{cur=JSON.parse(fs.readFileSync(f,'utf8'))}catch{}cur['opencode-go']={type:'api',key:process.env.OPENCODE_GO_API_KEY};fs.writeFileSync(f,JSON.stringify(cur),{mode:0o600});"
+          chmod 600 ~/.local/share/opencode/auth.json
+          echo "opencode auth configured for provider: $(node -e "try{console.log(Object.keys(JSON.parse(require('fs').readFileSync(require('path').join(require('os').homedir(),'.local','share','opencode','auth.json'),'utf8')))}catch(e){console.log('<unreadable>')}")"
+
+          # Ensure commits (including opencode's) have an identity and push
+          # to the right repo even if the agent forgets to configure git.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
           npm i -g opencode-ai --allow-scripts=opencode-ai
           opencode --version
 
           if [ "$EVENT_NAME" = "workflow_run" ]; then
-            TRIGGER_LINE="Scheduled CI failure in arika0093/LegacyBlazorJs (automatic trigger)."
+            TRIGGER_LINE="Scheduled CI failure in ${GITHUB_REPOSITORY} (automatic trigger)."
           else
-            TRIGGER_LINE="Manually requested autofix in arika0093/LegacyBlazorJs (workflow_dispatch)."
+            TRIGGER_LINE="Manually requested autofix in ${GITHUB_REPOSITORY} (workflow_dispatch)."
           fi
 
           PROMPT="$(cat <<PROMPT_EOF
@@ -174,7 +207,7 @@ jobs:
           - Run ID: ${FAILED_RUN_ID} / Number: ${FAILED_RUN_NUMBER} / SHA: ${FAILED_SHA}
           - URL: ${FAILED_RUN_URL}
 
-          1. Identify the cause: \`gh run view ${FAILED_RUN_ID} --repo arika0093/LegacyBlazorJs --log-failed\`, then inspect the repo.
+          1. Identify the cause: \`gh run view ${FAILED_RUN_ID} --repo ${GITHUB_REPOSITORY} --log-failed\`, then inspect the repo.
           2. Fix the root cause (minimal diff) and push DIRECTLY to \`main\`: commit as \`github-actions[bot]\` with message \`fix: auto-fix <workflow> scheduled failure (<run number>)\`, then \`git push origin HEAD:main\` (\`pull --rebase\` and retry once on reject). NEVER publish (\`gh release\`, \`dotnet nuget push\`), NEVER push tags, NEVER edit bot-managed README tables or \`release/*\` branches.
           3. Repeat 1-2 until the cause is resolved (max ~3 attempts, verify with the cheapest relevant local checks). If it is flaky infra with no repo change needed, push nothing.
 
@@ -182,4 +215,4 @@ jobs:
           PROMPT_EOF
           )"
 
-          opencode run --auto --model "$OPENCODE_MODEL" "$PROMPT"
+          opencode run --print-logs --auto --model "$OPENCODE_MODEL" "$PROMPT"
