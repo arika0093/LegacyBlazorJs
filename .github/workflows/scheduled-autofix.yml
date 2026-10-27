@@ -183,7 +183,7 @@ jobs:
           mkdir -p ~/.local/share/opencode
           OPENCODE_GO_API_KEY="$OPENCODE_GO_API_KEY" node -e "const fs=require('fs'),path=require('path'),os=require('os');const f=path.join(os.homedir(),'.local','share','opencode','auth.json');let cur={};try{cur=JSON.parse(fs.readFileSync(f,'utf8'))}catch{}cur['opencode-go']={type:'api',key:process.env.OPENCODE_GO_API_KEY};fs.writeFileSync(f,JSON.stringify(cur),{mode:0o600});"
           chmod 600 ~/.local/share/opencode/auth.json
-          echo "opencode auth configured for provider: $(node -e "try{console.log(Object.keys(JSON.parse(require('fs').readFileSync(require('path').join(require('os').homedir(),'.local','share','opencode','auth.json'),'utf8')))}catch(e){console.log('<unreadable>')}")"
+          node -e 'const fs=require("fs"),path=require("path"),os=require("os");try{console.log("opencode auth configured for providers: "+Object.keys(JSON.parse(fs.readFileSync(path.join(os.homedir(),".local","share","opencode","auth.json"),"utf8"))).join(","))}catch(e){console.log("opencode auth file unreadable");process.exit(1)}'
 
           # Ensure commits (including opencode's) have an identity and push
           # to the right repo even if the agent forgets to configure git.
