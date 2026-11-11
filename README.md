@@ -151,11 +151,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Trigger | Message |
 |--------|--------|------|----------|---------|
+| ✅ | [#55](https://github.com/arika0093/LegacyBlazorJs/actions/runs/42944811491) | 2026-11-11 | 🔧 Manual | No updates |
+| ✅ | [#54](https://github.com/arika0093/LegacyBlazorJs/actions/runs/42944734424) | 2026-11-11 | 📅 Scheduled | [10.0.15.89 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.15.89), [11.0.0-rc.3.26522.148.89 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-rc.3.26522.148.89), [9.0.23.89 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.23.89) |
 | ✅ | [#53](https://github.com/arika0093/LegacyBlazorJs/actions/runs/41733867139) | 2026-11-03 | 📅 Scheduled | No updates |
 | ✅ | [#52](https://github.com/arika0093/LegacyBlazorJs/actions/runs/40616673429) | 2026-10-28 | 📅 Scheduled | [10.0.13.86 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.13.86), [11.0.0-rc.2.26504.105.86 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-rc.2.26504.105.86), [9.0.21.86 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.21.86) |
 | ❌ | [#51](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39808362048) | 2026-10-22 | 🔧 Manual | Error |
-| ✅ | [#50](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39524385914) | 2026-10-21 | 📅 Scheduled | No updates |
-| ❌ | [#49](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39453983542) | 2026-10-20 | 🔧 Manual | Error in test-compat (current, 10, stable, v10.0.13, 10.0.13, 10.0.13.85, es2015) / test-compat |
 <!-- end:monthly-release-builds -->
 
 ### Weekly main build
