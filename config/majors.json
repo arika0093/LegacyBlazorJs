@@ -1,17 +1,13 @@
 {
-  "defaultBuildChannels": ["net9", "current", "preview"],
+  "defaultBuildChannels": ["net10", "current"],
   "channels": {
-    "net9": {
-      "major": 9,
-      "prereleaseMode": "stable"
-    },
-    "current": {
+    "net10": {
       "major": 10,
       "prereleaseMode": "stable"
     },
-    "preview": {
+    "current": {
       "major": 11,
-      "prereleaseMode": "prerelease"
+      "prereleaseMode": "stable"
     }
   }
 }
