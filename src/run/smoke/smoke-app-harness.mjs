@@ -13,7 +13,7 @@ import { requestText, runChecked } from './process-utils.mjs';
 import { createId, getAvailablePort, removeDirectory } from './shared.mjs';
 
 const SERVER_READY_TIMEOUT_MS = 120_000;
-const DEFAULT_TARGET_FRAMEWORK = 'net10.0';
+const DEFAULT_TARGET_FRAMEWORK = 'net11.0';
 const DEFAULT_GLOBAL_PACKAGES_FOLDER = '.nuget/packages';
 const DEFAULT_WORKSPACE_PACKAGE_SOURCE = '../../artifacts/packages';
 
