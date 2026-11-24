@@ -26,7 +26,7 @@
     "@babel/preset-env": "^7.29.7",
     "@rollup/plugin-babel": "^7.1.0",
     "@rollup/plugin-commonjs": "^29.0.3",
-    "@webcomponents/custom-elements": "^1.6.0",
+    "@webcomponents/custom-elements": "^1.6.1",
     "@webcomponents/template": "^1.5.1",
     "@webcomponents/webcomponentsjs": "^2.8.1",
     "abortcontroller-polyfill": "^1.7.8",
