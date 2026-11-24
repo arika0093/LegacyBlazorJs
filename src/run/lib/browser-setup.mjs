@@ -44,11 +44,12 @@ export async function setupCompatibilityBrowser(browser) {
 
 async function extractArchive(archivePath, destinationDirectory) {
   if (process.platform === 'win32') {
-    await run('powershell', [
-      '-NoProfile',
-      '-Command',
-      `Expand-Archive -LiteralPath ${quotePowerShellString(archivePath)} -DestinationPath ${quotePowerShellString(destinationDirectory)} -Force`,
-    ]);
+    // Windows ships bsdtar, which extracts zip archives without the
+    // Microsoft.PowerShell.Archive module. Invoking `powershell` from a Node
+    // process that inherited PowerShell 7's PSModulePath makes PowerShell 5.1
+    // load the PowerShell 7 archive module, whose ExtractToDirectory overload
+    // does not exist on .NET Framework.
+    await run('tar', ['-xf', archivePath, '-C', destinationDirectory]);
     return;
   }
 
@@ -67,10 +68,6 @@ function run(command, args) {
       }
     });
   });
-}
-
-function quotePowerShellString(value) {
-  return `'${value.replaceAll("'", "''")}'`;
 }
 
 async function findExistingExecutablePath(browser, browserDirectory, preferredRelativePaths = []) {
