@@ -151,11 +151,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:monthly-release-builds -->
 | Result | Run ID | Date | Trigger | Message |
 |--------|--------|------|----------|---------|
+| ✅ | [#57](https://github.com/arika0093/LegacyBlazorJs/actions/runs/44233333701) | 2026-11-18 | 📅 Scheduled | No updates |
 | ✅ | [#56](https://github.com/arika0093/LegacyBlazorJs/actions/runs/42954237606) | 2026-11-11 | 🔧 Manual | [10.0.15.91 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.15.91), [11.0.0.91 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0.91) |
 | ✅ | [#55](https://github.com/arika0093/LegacyBlazorJs/actions/runs/42944811491) | 2026-11-11 | 🔧 Manual | [10.0.15.91 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.15.91), [11.0.0.91 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0.91) |
 | ✅ | [#54](https://github.com/arika0093/LegacyBlazorJs/actions/runs/42944734424) | 2026-11-11 | 📅 Scheduled | [10.0.15.89 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.15.89), [10.0.15.91 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/10.0.15.91), [11.0.0-rc.3.26522.148.89 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0-rc.3.26522.148.89), [11.0.0.91 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/11.0.0.91), [9.0.23.89 released](https://github.com/arika0093/LegacyBlazorJs/releases/tag/9.0.23.89) |
 | ✅ | [#53](https://github.com/arika0093/LegacyBlazorJs/actions/runs/41733867139) | 2026-11-03 | 📅 Scheduled | No updates |
-| ✅ | [#52](https://github.com/arika0093/LegacyBlazorJs/actions/runs/40616673429) | 2026-10-28 | 📅 Scheduled | No updates |
 <!-- end:monthly-release-builds -->
 
 ### Weekly main build
@@ -163,11 +163,11 @@ The profile definitions are in [config/targets.json](config/targets.json).
 <!-- start:weekly-main-build -->
 | Result | Run ID | Date | Message | Upstream main hash |
 |--------|--------|------|---------|--------------------|
+| ❌ | [#205](https://github.com/arika0093/LegacyBlazorJs/actions/runs/45326496365) | 2026-11-24 | Error in smoke-test (es5) / test-compat | [a6110c23](https://github.com/dotnet/aspnetcore/tree/a6110c23) |
 | ❌ | [#202](https://github.com/arika0093/LegacyBlazorJs/actions/runs/44004347786) | 2026-11-17 | Error in resolve-build-metadata | [49147673](https://github.com/dotnet/aspnetcore/tree/49147673) |
 | ✅ | [#196](https://github.com/arika0093/LegacyBlazorJs/actions/runs/42742498629) | 2026-11-10 |  | [eeceb660](https://github.com/dotnet/aspnetcore/tree/eeceb660) |
 | ✅ | [#194](https://github.com/arika0093/LegacyBlazorJs/actions/runs/41513470525) | 2026-11-02 |  | [f570eec7](https://github.com/dotnet/aspnetcore/tree/f570eec7) |
 | ❌ | [#188](https://github.com/arika0093/LegacyBlazorJs/actions/runs/40419216376) | 2026-10-26 | Error in smoke-test (es2015) / test-compat | [12e90ca7](https://github.com/dotnet/aspnetcore/tree/12e90ca7) |
-| ❌ | [#186](https://github.com/arika0093/LegacyBlazorJs/actions/runs/39339249744) | 2026-10-19 | Error in smoke-test (es5) / test-compat | [c7a1c5c9](https://github.com/dotnet/aspnetcore/tree/c7a1c5c9) |
 <!-- end:weekly-main-build -->
 
 ## Note
